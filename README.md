@@ -25,6 +25,9 @@ librerías ASCII de terceros.
 - **Histéresis temporal.** Sin ella la salida hierve: sobre escena estática, el
   30% de los píxeles cambia entre dos frames. Con el default de 0,08 baja a
   0,02%.
+- **Grabación y export.** REC en vivo a ProRes, y render offline desacoplado del
+  reloj donde cada frame de entrada produce exactamente uno de salida. Audio del
+  archivo pasa sin recodificar.
 - **Presets** en JSON, más restauración automática del estado al abrir.
 
 ## Requisitos
@@ -101,8 +104,8 @@ Sources/
 | M3 — atlas dinámico, calibración, charset | ✅ |
 | M4 — DoG + Sobel + glifos direccionales | ✅ |
 | M5 — histéresis temporal, normalización de exposición | ✅ |
-| M6 — grabación con AVAssetWriter (ProRes) | pendiente |
-| M7 — render offline desacoplado del reloj | pendiente |
+| M6 — grabación con AVAssetWriter (ProRes) | ✅ |
+| M7 — render offline desacoplado del reloj | ✅ |
 | M8 — resto de formatos de export, pulido | pendiente |
 
 Fuera de la spec original, agregado sobre la marcha: modo Matrix, player de

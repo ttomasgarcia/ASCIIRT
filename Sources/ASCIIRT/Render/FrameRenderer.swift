@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Metal
 import MetalKit
+import CoreMedia
 import CoreVideo
 import QuartzCore
 import ShaderTypes
@@ -36,9 +37,17 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
     /// entre la cola de Vision y el render.
     var matteProvider: (() -> MTLTexture?)?
 
+    /// Grabacion en modo Live. Se consulta por frame; si esta grabando, el
+    /// mismo command buffer que dibuja el preview escribe tambien al archivo.
+    var writer: VideoWriter?
+
     /// Protege el intercambio de `pendingBuffer` entre la cola de captura y main.
     private let bufferLock = NSLock()
     private var pendingBuffer: CVPixelBuffer?
+    /// PTS del frame pendiente. Se arrastra desde la fuente porque el archivo
+    /// necesita el tiempo real del material, no el momento en que se dibujo.
+    private var pendingTime: CMTime = .zero
+    private var lastTime: CMTime = .zero
     /// Ultimo frame dibujado. Se conserva para poder repintar sin frame nuevo:
     /// el modo Matrix anima por reloj, no por entrada, y con el video en pausa
     /// no llegaria nada que disparara un draw.
@@ -132,8 +141,9 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
 
     // MARK: - Entrada de frames (cola de captura)
 
-    func submit(pixelBuffer: CVPixelBuffer) {
+    func submit(pixelBuffer: CVPixelBuffer, at time: CMTime) {
         bufferLock.lock()
+        pendingTime = time
         // Si ya habia uno esperando, ese frame nunca se va a ver.
         if pendingBuffer != nil { stats.droppedFrames += 1 }
         pendingBuffer = pixelBuffer
@@ -183,8 +193,10 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
     func draw(in view: MTKView) {
         bufferLock.lock()
         let buffer = pendingBuffer ?? lastBuffer
+        if pendingBuffer != nil { lastTime = pendingTime }
         pendingBuffer = nil
         lastBuffer = buffer
+        let frameTime = lastTime
         bufferLock.unlock()
 
         guard let buffer,
@@ -215,9 +227,42 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
             encoder.endEncoding()
 
+            // Grabacion: el resultado se dibuja tambien dentro de un buffer del
+            // pool del writer, en este mismo command buffer. El frame no vuelve
+            // a CPU en ningun momento.
+            var recordedBuffer: CVPixelBuffer?
+            var recordedKeepAlive: CVMetalTexture?
+            if asciiEnabled, let writer, writer.isRecording, let target = writer.dequeuePixelBuffer() {
+                do {
+                    let (targetTexture, targetKeepAlive) = try context.makeTexture(from: target)
+                    let descriptor = MTLRenderPassDescriptor()
+                    descriptor.colorAttachments[0].texture = targetTexture
+                    descriptor.colorAttachments[0].loadAction = .dontCare
+                    descriptor.colorAttachments[0].storeAction = .store
+
+                    if let fileEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) {
+                        fileEncoder.setRenderPipelineState(pipelineState)
+                        fileEncoder.setFragmentTexture(ascii.outputTexture,
+                                                       index: Int(ASCIIRTTextureIndexSource.rawValue))
+                        fileEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+                        fileEncoder.endEncoding()
+                        recordedBuffer = target
+                        recordedKeepAlive = targetKeepAlive
+                    }
+                } catch let error as AppError {
+                    onError?(error)
+                }
+            }
+
             // El CVMetalTexture tiene que sobrevivir a la ejecucion en GPU; la
             // captura en el completion handler es lo que lo mantiene vivo.
-            commandBuffer.addCompletedHandler { _ in _ = keepAlive }
+            commandBuffer.addCompletedHandler { [weak self] _ in
+                _ = keepAlive
+                _ = recordedKeepAlive
+                if let recordedBuffer {
+                    self?.writer?.append(recordedBuffer, at: frameTime)
+                }
+            }
             commandBuffer.present(drawable)
             commandBuffer.commit()
 

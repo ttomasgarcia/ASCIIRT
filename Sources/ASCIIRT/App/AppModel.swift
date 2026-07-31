@@ -124,6 +124,21 @@ final class AppModel: ObservableObject {
         didSet { sync() }
     }
 
+    // MARK: - Grabacion (M6)
+
+    @Published var exportCodec: ExportCodec = .proRes422HQ { didSet { autosave() } }
+    @Published private(set) var isRecording = false
+    @Published private(set) var recordStats = VideoWriter.Stats()
+    /// Se muestra una sola vez por sesion (spec §7): repetirla en cada export
+    /// la vuelve ruido y el usuario deja de leerla.
+    @Published var showedH264Warning = false
+
+    // MARK: - Render offline (M7)
+
+    @Published private(set) var isRendering = false
+    @Published private(set) var renderProgress = OfflineRenderer.Progress()
+    @Published private(set) var lastRenderSummary: String?
+
     // MARK: - Presets
 
     @Published private(set) var presetNames: [String] = []
@@ -160,6 +175,8 @@ final class AppModel: ObservableObject {
     private let camera = CameraSource()
     private let file = FileSource()
     private let matte: SubjectMatte
+    private let writer = VideoWriter()
+    private var offline: OfflineRenderer!
     private var openFileObserver: NSObjectProtocol?
 
     /// Mientras se aplica un preset, los didSet no tocan el pipeline: se hace un
@@ -193,6 +210,10 @@ final class AppModel: ObservableObject {
             DispatchQueue.main.async { self?.report(error) }
         }
         renderer.matteProvider = { [weak self] in self?.matte.texture }
+        renderer.writer = writer
+        self.offline = OfflineRenderer(context: context)
+        writer.onStats = { [weak self] stats in self?.recordStats = stats }
+        writer.onError = { [weak self] error in self?.report(error) }
         matte.onError = { [weak self] error in self?.report(error) }
         camera.onExposureLockSupport = { [weak self] supported in
             self?.supportsExposureLock = supported
@@ -370,6 +391,7 @@ final class AppModel: ObservableObject {
         preset.lumaSmoothAlpha = lumaSmoothAlpha
         preset.lumaTarget = lumaTarget
         preset.exposureLocked = exposureLocked
+        preset.exportCodec = exportCodec
         preset.matrixImageMix = matrixImageMix
         preset.matrixBaseLevel = matrixBaseLevel
         preset.matrixSpawnBias = matrixSpawnBias
@@ -413,6 +435,7 @@ final class AppModel: ObservableObject {
         lumaSmoothAlpha = preset.lumaSmoothAlpha
         lumaTarget = preset.lumaTarget
         exposureLocked = preset.exposureLocked
+        exportCodec = preset.exportCodec
         matrixImageMix = preset.matrixImageMix
         matrixBaseLevel = preset.matrixBaseLevel
         matrixSpawnBias = preset.matrixSpawnBias
@@ -562,6 +585,119 @@ final class AppModel: ObservableObject {
         Task { await file.load(url: url) }
     }
 
+    // MARK: - Grabacion
+
+    /// Duracion de la grabacion en curso, en segundos.
+    var recordDuration: Double { recordStats.duration }
+
+    func toggleRecording() {
+        if isRecording {
+            Task { await stopRecording() }
+        } else {
+            startRecording()
+        }
+    }
+
+    private func startRecording() {
+        guard !isRecording else { return }
+        guard isRunning else {
+            report(AppError(.capture, "No hay señal para grabar."))
+            return
+        }
+
+        if exportCodec == .h264 && !showedH264Warning {
+            showedH264Warning = true
+            report(AppError(.capture, "H.264 es el peor caso para material ASCII.",
+                            detail: "Bordes de altísima frecuencia producen ringing que se come los glifos finos. "
+                                  + "El bitrate ya va a ~3x de lo normal, pero para post usá ProRes."))
+        }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "ASCIIRT.\(exportCodec.fileExtension)"
+        panel.allowedContentTypes = exportCodec == .h264 ? [.mpeg4Movie] : [.quickTimeMovie]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try writer.start(url: url,
+                             size: config.outputSize,
+                             codec: exportCodec,
+                             fps: format?.fps ?? 30,
+                             realTime: true)
+            isRecording = true
+        } catch let error as AppError {
+            report(error)
+        } catch {
+            report(AppError(.capture, "No se pudo iniciar la grabación.", underlying: error))
+        }
+    }
+
+    private func stopRecording() async {
+        guard isRecording else { return }
+        isRecording = false
+        switch await writer.finish() {
+        case .success(let url):
+            // Revelar en Finder en vez de un cartel de "listo": lo primero que
+            // uno hace despues de grabar es ir a buscar el archivo.
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        case .failure(let error):
+            report(error)
+        }
+    }
+
+    // MARK: - Render offline
+
+    /// Spec §6: cada frame de entrada produce exactamente uno de salida. Se
+    /// detiene la reproduccion primero — el preview y el render competirian por
+    /// la GPU y por el decodificador del mismo archivo.
+    func startOfflineRender() {
+        guard !isRendering, let source = fileURL else {
+            report(AppError(.capture, "Abrí un archivo de video primero."))
+            return
+        }
+        if isRecording { Task { await stopRecording() } }
+        file.pause()
+
+        if exportCodec == .h264 && !showedH264Warning {
+            showedH264Warning = true
+            report(AppError(.capture, "H.264 es el peor caso para material ASCII.",
+                            detail: "Bordes de altísima frecuencia producen ringing que se come los glifos finos. "
+                                  + "El bitrate ya va a ~3x de lo normal, pero para post usá ProRes."))
+        }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = source.deletingPathExtension().lastPathComponent
+            + "_ascii." + exportCodec.fileExtension
+        panel.allowedContentTypes = exportCodec == .h264 ? [.mpeg4Movie] : [.quickTimeMovie]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        isRendering = true
+        renderProgress = OfflineRenderer.Progress()
+        lastRenderSummary = nil
+
+        offline.render(source: source, destination: destination,
+                       config: config, codec: exportCodec,
+                       onProgress: { [weak self] progress in
+                           self?.renderProgress = progress
+                       },
+                       onFinish: { [weak self] result in
+                           guard let self else { return }
+                           self.isRendering = false
+                           switch result {
+                           case .success(let frames):
+                               self.lastRenderSummary = "\(frames) frames escritos"
+                               NSWorkspace.shared.activateFileViewerSelecting([destination])
+                           case .failure(let error):
+                               self.report(error)
+                           }
+                       })
+    }
+
+    func cancelOfflineRender() {
+        offline.cancel()
+    }
+
     // MARK: - Transporte
 
     func togglePlayback() { file.togglePlayback() }
@@ -608,7 +744,7 @@ extension AppModel: FrameSourceDelegate {
     func frameSource(_ source: FrameSource, didOutput pixelBuffer: CVPixelBuffer, at time: CMTime) {
         // Vision corre en su propia cola y descarta lo que no llega a procesar.
         matte.submit(pixelBuffer)
-        renderer.submit(pixelBuffer: pixelBuffer)
+        renderer.submit(pixelBuffer: pixelBuffer, at: time)
     }
 
     func frameSource(_ source: FrameSource, didChangeFormat description: FormatDescription) {

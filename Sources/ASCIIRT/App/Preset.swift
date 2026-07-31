@@ -43,6 +43,9 @@ struct Preset: Codable, Equatable {
     var lumaSmoothAlpha: Double = 0.05
     var lumaTarget: Double = 0.5
     var exposureLocked: Bool = false
+
+    // Export
+    var exportCodec: ExportCodec = .proRes422HQ
     var matrixImageMix: Double = 0.75
 
     var matrixBaseLevel: Double = 0.30
@@ -94,6 +97,7 @@ struct Preset: Codable, Equatable {
         lumaSmoothAlpha = c.value(.lumaSmoothAlpha, d.lumaSmoothAlpha)
         lumaTarget = c.value(.lumaTarget, d.lumaTarget)
         exposureLocked = c.value(.exposureLocked, d.exposureLocked)
+        exportCodec = c.value(.exportCodec, d.exportCodec)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)
 
         matrixBaseLevel = c.value(.matrixBaseLevel, d.matrixBaseLevel)

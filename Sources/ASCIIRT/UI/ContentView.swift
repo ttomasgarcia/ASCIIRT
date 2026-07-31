@@ -5,6 +5,7 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @State private var showControls = true
     @State private var isDropTargeted = false
+    @State private var recordPulse = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -22,6 +23,17 @@ struct ContentView: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    model.toggleRecording()
+                } label: {
+                    Label(model.isRecording ? "Detener" : "REC",
+                          systemImage: model.isRecording ? "stop.fill" : "record.circle")
+                }
+                .tint(model.isRecording ? .red : nil)
+                .help(model.isRecording ? "Detener y guardar" : "Grabar a archivo")
+                .disabled(!model.isRunning)
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) { showControls.toggle() }
@@ -72,6 +84,8 @@ struct ContentView: View {
         // Los numeros de salud van sobre el preview y no en el panel: se miran
         // mientras se mira la imagen, no mientras se tocan parametros.
         .overlay(alignment: .topTrailing) { hud }
+        .overlay(alignment: .topLeading) { recordBadge }
+        .overlay { renderOverlay }
         .overlay(alignment: .bottom) { ErrorBanner(model: model) }
     }
 
@@ -91,6 +105,69 @@ struct ContentView: View {
         .background(.ultraThinMaterial, in: Capsule())
         .padding(10)
         .opacity(model.isRunning ? 1 : 0)
+    }
+
+    /// Estado de grabacion sobre la imagen: mientras se graba, el usuario mira
+    /// el preview, no el panel.
+    @ViewBuilder private var recordBadge: some View {
+        if model.isRecording {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 8, height: 8)
+                    // Parpadeo: un punto rojo fijo se confunde con un adorno.
+                    .opacity(recordPulse ? 1 : 0.25)
+                    .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: recordPulse)
+                Text(timecode(model.recordDuration))
+                    .monospacedDigit()
+                Text("\(model.recordStats.framesWritten)f")
+                    .foregroundStyle(.secondary)
+                if model.recordStats.framesDropped > 0 {
+                    // Spec §7: los frames dropeados durante la grabacion tienen
+                    // que verse, no quedar en un log.
+                    Label("\(model.recordStats.framesDropped)", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
+            .font(.system(size: 10, design: .monospaced))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(.ultraThinMaterial, in: Capsule())
+            .padding(10)
+            .onAppear { recordPulse = true }
+            .onDisappear { recordPulse = false }
+        }
+    }
+
+    /// El render offline tapa el preview a proposito: mientras corre, la
+    /// reproduccion esta detenida y no hay nada que mirar debajo.
+    @ViewBuilder private var renderOverlay: some View {
+        if model.isRendering {
+            ZStack {
+                Color.black.opacity(0.72)
+                VStack(spacing: 14) {
+                    Text("Render offline")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    ProgressView(value: model.renderProgress.fraction)
+                        .frame(width: 260)
+                    Text("\(model.renderProgress.framesDone) / \(model.renderProgress.framesTotal) frames")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    Button("Cancelar") { model.cancelOfflineRender() }
+                        .controlSize(.small)
+                }
+                .padding(24)
+                .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 10))
+            }
+            .allowsHitTesting(true)
+        }
+    }
+
+    private func timecode(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds >= 0 else { return "00:00" }
+        let total = Int(seconds)
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 
     private var placeholder: String {
@@ -209,6 +286,7 @@ private struct ControlPanel: View {
     @State private var showSource = true
     @State private var showGrid = true
     @State private var showCharset = false
+    @State private var showExport = false
     @State private var showEdges = true
     @State private var showTemporal = false
     @State private var showMatrix = true
@@ -231,6 +309,10 @@ private struct ControlPanel: View {
                 Divider()
                 PanelSection(title: "Charset", systemImage: "textformat", isExpanded: $showCharset) {
                     charsetContent
+                }
+                Divider()
+                PanelSection(title: "Export", systemImage: "square.and.arrow.down", isExpanded: $showExport) {
+                    exportContent
                 }
                 Divider()
                 PanelSection(title: "Bordes", systemImage: "scribble", isExpanded: $showEdges) {
@@ -443,6 +525,48 @@ private struct ControlPanel: View {
                 Text("Cobertura calibrada")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: Export
+
+    private var exportContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            Picker("", selection: $model.exportCodec) {
+                ForEach(ExportCodec.allCases) { codec in Text(codec.rawValue).tag(codec) }
+            }
+            .labelsHidden()
+            .controlSize(.small)
+            .disabled(model.isRecording)
+
+            Text(model.exportCodec == .h264
+                 ? "Bitrate a ~3× de lo normal: el ASCII es el peor caso para un codec de transformada."
+                 : "ProRes: sin pérdida perceptible, pesado. Es lo que va a post.")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if model.isRecording {
+                ParamReadout(label: "Escritos", value: "\(model.recordStats.framesWritten)")
+                ParamReadout(label: "Perdidos", value: "\(model.recordStats.framesDropped)")
+            }
+
+            Divider().padding(.vertical, 2)
+            PanelGroupLabel(text: "Render offline")
+            Text("Desacoplado del reloj: cada frame de entrada produce uno de salida.")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Renderizar archivo…") { model.startOfflineRender() }
+                .controlSize(.small)
+                .disabled(model.fileURL == nil || model.isRendering)
+
+            if let summary = model.lastRenderSummary {
+                Label(summary, systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.green)
             }
         }
     }

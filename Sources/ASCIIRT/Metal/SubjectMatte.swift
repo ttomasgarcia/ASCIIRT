@@ -55,6 +55,26 @@ final class SubjectMatte {
         return latestTexture
     }
 
+    /// Version bloqueante para el render offline.
+    ///
+    /// En Live se descarta lo que no se llega a procesar porque hay un reloj que
+    /// respetar. Offline no lo hay, y saltear frames haria que el export no
+    /// coincida con lo que el usuario vio en el preview — que para una
+    /// herramienta de este tipo es un error, no una optimizacion.
+    func process(_ pixelBuffer: CVPixelBuffer) -> MTLTexture? {
+        do {
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+            try handler.perform([request])
+            guard let mask = request.results?.first?.pixelBuffer else { return nil }
+            return try upload(mask)
+        } catch {
+            DispatchQueue.main.async {
+                self.onError?(AppError(.capture, "Vision no pudo segmentar el sujeto.", underlying: error))
+            }
+            return nil
+        }
+    }
+
     func submit(_ pixelBuffer: CVPixelBuffer) {
         guard isEnabled else { return }
 

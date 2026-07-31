@@ -124,6 +124,11 @@ final class ASCIIPipeline {
     /// que el tiempo no dependa de cuando arranco la app.
     private let startTime = CACurrentMediaTime()
 
+    /// Tiempo forzado, en segundos. El modo offline lo deriva del indice de
+    /// frame: si usara el reloj de pared, dos corridas del mismo archivo darian
+    /// lluvias distintas y el render dejaria de ser reproducible.
+    var timeOverride: Float?
+
     init(context: MetalContext, config: PipelineConfig) throws {
         self.context = context
         self.config = config
@@ -331,7 +336,7 @@ final class ASCIIPipeline {
                             tileSize: config.tileSize,
                             rampLength: UInt32(atlas.rampLength),
                             matrixEnabled: config.matrixEnabled ? 1 : 0,
-                            time: Float(CACurrentMediaTime() - startTime),
+                            time: timeOverride ?? Float(CACurrentMediaTime() - startTime),
                             matrixSpeed: config.matrixSpeed,
                             matrixTrail: config.matrixTrail,
                             matrixChurn: config.matrixChurn,
