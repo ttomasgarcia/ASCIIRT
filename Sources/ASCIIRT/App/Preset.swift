@@ -1,0 +1,182 @@
+import AppKit
+import Foundation
+
+/// Set completo de parametros como JSON (spec §8).
+///
+/// Es un DTO plano y no el `PipelineConfig` serializado a proposito: el config
+/// tiene tipos que no sobreviven bien a JSON (`Set<Character>`, `FontSelection`)
+/// y, sobre todo, un preset guardado hoy tiene que abrir en una version futura
+/// que agrego parametros. Por eso todo campo faltante cae en su default en vez
+/// de hacer fallar la decodificacion entera.
+struct Preset: Codable, Equatable {
+    var name: String = "Sin nombre"
+
+    // Grid
+    var tileWidth: Int = 8
+    var aspectFollowsFont: Bool = true
+    var cellAspect: Double = 2.0
+    var asciiEnabled: Bool = true
+
+    // Charset
+    var charset: String = PipelineConfig.defaultCharset
+    var excluded: String = ""
+    var fontSystemName: String? = "Menlo-Regular"
+    var fontPath: String?
+
+    // Matrix
+    var matrixEnabled: Bool = false
+    var matrixSpeed: Double = 14
+    var matrixTrail: Double = 18
+    var matrixChurn: Double = 12
+    var matrixDensity: Double = 1
+    var matrixImageMix: Double = 0.75
+
+    var matrixBaseLevel: Double = 0.30
+
+    var matrixSpawnBias: Double = 0
+    var matrixSpawnStrength: Double = 0.6
+
+    var matrixRelief: Double = 10
+    var reliefRadius: Double = 5
+    var subjectMatteEnabled: Bool = false
+    var matteWeight: Double = 0.6
+
+    var matrixHeadTintEnabled: Bool = false
+    var matrixHeadCells: Double = 3
+    var headColor: [Double] = [1.0, 0.10, 0.10]
+
+    init() {}
+
+    /// Decodificacion tolerante: lo que falte toma el default.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Preset()
+
+        name = c.value(.name, d.name)
+        tileWidth = c.value(.tileWidth, d.tileWidth)
+        aspectFollowsFont = c.value(.aspectFollowsFont, d.aspectFollowsFont)
+        cellAspect = c.value(.cellAspect, d.cellAspect)
+        asciiEnabled = c.value(.asciiEnabled, d.asciiEnabled)
+
+        charset = c.value(.charset, d.charset)
+        excluded = c.value(.excluded, d.excluded)
+        fontSystemName = c.value(.fontSystemName, d.fontSystemName)
+        fontPath = c.value(.fontPath, d.fontPath)
+
+        matrixEnabled = c.value(.matrixEnabled, d.matrixEnabled)
+        matrixSpeed = c.value(.matrixSpeed, d.matrixSpeed)
+        matrixTrail = c.value(.matrixTrail, d.matrixTrail)
+        matrixChurn = c.value(.matrixChurn, d.matrixChurn)
+        matrixDensity = c.value(.matrixDensity, d.matrixDensity)
+        matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)
+
+        matrixBaseLevel = c.value(.matrixBaseLevel, d.matrixBaseLevel)
+
+        matrixSpawnBias = c.value(.matrixSpawnBias, d.matrixSpawnBias)
+        matrixSpawnStrength = c.value(.matrixSpawnStrength, d.matrixSpawnStrength)
+
+        matrixRelief = c.value(.matrixRelief, d.matrixRelief)
+        reliefRadius = c.value(.reliefRadius, d.reliefRadius)
+        subjectMatteEnabled = c.value(.subjectMatteEnabled, d.subjectMatteEnabled)
+        matteWeight = c.value(.matteWeight, d.matteWeight)
+
+        matrixHeadTintEnabled = c.value(.matrixHeadTintEnabled, d.matrixHeadTintEnabled)
+        matrixHeadCells = c.value(.matrixHeadCells, d.matrixHeadCells)
+        headColor = c.value(.headColor, d.headColor)
+    }
+
+    var font: FontSelection {
+        if let fontPath { return .file(url: URL(fileURLWithPath: fontPath)) }
+        return .system(name: fontSystemName ?? "Menlo-Regular")
+    }
+
+    mutating func setFont(_ selection: FontSelection) {
+        switch selection {
+        case .system(let name):
+            fontSystemName = name
+            fontPath = nil
+        case .file(let url):
+            fontSystemName = nil
+            fontPath = url.path
+        }
+    }
+}
+
+private extension KeyedDecodingContainer {
+    /// `decodeIfPresent` con default y sin propagar el error: un campo con tipo
+    /// cambiado no debe invalidar el preset entero.
+    func value<T: Decodable>(_ key: Key, _ fallback: T) -> T {
+        ((try? decodeIfPresent(T.self, forKey: key)) ?? nil) ?? fallback
+    }
+}
+
+/// Presets en disco, en una carpeta que el usuario puede abrir en Finder
+/// (spec §8). Un archivo JSON por preset, mas el estado de la ultima sesion.
+enum PresetStore {
+
+    static var folder: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("ASCIIRT/Presets", isDirectory: true)
+    }
+
+    /// Estado que se restaura al abrir. Va fuera de la carpeta de presets para
+    /// que no aparezca como uno mas en la lista.
+    static var lastSessionURL: URL {
+        folder.deletingLastPathComponent().appendingPathComponent("last-session.json")
+    }
+
+    static func ensureFolder() throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    }
+
+    static func list() -> [String] {
+        guard let entries = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else {
+            return []
+        }
+        return entries
+            .filter { $0.pathExtension == "json" }
+            .map { $0.deletingPathExtension().lastPathComponent }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    static func url(for name: String) -> URL {
+        // Los separadores de ruta en un nombre escribirian fuera de la carpeta.
+        let safe = name.replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        return folder.appendingPathComponent("\(safe).json")
+    }
+
+    static func save(_ preset: Preset, to url: URL) throws {
+        try ensureFolder()
+        let encoder = JSONEncoder()
+        // Legible y con orden estable: un preset es un archivo que el usuario
+        // puede abrir, versionar o mandar por mail.
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do {
+            try encoder.encode(preset).write(to: url, options: .atomic)
+        } catch {
+            throw AppError(.capture, "No se pudo guardar el preset.", underlying: error)
+        }
+    }
+
+    static func load(from url: URL) throws -> Preset {
+        do {
+            return try JSONDecoder().decode(Preset.self, from: Data(contentsOf: url))
+        } catch {
+            throw AppError(.capture, "No se pudo leer «\(url.lastPathComponent)».", underlying: error)
+        }
+    }
+
+    static func delete(named name: String) throws {
+        do {
+            try FileManager.default.removeItem(at: url(for: name))
+        } catch {
+            throw AppError(.capture, "No se pudo borrar «\(name)».", underlying: error)
+        }
+    }
+
+    static func revealInFinder() {
+        try? ensureFolder()
+        NSWorkspace.shared.activateFileViewerSelecting([folder])
+    }
+}

@@ -1,0 +1,10 @@
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Bundle armado por Scripts/build.sh
+build/
+
+# macOS
+.DS_Store
