@@ -48,6 +48,17 @@ struct PipelineConfig: Equatable {
     var lumaSmoothAlpha: Float = 0.05
     var lumaTarget: Float = 0.5
 
+    // MARK: Color (M8)
+    var colorMode: UInt32 = 0
+    var invert = false
+    var transparentBackground = false
+    var foreground: SIMD3<Float> = SIMD3(1, 1, 1)
+    var background: SIMD3<Float> = SIMD3(0, 0, 0)
+
+    // MARK: Salida
+    /// En `true` la resolucion de salida sigue a la de la fuente.
+    var outputFollowsSource = true
+
     /// Default de spec §2. Se recalibra siempre; este orden no se asume.
     static let defaultCharset = #" .'`^",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"#
 
@@ -96,6 +107,8 @@ final class ASCIIPipeline {
     private var heightTexture: MTLTexture
     private var spawnTexture: MTLTexture
     private var lumaRawTexture: MTLTexture
+    private var colorTexture: MTLTexture
+    private var gridColorTexture: MTLTexture
     private var dogTempTexture: MTLTexture
     private var dogTexture: MTLTexture
     private var sobelTexture: MTLTexture
@@ -152,6 +165,7 @@ final class ASCIIPipeline {
             (textures.luma, textures.grid, textures.heightTemp, textures.height, textures.spawn, textures.output)
         (lumaRawTexture, dogTempTexture, dogTexture, sobelTexture, edgeTexture, glyphTextures) =
             (textures.lumaRaw, textures.dogTemp, textures.dog, textures.sobel, textures.edge, textures.glyphs)
+        (colorTexture, gridColorTexture) = (textures.color, textures.gridColor)
         self.matteFallback = try ASCIIPipeline.makeFallbackMatte(context)
 
         var initialAverage: Float = 0.5
@@ -186,6 +200,7 @@ final class ASCIIPipeline {
                 (textures.luma, textures.grid, textures.heightTemp, textures.height, textures.spawn, textures.output)
             (lumaRawTexture, dogTempTexture, dogTexture, sobelTexture, edgeTexture, glyphTextures) =
                 (textures.lumaRaw, textures.dogTemp, textures.dog, textures.sobel, textures.edge, textures.glyphs)
+            (colorTexture, gridColorTexture) = (textures.color, textures.gridColor)
         }
         if atlasChanged {
             atlas = try FontAtlasBuilder.build(device: context.device,
@@ -223,6 +238,7 @@ final class ASCIIPipeline {
         encoder.setComputePipelineState(lumaPSO)
         encoder.setTexture(source, index: Int(ASCIIRTTextureIndexSource.rawValue))
         encoder.setTexture(lumaRawTexture, index: Int(ASCIIRTTextureIndexLumaRaw.rawValue))
+        encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: lumaPSO))
 
         // [2] Normalizacion de exposicion. Consume la media del frame anterior.
@@ -233,6 +249,7 @@ final class ASCIIPipeline {
         // [3] Downscale a grid
         encoder.setComputePipelineState(downscalePSO)
         encoder.setTexture(gridTexture, index: Int(ASCIIRTTextureIndexGrid.rawValue))
+        encoder.setTexture(gridColorTexture, index: Int(ASCIIRTTextureIndexGridColor.rawValue))
         encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: downscalePSO))
 
         // [4][5][6] Bordes. Solo si estan activos: son las tres etapas mas caras
@@ -294,6 +311,7 @@ final class ASCIIPipeline {
         encoder.setTexture(spawnTexture, index: Int(ASCIIRTTextureIndexSpawn.rawValue))
         encoder.setTexture(atlas.edgeTexture, index: Int(ASCIIRTTextureIndexEdgeAtlas.rawValue))
         encoder.setTexture(glyphTextures[glyphIndex], index: Int(ASCIIRTTextureIndexGlyphNext.rawValue))
+        encoder.setTexture(gridColorTexture, index: Int(ASCIIRTTextureIndexGridColor.rawValue))
         encoder.setTexture(outputTexture, index: Int(ASCIIRTTextureIndexOutput.rawValue))
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: asciiThreadgroup())
 
@@ -363,6 +381,15 @@ final class ASCIIPipeline {
                             autoLevelStrength: config.autoLevelStrength,
                             lumaSmoothAlpha: config.lumaSmoothAlpha,
                             lumaTarget: config.lumaTarget,
+                            colorMode: config.colorMode,
+                            invert: config.invert ? 1 : 0,
+                            transparentBackground: config.transparentBackground ? 1 : 0,
+                            foregroundR: config.foreground.x,
+                            foregroundG: config.foreground.y,
+                            foregroundB: config.foreground.z,
+                            backgroundR: config.background.x,
+                            backgroundG: config.background.y,
+                            backgroundB: config.background.z,
                             _pad0: 0)
     }
 
@@ -417,7 +444,7 @@ final class ASCIIPipeline {
     }
 
     private struct Textures {
-        let luma, lumaRaw, grid: MTLTexture
+        let luma, lumaRaw, grid, color, gridColor: MTLTexture
         let dogTemp, dog, sobel, edge: MTLTexture
         let glyphs: [MTLTexture]
         let heightTemp, height, spawn, output: MTLTexture
@@ -456,6 +483,8 @@ final class ASCIIPipeline {
         let output = try make(.rgba8Unorm, width, height, "output")
 
         let lumaRaw = try make(.r16Float, width, height, "lumaRaw")
+        let color = try make(.rgba8Unorm, width, height, "color")
+        let gridColor = try make(.rgba8Unorm, Int(grid.x), Int(grid.y), "gridColor")
         let dogTemp = try make(.rg16Float, width, height, "dogTemp")
         let dog = try make(.r16Float, width, height, "dog")
         let sobel = try make(.rg16Float, width, height, "sobel")
@@ -464,7 +493,7 @@ final class ASCIIPipeline {
         // razonable) y una bandera de si vino de un borde.
         let glyphs = try (0..<2).map { try make(.rg8Uint, Int(grid.x), Int(grid.y), "glyph\($0)") }
 
-        return Textures(luma: luma, lumaRaw: lumaRaw, grid: gridTexture,
+        return Textures(luma: luma, lumaRaw: lumaRaw, grid: gridTexture, color: color, gridColor: gridColor,
                         dogTemp: dogTemp, dog: dog, sobel: sobel, edge: edge, glyphs: glyphs,
                         heightTemp: temp, height: heightTexture, spawn: spawn, output: output)
     }

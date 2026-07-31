@@ -286,6 +286,7 @@ private struct ControlPanel: View {
     @State private var showSource = true
     @State private var showGrid = true
     @State private var showCharset = false
+    @State private var showColor = false
     @State private var showExport = false
     @State private var showEdges = true
     @State private var showTemporal = false
@@ -309,6 +310,10 @@ private struct ControlPanel: View {
                 Divider()
                 PanelSection(title: "Charset", systemImage: "textformat", isExpanded: $showCharset) {
                     charsetContent
+                }
+                Divider()
+                PanelSection(title: "Color", systemImage: "paintpalette", isExpanded: $showColor) {
+                    colorContent
                 }
                 Divider()
                 PanelSection(title: "Export", systemImage: "square.and.arrow.down", isExpanded: $showExport) {
@@ -529,10 +534,63 @@ private struct ControlPanel: View {
         }
     }
 
+    // MARK: Color
+
+    private var colorContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            Picker("", selection: $model.colorMode) {
+                ForEach(AppModel.ColorMode.allCases) { mode in Text(mode.label).tag(mode) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+
+            HStack(spacing: 8) {
+                Text(model.colorMode == .original ? "Fondo" : "Tinta")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .frame(width: PanelMetrics.labelWidth, alignment: .leading)
+                if model.colorMode == .original {
+                    ColorPicker("", selection: $model.backgroundColor, supportsOpacity: false)
+                        .labelsHidden()
+                } else {
+                    ColorPicker("", selection: $model.foregroundColor, supportsOpacity: false)
+                        .labelsHidden()
+                    if model.colorMode == .duotone {
+                        Text("Fondo").font(.system(size: 11)).foregroundStyle(.secondary)
+                        ColorPicker("", selection: $model.backgroundColor, supportsOpacity: false)
+                            .labelsHidden()
+                    }
+                }
+                Spacer()
+            }
+
+            ParamToggle(label: "Invertir", isOn: $model.invert,
+                        help: "Cambia quién es tinta y quién es fondo. No es el negativo fotográfico.")
+            ParamToggle(label: "Fondo transparente", isOn: $model.transparentBackground,
+                        help: "Solo lo conserva ProRes 4444 y la secuencia PNG; el resto lo aplasta contra negro.")
+
+            if model.transparentBackground && !model.exportCodec.supportsAlpha {
+                Label("«\(model.exportCodec.rawValue)» no lleva alpha.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
     // MARK: Export
 
     private var exportContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            PanelGroupLabel(text: "Resolución de salida")
+            Picker("", selection: $model.outputPreset) {
+                ForEach(AppModel.OutputPreset.allCases) { preset in Text(preset.rawValue).tag(preset) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+
+            PanelGroupLabel(text: "Formato")
             Picker("", selection: $model.exportCodec) {
                 ForEach(ExportCodec.allCases) { codec in Text(codec.rawValue).tag(codec) }
             }
@@ -540,9 +598,7 @@ private struct ControlPanel: View {
             .controlSize(.small)
             .disabled(model.isRecording)
 
-            Text(model.exportCodec == .h264
-                 ? "Bitrate a ~3× de lo normal: el ASCII es el peor caso para un codec de transformada."
-                 : "ProRes: sin pérdida perceptible, pesado. Es lo que va a post.")
+            Text(exportNote)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -667,6 +723,19 @@ private struct ControlPanel: View {
             }
             .disabled(!model.matrixEnabled)
             .opacity(model.matrixEnabled ? 1 : 0.45)
+        }
+    }
+
+    private var exportNote: String {
+        switch model.exportCodec {
+        case .h264:
+            return "Bitrate a ~3× de lo normal: el ASCII es el peor caso para un codec de transformada."
+        case .pngSequence:
+            return "Sin pérdida y con alpha. Solo en render offline; es el único destino donde el frame vuelve a CPU."
+        case .proRes4444:
+            return "El único formato de video acá que conserva el fondo transparente."
+        case .proRes422HQ:
+            return "Sin pérdida perceptible, pesado. Es lo que va a post."
         }
     }
 

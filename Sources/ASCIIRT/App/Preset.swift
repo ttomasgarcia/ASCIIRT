@@ -46,6 +46,14 @@ struct Preset: Codable, Equatable {
 
     // Export
     var exportCodec: ExportCodec = .proRes422HQ
+
+    // Color y salida
+    var outputPreset: String = "Fuente"
+    var colorMode: UInt32 = 0
+    var invert: Bool = false
+    var transparentBackground: Bool = false
+    var foreground: [Double] = [1, 1, 1]
+    var background: [Double] = [0, 0, 0]
     var matrixImageMix: Double = 0.75
 
     var matrixBaseLevel: Double = 0.30
@@ -98,6 +106,12 @@ struct Preset: Codable, Equatable {
         lumaTarget = c.value(.lumaTarget, d.lumaTarget)
         exposureLocked = c.value(.exposureLocked, d.exposureLocked)
         exportCodec = c.value(.exportCodec, d.exportCodec)
+        outputPreset = c.value(.outputPreset, d.outputPreset)
+        colorMode = c.value(.colorMode, d.colorMode)
+        invert = c.value(.invert, d.invert)
+        transparentBackground = c.value(.transparentBackground, d.transparentBackground)
+        foreground = c.value(.foreground, d.foreground)
+        background = c.value(.background, d.background)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)
 
         matrixBaseLevel = c.value(.matrixBaseLevel, d.matrixBaseLevel)

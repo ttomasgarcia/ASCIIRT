@@ -58,6 +58,8 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexGlyphPrev = 14,///< RG8Uint por tile del frame anterior (histeresis)
     ASCIIRTTextureIndexGlyphNext = 15,///< RG8Uint por tile de este frame
     ASCIIRTTextureIndexEdgeAtlas = 16,///< R8Unorm: los 4 glifos direccionales
+    ASCIIRTTextureIndexColor = 17,    ///< RGBA8 color de la fuente a resolucion de salida
+    ASCIIRTTextureIndexGridColor = 18,///< RGBA8 color medio por tile
 };
 
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
@@ -198,6 +200,23 @@ typedef struct {
     float lumaSmoothAlpha;
     /// Punto medio al que se lleva la luminancia media.
     float lumaTarget;
+
+    // MARK: Color (spec §8)
+
+    /// 0 mono (frente sobre negro), 1 dos colores, 2 color original por tile.
+    uint32_t colorMode;
+    /// Invierte tinta y fondo. Util cuando la salida va sobre papel.
+    uint32_t invert;
+    /// Fondo transparente. Solo tiene sentido exportando a ProRes 4444; en los
+    /// demas formatos el alpha se aplasta contra negro igual.
+    uint32_t transparentBackground;
+
+    float foregroundR;
+    float foregroundG;
+    float foregroundB;
+    float backgroundR;
+    float backgroundG;
+    float backgroundB;
 
     /// Padding explicito para cerrar en multiplo de 8.
     uint32_t _pad0;

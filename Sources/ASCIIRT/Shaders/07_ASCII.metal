@@ -94,6 +94,7 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                         texture2d<float, access::read>  atlas  [[texture(ASCIIRTTextureIndexAtlas)]],
                         texture2d<float, access::read>  edgeAtlas [[texture(ASCIIRTTextureIndexEdgeAtlas)]],
                         texture2d<uint,  access::read>  glyphs [[texture(ASCIIRTTextureIndexGlyphNext)]],
+                        texture2d<float, access::read>  gridColor [[texture(ASCIIRTTextureIndexGridColor)]],
                         texture2d<float, access::read>  height [[texture(ASCIIRTTextureIndexHeight)]],
                         texture2d<float, access::read>  spawn  [[texture(ASCIIRTTextureIndexSpawn)]],
                         texture2d<float, access::write> output [[texture(ASCIIRTTextureIndexOutput)]],
@@ -117,9 +118,28 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     const uint2 decision = glyphs.read(tile).rg;
     uint index = decision.x;
     bool isEdge = decision.y != 0u;
-    float3 color = float3(1.0);
+
+    const float3 foreground = float3(params.foregroundR, params.foregroundG, params.foregroundB);
+    const float3 background = float3(params.backgroundR, params.backgroundG, params.backgroundB);
+
+    // Modos de color (spec §8). El modo 2 usa el promedio del tile, no el pixel:
+    // pintar cada pixel del glifo con su color de origen convertiria el glifo en
+    // una ventana a la imagen y se perderia la lectura tipografica.
+    float3 tint = foreground;
+    float3 backdrop = background;
+    switch (params.colorMode) {
+        case 0u: backdrop = float3(0.0); break;                       // mono
+        case 1u: break;                                               // dos colores
+        default: tint = gridColor.read(tile).rgb; break;              // original por tile
+    }
+
+    // `color` es el multiplicador de la tinta; lo pisa el modo Matrix, que trae
+    // su propia paleta.
+    float3 color = tint;
+    bool matrixOverride = false;
 
     if (params.matrixEnabled != 0u) {
+        matrixOverride = true;
         // El relieve sale del campo de altura (luma difuminada + matte), no de
         // la luma cruda: la luma lleva textura y meteria volumen falso donde
         // solo hay un estampado.
@@ -193,5 +213,16 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     // los ordenaria por cobertura junto con el resto y perderian su indice.
     const float ink = isEdge ? edgeAtlas.read(texel).r : atlas.read(texel).r;
 
-    output.write(float4(color * ink, 1.0), gid);
+    // Invert cambia quien es tinta y quien es fondo, no el color: invertir el
+    // color daria el negativo fotografico, que es otra cosa.
+    const float coverage = params.invert != 0u ? 1.0 - ink : ink;
+
+    // Matrix ya trae su composicion resuelta contra negro; los modos de color
+    // solo aplican fuera de el.
+    const float3 rgb = matrixOverride ? color * coverage : mix(backdrop, color, coverage);
+
+    // Alpha premultiplicado: es lo que espera una pista ProRes 4444. Sin
+    // premultiplicar, los bordes antialiaseados del glifo salen con halo.
+    const float alpha = params.transparentBackground != 0u ? coverage : 1.0;
+    output.write(float4(params.transparentBackground != 0u ? rgb * alpha : rgb, alpha), gid);
 }

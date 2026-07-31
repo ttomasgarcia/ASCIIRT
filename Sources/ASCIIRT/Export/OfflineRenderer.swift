@@ -115,12 +115,26 @@ final class OfflineRenderer {
         let reader = try makeReader(asset: asset, track: videoTrack, transform: transform)
         let videoOutput = reader.outputs[0]
 
-        try writer.start(url: destination,
-                         size: jobConfig.outputSize,
-                         codec: codec,
-                         fps: fps,
-                         realTime: false,
-                         audioFormat: audioTrack.flatMap(formatDescription(of:)))
+        // La secuencia PNG usa el pool de un writer que nunca arranca sesion:
+        // se necesitan los CVPixelBuffer para que la GPU escriba adentro, pero
+        // no hay pista que escribir.
+        let sequence: ImageSequenceWriter?
+        if codec.isImageSequence {
+            let folder = destination.deletingPathExtension()
+            let seq = ImageSequenceWriter(folder: folder,
+                                          basename: folder.lastPathComponent)
+            try seq.prepare()
+            sequence = seq
+            try writer.startPixelBufferPoolOnly(size: jobConfig.outputSize)
+        } else {
+            sequence = nil
+            try writer.start(url: destination,
+                             size: jobConfig.outputSize,
+                             codec: codec,
+                             fps: fps,
+                             realTime: false,
+                             audioFormat: audioTrack.flatMap(formatDescription(of:)))
+        }
 
         guard reader.startReading() else {
             throw AppError(.capture, "No se pudo leer el archivo.",
@@ -129,10 +143,11 @@ final class OfflineRenderer {
 
         // El audio va en su propio hilo con su propio lector: un AVAssetReader no
         // se puede rebobinar, y entrelazar las dos pistas desde un solo lector
-        // obligaria a bufferear una de las dos entera.
-        let audioWork = audioTrack.map { track in
+        // obligaria a bufferear una de las dos entera. Una secuencia de imagenes
+        // no lleva audio.
+        let audioWork = sequence == nil ? audioTrack.map { track in
             startAudioPassthrough(asset: asset, track: track, writer: writer)
-        }
+        } : nil
 
         var frameIndex = 0
         var blitState: MTLRenderPipelineState?
@@ -181,11 +196,16 @@ final class OfflineRenderer {
             _ = sourceKeepAlive
             _ = targetKeepAlive
 
-            // PTS exacto = indice / fps (spec §6), no el timestamp del sample.
-            let presentation = CMTime(value: CMTimeValue(frameIndex),
-                                      timescale: CMTimeScale(fps.rounded()))
-            guard writer.appendSynchronously(target, at: presentation) else {
-                throw AppError(.capture, "El escritor rechazó el frame \(frameIndex).")
+            if let sequence {
+                try sequence.write(target, index: frameIndex,
+                                   withAlpha: jobConfig.transparentBackground)
+            } else {
+                // PTS exacto = indice / fps (spec §6), no el timestamp del sample.
+                let presentation = CMTime(value: CMTimeValue(frameIndex),
+                                          timescale: CMTimeScale(fps.rounded()))
+                guard writer.appendSynchronously(target, at: presentation) else {
+                    throw AppError(.capture, "El escritor rechazó el frame \(frameIndex).")
+                }
             }
 
             frameIndex += 1
@@ -198,8 +218,13 @@ final class OfflineRenderer {
 
         if isCancelled {
             _ = await_finish(writer)
-            try? FileManager.default.removeItem(at: destination)
+            try? FileManager.default.removeItem(at: sequence?.folder ?? destination)
             throw AppError(.capture, "Render cancelado.")
+        }
+
+        if sequence != nil {
+            writer.stopPixelBufferPoolOnly()
+            return frameIndex
         }
 
         switch await_finish(writer) {

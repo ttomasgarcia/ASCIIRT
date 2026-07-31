@@ -70,6 +70,50 @@ final class AppModel: ObservableObject {
     private var appliedCharset: [Character] = Array(PipelineConfig.defaultCharset)
     private var appliedExcluded: Set<Character> = []
 
+    // MARK: - Color y salida (M8)
+
+    /// Presets de spec §8 mas "seguir a la fuente", que es el default util.
+    enum OutputPreset: String, CaseIterable, Identifiable {
+        case source = "Fuente"
+        case hd1080 = "1080p"
+        case qhd1440 = "1440p"
+        case uhd4K = "4K"
+
+        var id: String { rawValue }
+
+        var size: SIMD2<UInt32>? {
+            switch self {
+            case .source: return nil
+            case .hd1080: return SIMD2(1920, 1080)
+            case .qhd1440: return SIMD2(2560, 1440)
+            case .uhd4K: return SIMD2(3840, 2160)
+            }
+        }
+    }
+
+    @Published var outputPreset: OutputPreset = .source { didSet { sync() } }
+
+    enum ColorMode: UInt32, CaseIterable, Identifiable {
+        case mono = 0
+        case duotone = 1
+        case original = 2
+
+        var id: UInt32 { rawValue }
+        var label: String {
+            switch self {
+            case .mono: return "Mono"
+            case .duotone: return "Dos colores"
+            case .original: return "Original"
+            }
+        }
+    }
+
+    @Published var colorMode: ColorMode = .mono { didSet { sync() } }
+    @Published var invert = false { didSet { sync() } }
+    @Published var transparentBackground = false { didSet { sync() } }
+    @Published var foregroundColor: Color = .white { didSet { sync() } }
+    @Published var backgroundColor: Color = .black { didSet { sync() } }
+
     // MARK: - Bordes (M4)
 
     @Published var edgesEnabled = true { didSet { sync() } }
@@ -259,7 +303,13 @@ final class AppModel: ObservableObject {
         guard !isApplyingPreset else { return }
 
         var next = PipelineConfig()
-        next.outputSize = sourceSize
+        next.outputSize = outputPreset.size ?? sourceSize
+        next.outputFollowsSource = outputPreset == .source
+        next.colorMode = colorMode.rawValue
+        next.invert = invert
+        next.transparentBackground = transparentBackground
+        next.foreground = AppModel.components(of: foregroundColor)
+        next.background = AppModel.components(of: backgroundColor)
         next.tileSize = SIMD2(tileWidth, resolvedCellHeight())
         next.font = selectedFont
         next.charset = appliedCharset
@@ -392,6 +442,14 @@ final class AppModel: ObservableObject {
         preset.lumaTarget = lumaTarget
         preset.exposureLocked = exposureLocked
         preset.exportCodec = exportCodec
+        preset.outputPreset = outputPreset.rawValue
+        preset.colorMode = colorMode.rawValue
+        preset.invert = invert
+        preset.transparentBackground = transparentBackground
+        let fg = AppModel.components(of: foregroundColor)
+        let bg = AppModel.components(of: backgroundColor)
+        preset.foreground = [Double(fg.x), Double(fg.y), Double(fg.z)]
+        preset.background = [Double(bg.x), Double(bg.y), Double(bg.z)]
         preset.matrixImageMix = matrixImageMix
         preset.matrixBaseLevel = matrixBaseLevel
         preset.matrixSpawnBias = matrixSpawnBias
@@ -436,6 +494,16 @@ final class AppModel: ObservableObject {
         lumaTarget = preset.lumaTarget
         exposureLocked = preset.exposureLocked
         exportCodec = preset.exportCodec
+        outputPreset = OutputPreset(rawValue: preset.outputPreset) ?? .source
+        colorMode = ColorMode(rawValue: preset.colorMode) ?? .mono
+        invert = preset.invert
+        transparentBackground = preset.transparentBackground
+        if preset.foreground.count >= 3 {
+            foregroundColor = Color(red: preset.foreground[0], green: preset.foreground[1], blue: preset.foreground[2])
+        }
+        if preset.background.count >= 3 {
+            backgroundColor = Color(red: preset.background[0], green: preset.background[1], blue: preset.background[2])
+        }
         matrixImageMix = preset.matrixImageMix
         matrixBaseLevel = preset.matrixBaseLevel
         matrixSpawnBias = preset.matrixSpawnBias
@@ -600,6 +668,12 @@ final class AppModel: ObservableObject {
 
     private func startRecording() {
         guard !isRecording else { return }
+        guard !exportCodec.isImageSequence else {
+            report(AppError(.capture, "La secuencia PNG solo sale del render offline.",
+                            detail: "Escribir PNG por frame no entra en tiempo real: es el único destino "
+                                  + "donde el frame vuelve a CPU."))
+            return
+        }
         guard isRunning else {
             report(AppError(.capture, "No hay señal para grabar."))
             return

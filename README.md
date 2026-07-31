@@ -26,8 +26,11 @@ librerías ASCII de terceros.
   30% de los píxeles cambia entre dos frames. Con el default de 0,08 baja a
   0,02%.
 - **Grabación y export.** REC en vivo a ProRes, y render offline desacoplado del
-  reloj donde cada frame de entrada produce exactamente uno de salida. Audio del
-  archivo pasa sin recodificar.
+  reloj donde cada frame de entrada produce exactamente uno de salida. ProRes
+  422 HQ / 4444, H.264 y secuencia PNG numerada. Audio del archivo pasa sin
+  recodificar.
+- **Modos de color**: mono, dos colores, o color original promediado por tile.
+  Más invertir y fondo transparente para ProRes 4444 / secuencia PNG.
 - **Presets** en JSON, más restauración automática del estado al abrir.
 
 ## Requisitos
@@ -106,10 +109,26 @@ Sources/
 | M5 — histéresis temporal, normalización de exposición | ✅ |
 | M6 — grabación con AVAssetWriter (ProRes) | ✅ |
 | M7 — render offline desacoplado del reloj | ✅ |
-| M8 — resto de formatos de export, pulido | pendiente |
+| M8 — resto de formatos de export, pulido | ✅ |
 
 Fuera de la spec original, agregado sobre la marcha: modo Matrix, player de
 archivo, presets con persistencia.
+
+### Verificado con medición
+
+- **Histéresis**: sobre escena estática, la fracción de píxeles que cambia entre
+  dos frames pasa de 30,63 % con el umbral en 0 a 0,02 % en 0,08 y 0,00 % en
+  0,25 (spec §10).
+- **Rampa calibrada**: 69 de 69 glifos ordenados por cobertura medida.
+- **Presets**: round-trip de 14 valores distintivos, todos sobreviven a
+  guardar → cerrar → abrir.
+
+### Sin verificar de punta a punta
+
+El export a disco (REC en vivo y render offline) está escrito y revisado, y la
+grabación en vivo la probó el autor con éxito, pero el conteo de frames del
+render offline contra el original no se midió todavía. El criterio §10 —"frame
+count de entrada == frame count de salida"— sigue abierto.
 
 ## Referencia
 

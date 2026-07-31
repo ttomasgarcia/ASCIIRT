@@ -9,21 +9,33 @@ enum ExportCodec: String, CaseIterable, Identifiable, Codable {
     case proRes422HQ = "ProRes 422 HQ"
     case proRes4444 = "ProRes 4444"
     case h264 = "H.264"
+    case pngSequence = "Secuencia PNG"
 
     var id: String { rawValue }
+
+    /// La secuencia no pasa por AVAssetWriter: es un destino distinto, no otro
+    /// codec, y solo existe en el camino offline.
+    var isImageSequence: Bool { self == .pngSequence }
 
     var avCodec: AVVideoCodecType {
         switch self {
         case .proRes422HQ: return .proRes422HQ
         case .proRes4444: return .proRes4444
         case .h264: return .h264
+        case .pngSequence: return .proRes4444   // nunca se usa; ver isImageSequence
         }
     }
 
     /// ProRes 4444 es el unico que lleva alpha; los demas aplastan contra negro.
-    var supportsAlpha: Bool { self == .proRes4444 }
+    var supportsAlpha: Bool { self == .proRes4444 || self == .pngSequence }
 
-    var fileExtension: String { self == .h264 ? "mp4" : "mov" }
+    var fileExtension: String {
+        switch self {
+        case .h264: return "mp4"
+        case .pngSequence: return "png"
+        default: return "mov"
+        }
+    }
 
     var fileType: AVFileType { self == .h264 ? .mp4 : .mov }
 
@@ -68,6 +80,7 @@ final class VideoWriter {
     private var sessionStartSeconds: Double?
     private var lastPresentation: CMTime = .invalid
     private var realTime = false
+    private var standalonePool: CVPixelBufferPool?
 
     /// Los append van serializados en su propia cola: llegan desde los
     /// completion handlers de Metal, que corren en hilos internos del driver.
@@ -166,8 +179,41 @@ final class VideoWriter {
         self.isRecording = true
     }
 
+    /// Pool de buffers sin pista de salida, para la secuencia de imagenes: la
+    /// GPU necesita CVPixelBuffer donde escribir, pero no hay nada que multiplexar.
+    func startPixelBufferPoolOnly(size: SIMD2<UInt32>) throws {
+        var pool: CVPixelBufferPool?
+        let attributes: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: Int(size.x),
+            kCVPixelBufferHeightKey as String: Int(size.y),
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+        ]
+        guard CVPixelBufferPoolCreate(kCFAllocatorDefault, nil,
+                                      attributes as CFDictionary, &pool) == kCVReturnSuccess,
+              let pool else {
+            throw AppError(.metal, "No se pudo crear el pool de buffers de salida.")
+        }
+        standalonePool = pool
+        stats = Stats()
+        isRecording = true
+    }
+
+    func stopPixelBufferPoolOnly() {
+        standalonePool = nil
+        isRecording = false
+    }
+
     /// Buffer del pool listo para que el render escriba adentro.
     func dequeuePixelBuffer() -> CVPixelBuffer? {
+        if let standalonePool {
+            var buffer: CVPixelBuffer?
+            guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, standalonePool, &buffer) == kCVReturnSuccess else {
+                return nil
+            }
+            return buffer
+        }
         guard isRecording, let pool = adaptor?.pixelBufferPool else { return nil }
         var buffer: CVPixelBuffer?
         guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer) == kCVReturnSuccess else {
