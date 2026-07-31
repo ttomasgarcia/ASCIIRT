@@ -29,6 +29,20 @@ struct Preset: Codable, Equatable {
     var matrixTrail: Double = 18
     var matrixChurn: Double = 12
     var matrixDensity: Double = 1
+
+    // Bordes
+    var edgesEnabled: Bool = true
+    var dogSigma1: Double = 0.8
+    var dogSigma2: Double = 2.4
+    var dogTau: Double = 0.9
+    var edgeThreshold: Double = 0.12
+
+    // Temporal y exposicion
+    var hysteresisThreshold: Double = 0.08
+    var autoLevelStrength: Double = 0.0
+    var lumaSmoothAlpha: Double = 0.05
+    var lumaTarget: Double = 0.5
+    var exposureLocked: Bool = false
     var matrixImageMix: Double = 0.75
 
     var matrixBaseLevel: Double = 0.30
@@ -68,6 +82,18 @@ struct Preset: Codable, Equatable {
         matrixTrail = c.value(.matrixTrail, d.matrixTrail)
         matrixChurn = c.value(.matrixChurn, d.matrixChurn)
         matrixDensity = c.value(.matrixDensity, d.matrixDensity)
+
+        edgesEnabled = c.value(.edgesEnabled, d.edgesEnabled)
+        dogSigma1 = c.value(.dogSigma1, d.dogSigma1)
+        dogSigma2 = c.value(.dogSigma2, d.dogSigma2)
+        dogTau = c.value(.dogTau, d.dogTau)
+        edgeThreshold = c.value(.edgeThreshold, d.edgeThreshold)
+
+        hysteresisThreshold = c.value(.hysteresisThreshold, d.hysteresisThreshold)
+        autoLevelStrength = c.value(.autoLevelStrength, d.autoLevelStrength)
+        lumaSmoothAlpha = c.value(.lumaSmoothAlpha, d.lumaSmoothAlpha)
+        lumaTarget = c.value(.lumaTarget, d.lumaTarget)
+        exposureLocked = c.value(.exposureLocked, d.exposureLocked)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)
 
         matrixBaseLevel = c.value(.matrixBaseLevel, d.matrixBaseLevel)

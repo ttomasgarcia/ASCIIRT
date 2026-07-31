@@ -70,6 +70,25 @@ final class AppModel: ObservableObject {
     private var appliedCharset: [Character] = Array(PipelineConfig.defaultCharset)
     private var appliedExcluded: Set<Character> = []
 
+    // MARK: - Bordes (M4)
+
+    @Published var edgesEnabled = true { didSet { sync() } }
+    @Published var dogSigma1: Double = 0.8 { didSet { sync() } }
+    @Published var dogSigma2: Double = 2.4 { didSet { sync() } }
+    @Published var dogTau: Double = 0.9 { didSet { sync() } }
+    @Published var edgeThreshold: Double = 0.12 { didSet { sync() } }
+
+    // MARK: - Temporal y exposicion (M5)
+
+    @Published var hysteresisThreshold: Double = 0.08 { didSet { sync() } }
+    @Published var autoLevelStrength: Double = 0.0 { didSet { sync() } }
+    @Published var lumaSmoothAlpha: Double = 0.05 { didSet { sync() } }
+    @Published var lumaTarget: Double = 0.5 { didSet { sync() } }
+    @Published var exposureLocked = false {
+        didSet { camera.setExposureLocked(exposureLocked); autosave() }
+    }
+    @Published private(set) var supportsExposureLock = false
+
     // MARK: - Matrix
 
     @Published var matrixEnabled = false {
@@ -175,6 +194,9 @@ final class AppModel: ObservableObject {
         }
         renderer.matteProvider = { [weak self] in self?.matte.texture }
         matte.onError = { [weak self] error in self?.report(error) }
+        camera.onExposureLockSupport = { [weak self] supported in
+            self?.supportsExposureLock = supported
+        }
 
         file.onTime = { [weak self] time in
             guard let self, !self.isScrubbing else { return }
@@ -227,6 +249,15 @@ final class AppModel: ObservableObject {
         next.matrixTrail = Float(matrixTrail)
         next.matrixChurn = Float(matrixChurn)
         next.matrixDensity = UInt32(max(1, matrixDensity.rounded()))
+        next.edgesEnabled = edgesEnabled
+        next.dogSigma1 = Float(dogSigma1)
+        next.dogSigma2 = Float(dogSigma2)
+        next.dogTau = Float(dogTau)
+        next.edgeThreshold = Float(edgeThreshold)
+        next.hysteresisThreshold = Float(hysteresisThreshold)
+        next.autoLevelStrength = Float(autoLevelStrength)
+        next.lumaSmoothAlpha = Float(lumaSmoothAlpha)
+        next.lumaTarget = Float(lumaTarget)
         next.matrixImageMix = Float(matrixImageMix)
         next.matrixBaseLevel = Float(matrixBaseLevel)
         next.matrixSpawnBias = Float(matrixSpawnBias)
@@ -329,6 +360,16 @@ final class AppModel: ObservableObject {
         preset.matrixTrail = matrixTrail
         preset.matrixChurn = matrixChurn
         preset.matrixDensity = matrixDensity
+        preset.edgesEnabled = edgesEnabled
+        preset.dogSigma1 = dogSigma1
+        preset.dogSigma2 = dogSigma2
+        preset.dogTau = dogTau
+        preset.edgeThreshold = edgeThreshold
+        preset.hysteresisThreshold = hysteresisThreshold
+        preset.autoLevelStrength = autoLevelStrength
+        preset.lumaSmoothAlpha = lumaSmoothAlpha
+        preset.lumaTarget = lumaTarget
+        preset.exposureLocked = exposureLocked
         preset.matrixImageMix = matrixImageMix
         preset.matrixBaseLevel = matrixBaseLevel
         preset.matrixSpawnBias = matrixSpawnBias
@@ -362,6 +403,16 @@ final class AppModel: ObservableObject {
         matrixTrail = preset.matrixTrail
         matrixChurn = preset.matrixChurn
         matrixDensity = preset.matrixDensity
+        edgesEnabled = preset.edgesEnabled
+        dogSigma1 = preset.dogSigma1
+        dogSigma2 = preset.dogSigma2
+        dogTau = preset.dogTau
+        edgeThreshold = preset.edgeThreshold
+        hysteresisThreshold = preset.hysteresisThreshold
+        autoLevelStrength = preset.autoLevelStrength
+        lumaSmoothAlpha = preset.lumaSmoothAlpha
+        lumaTarget = preset.lumaTarget
+        exposureLocked = preset.exposureLocked
         matrixImageMix = preset.matrixImageMix
         matrixBaseLevel = preset.matrixBaseLevel
         matrixSpawnBias = preset.matrixSpawnBias
@@ -385,6 +436,7 @@ final class AppModel: ObservableObject {
         renderer.asciiEnabled = asciiEnabled
         renderer.continuousRedraw = matrixEnabled
         matte.isEnabled = subjectMatteEnabled
+        camera.setExposureLocked(exposureLocked)
         sync()
 
         if markCurrent { currentPresetName = preset.name }

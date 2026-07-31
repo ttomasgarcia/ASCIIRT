@@ -209,6 +209,8 @@ private struct ControlPanel: View {
     @State private var showSource = true
     @State private var showGrid = true
     @State private var showCharset = false
+    @State private var showEdges = true
+    @State private var showTemporal = false
     @State private var showMatrix = true
     @State private var showCoverage = false
 
@@ -229,6 +231,14 @@ private struct ControlPanel: View {
                 Divider()
                 PanelSection(title: "Charset", systemImage: "textformat", isExpanded: $showCharset) {
                     charsetContent
+                }
+                Divider()
+                PanelSection(title: "Bordes", systemImage: "scribble", isExpanded: $showEdges) {
+                    edgesContent
+                }
+                Divider()
+                PanelSection(title: "Temporal", systemImage: "waveform.path", isExpanded: $showTemporal) {
+                    temporalContent
                 }
                 Divider()
                 PanelSection(title: "Matrix", systemImage: "cloud.rain", isExpanded: $showMatrix) {
@@ -434,6 +444,50 @@ private struct ControlPanel: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: Bordes
+
+    private var edgesContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            ParamToggle(label: "Glifos de borde", isOn: $model.edgesEnabled,
+                        help: "Apagado deja solo la rampa de luminancia, para comparar.")
+
+            VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+                ParamSlider(label: "Umbral", value: $model.edgeThreshold, range: 0...1,
+                            help: "Por encima de esto el tile usa - / | \\ en vez de rampa.")
+                PanelGroupLabel(text: "Diferencia de gaussianas")
+                ParamSlider(label: "Sigma 1", value: $model.dogSigma1, range: 0.2...4)
+                ParamSlider(label: "Sigma 2", value: $model.dogSigma2, range: 0.5...10)
+                ParamSlider(label: "Tau", value: $model.dogTau, range: 0...1.2,
+                            help: "Cuánto se resta la gaussiana ancha. Cerca de 1 queda casi solo borde.")
+            }
+            .disabled(!model.edgesEnabled)
+            .opacity(model.edgesEnabled ? 1 : 0.45)
+        }
+    }
+
+    // MARK: Temporal
+
+    private var temporalContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...0.5,
+                        help: "En 0 es el comportamiento clásico y la rampa hierve. 0,08 es el default.")
+
+            PanelGroupLabel(text: "Exposición")
+            ParamToggle(label: "Lock de cámara", isOn: $model.exposureLocked,
+                        help: model.supportsExposureLock
+                            ? "Congela exposición y balance de blancos en el hardware."
+                            : "Esta cámara no soporta lock de exposición.")
+                .disabled(!model.supportsExposureLock)
+
+            ParamSlider(label: "Auto nivel", value: $model.autoLevelStrength, range: 0...1,
+                        help: "Mezcla entre luma cruda y normalizada.")
+            ParamSlider(label: "Suavizado", value: $model.lumaSmoothAlpha, range: 0.01...0.5,
+                        help: "Alpha de la media móvil. Chico reacciona lento pero no persigue al AGC.")
+            ParamSlider(label: "Punto medio", value: $model.lumaTarget, range: 0.2...0.8)
+                .disabled(model.autoLevelStrength <= 0)
         }
     }
 

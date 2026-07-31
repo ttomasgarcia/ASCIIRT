@@ -35,6 +35,19 @@ struct PipelineConfig: Equatable {
     var matrixSpawnStrength: Float = 0.6
     var matrixDensity: UInt32 = 1
 
+    // MARK: Bordes (M4)
+    var edgesEnabled = true
+    var dogSigma1: Float = 0.8
+    var dogSigma2: Float = 2.4
+    var dogTau: Float = 0.9
+    var edgeThreshold: Float = 0.12
+
+    // MARK: Temporal y exposicion (M5)
+    var hysteresisThreshold: Float = 0.08
+    var autoLevelStrength: Float = 0.0
+    var lumaSmoothAlpha: Float = 0.05
+    var lumaTarget: Float = 0.5
+
     /// Default de spec §2. Se recalibra siempre; este orden no se asume.
     static let defaultCharset = #" .'`^",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"#
 
@@ -68,6 +81,13 @@ final class ASCIIPipeline {
     private let reliefBlurHPSO: MTLComputePipelineState
     private let reliefBlurVPSO: MTLComputePipelineState
     private let spawnPSO: MTLComputePipelineState
+    private let normalizePSO: MTLComputePipelineState
+    private let dogHPSO: MTLComputePipelineState
+    private let dogVPSO: MTLComputePipelineState
+    private let sobelPSO: MTLComputePipelineState
+    private let edgeQuantizePSO: MTLComputePipelineState
+    private let glyphIndexPSO: MTLComputePipelineState
+    private let statsPSO: MTLComputePipelineState
     private let asciiPSO: MTLComputePipelineState
 
     private var lumaTexture: MTLTexture
@@ -75,6 +95,19 @@ final class ASCIIPipeline {
     private var heightTemp: MTLTexture
     private var heightTexture: MTLTexture
     private var spawnTexture: MTLTexture
+    private var lumaRawTexture: MTLTexture
+    private var dogTempTexture: MTLTexture
+    private var dogTexture: MTLTexture
+    private var sobelTexture: MTLTexture
+    private var edgeTexture: MTLTexture
+    /// Ping-pong de la histeresis: se lee el del frame anterior y se escribe el
+    /// nuevo. Con una sola textura el kernel leeria lo que el mismo acaba de
+    /// escribir en otra celda del mismo dispatch.
+    private var glyphTextures: [MTLTexture]
+    private var glyphIndex = 0
+
+    /// Media movil de luminancia. Vive en GPU entre frames (spec §4b).
+    private let lumaStatsBuffer: MTLBuffer
     /// Matte del sujeto del ultimo frame que Vision alcanzo a procesar. Puede
     /// venir con uno o dos frames de atraso; para un campo de altura eso no se
     /// nota, y el alternativo seria bloquear el render.
@@ -100,11 +133,30 @@ final class ASCIIPipeline {
         self.reliefBlurHPSO = try ASCIIPipeline.makePSO(context, "reliefBlurH")
         self.reliefBlurVPSO = try ASCIIPipeline.makePSO(context, "reliefBlurV")
         self.spawnPSO = try ASCIIPipeline.makePSO(context, "spawnKernel")
+        self.normalizePSO = try ASCIIPipeline.makePSO(context, "normalizeKernel")
+        self.dogHPSO = try ASCIIPipeline.makePSO(context, "dogBlurH")
+        self.dogVPSO = try ASCIIPipeline.makePSO(context, "dogBlurV")
+        self.sobelPSO = try ASCIIPipeline.makePSO(context, "sobelKernel")
+        self.edgeQuantizePSO = try ASCIIPipeline.makePSO(context, "edgeQuantizeKernel")
+        self.glyphIndexPSO = try ASCIIPipeline.makePSO(context, "glyphIndexKernel")
+        self.statsPSO = try ASCIIPipeline.makePSO(context, "lumaStatsKernel")
         self.asciiPSO = try ASCIIPipeline.makePSO(context, "asciiKernel")
 
+        let textures = try ASCIIPipeline.makeTextures(context, config)
         (lumaTexture, gridTexture, heightTemp, heightTexture, spawnTexture, outputTexture) =
-            try ASCIIPipeline.makeTextures(context, config)
+            (textures.luma, textures.grid, textures.heightTemp, textures.height, textures.spawn, textures.output)
+        (lumaRawTexture, dogTempTexture, dogTexture, sobelTexture, edgeTexture, glyphTextures) =
+            (textures.lumaRaw, textures.dogTemp, textures.dog, textures.sobel, textures.edge, textures.glyphs)
         self.matteFallback = try ASCIIPipeline.makeFallbackMatte(context)
+
+        var initialAverage: Float = 0.5
+        guard let buffer = context.device.makeBuffer(bytes: &initialAverage,
+                                                     length: MemoryLayout<Float>.stride,
+                                                     options: .storageModeShared) else {
+            throw AppError(.metal, "No se pudo crear el buffer de estadisticas de luma.")
+        }
+        buffer.label = "asciirt.lumaStats"
+        self.lumaStatsBuffer = buffer
         self.atlas = try FontAtlasBuilder.build(device: context.device,
                                                 font: config.font,
                                                 charset: config.charset,
@@ -124,8 +176,11 @@ final class ASCIIPipeline {
             || new.excluded != config.excluded
 
         if sizeChanged {
+            let textures = try ASCIIPipeline.makeTextures(context, new)
             (lumaTexture, gridTexture, heightTemp, heightTexture, spawnTexture, outputTexture) =
-                try ASCIIPipeline.makeTextures(context, new)
+                (textures.luma, textures.grid, textures.heightTemp, textures.height, textures.spawn, textures.output)
+            (lumaRawTexture, dogTempTexture, dogTexture, sobelTexture, edgeTexture, glyphTextures) =
+                (textures.lumaRaw, textures.dogTemp, textures.dog, textures.sobel, textures.edge, textures.glyphs)
         }
         if atlasChanged {
             atlas = try FontAtlasBuilder.build(device: context.device,
@@ -152,18 +207,56 @@ final class ASCIIPipeline {
                                   height: Int(config.gridSize.y),
                                   depth: 1)
 
-        // [1] Luma
-        encoder.setComputePipelineState(lumaPSO)
-        encoder.setTexture(source, index: Int(ASCIIRTTextureIndexSource.rawValue))
-        encoder.setTexture(lumaTexture, index: Int(ASCIIRTTextureIndexLuma.rawValue))
+        // Todos los dispatches comparten el mismo bind de parametros y del
+        // buffer de estadisticas; se setean una vez.
         encoder.setBytes(&params, length: MemoryLayout<RenderParams>.stride,
                          index: Int(ASCIIRTBufferIndexRenderParams.rawValue))
+        encoder.setBuffer(lumaStatsBuffer, offset: 0,
+                          index: Int(ASCIIRTBufferIndexLumaStats.rawValue))
+
+        // [1] Luma cruda
+        encoder.setComputePipelineState(lumaPSO)
+        encoder.setTexture(source, index: Int(ASCIIRTTextureIndexSource.rawValue))
+        encoder.setTexture(lumaRawTexture, index: Int(ASCIIRTTextureIndexLumaRaw.rawValue))
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: lumaPSO))
+
+        // [2] Normalizacion de exposicion. Consume la media del frame anterior.
+        encoder.setComputePipelineState(normalizePSO)
+        encoder.setTexture(lumaTexture, index: Int(ASCIIRTTextureIndexLuma.rawValue))
+        encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: normalizePSO))
 
         // [3] Downscale a grid
         encoder.setComputePipelineState(downscalePSO)
         encoder.setTexture(gridTexture, index: Int(ASCIIRTTextureIndexGrid.rawValue))
         encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: downscalePSO))
+
+        // [4][5][6] Bordes. Solo si estan activos: son las tres etapas mas caras
+        // del pipeline y con el bypass puesto no aportan nada.
+        if config.edgesEnabled {
+            encoder.setComputePipelineState(dogHPSO)
+            encoder.setTexture(dogTempTexture, index: Int(ASCIIRTTextureIndexDoGTemp.rawValue))
+            encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: dogHPSO))
+
+            encoder.setComputePipelineState(dogVPSO)
+            encoder.setTexture(dogTexture, index: Int(ASCIIRTTextureIndexDoG.rawValue))
+            encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: dogVPSO))
+
+            encoder.setComputePipelineState(sobelPSO)
+            encoder.setTexture(sobelTexture, index: Int(ASCIIRTTextureIndexSobel.rawValue))
+            encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: sobelPSO))
+
+            encoder.setComputePipelineState(edgeQuantizePSO)
+            encoder.setTexture(edgeTexture, index: Int(ASCIIRTTextureIndexEdge.rawValue))
+            encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: edgeQuantizePSO))
+        }
+
+        // Decision de glifo por tile: bordes sobre luminancia, mas histeresis.
+        glyphIndex = 1 - glyphIndex
+        encoder.setComputePipelineState(glyphIndexPSO)
+        encoder.setTexture(edgeTexture, index: Int(ASCIIRTTextureIndexEdge.rawValue))
+        encoder.setTexture(glyphTextures[1 - glyphIndex], index: Int(ASCIIRTTextureIndexGlyphPrev.rawValue))
+        encoder.setTexture(glyphTextures[glyphIndex], index: Int(ASCIIRTTextureIndexGlyphNext.rawValue))
+        encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: glyphIndexPSO))
 
         // Campo de altura para el relieve. Solo cuando hace falta: con la lluvia
         // apagada son dos dispatches al pedo por frame.
@@ -194,8 +287,17 @@ final class ASCIIPipeline {
         encoder.setTexture(atlas.texture, index: Int(ASCIIRTTextureIndexAtlas.rawValue))
         encoder.setTexture(heightTexture, index: Int(ASCIIRTTextureIndexHeight.rawValue))
         encoder.setTexture(spawnTexture, index: Int(ASCIIRTTextureIndexSpawn.rawValue))
+        encoder.setTexture(atlas.edgeTexture, index: Int(ASCIIRTTextureIndexEdgeAtlas.rawValue))
+        encoder.setTexture(glyphTextures[glyphIndex], index: Int(ASCIIRTTextureIndexGlyphNext.rawValue))
         encoder.setTexture(outputTexture, index: Int(ASCIIRTTextureIndexOutput.rawValue))
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: asciiThreadgroup())
+
+        // Media de luminancia para el frame siguiente. Va al final: el encoder es
+        // serial, asi que la etapa [2] de este frame ya leyo el valor anterior.
+        encoder.setComputePipelineState(statsPSO)
+        encoder.setTexture(lumaRawTexture, index: Int(ASCIIRTTextureIndexLumaRaw.rawValue))
+        encoder.dispatchThreadgroups(MTLSize(width: 1, height: 1, depth: 1),
+                                     threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
 
         encoder.endEncoding()
     }
@@ -247,8 +349,16 @@ final class ASCIIPipeline {
                             matrixSpawnBias: config.matrixSpawnBias,
                             matrixSpawnStrength: config.matrixSpawnStrength,
                             matrixDensity: max(config.matrixDensity, 1),
-                            _pad0: 0,
-                            _pad1: 0)
+                            edgesEnabled: config.edgesEnabled ? 1 : 0,
+                            dogSigma1: config.dogSigma1,
+                            dogSigma2: config.dogSigma2,
+                            dogTau: config.dogTau,
+                            edgeThreshold: config.edgeThreshold,
+                            hysteresisThreshold: config.hysteresisThreshold,
+                            autoLevelStrength: config.autoLevelStrength,
+                            lumaSmoothAlpha: config.lumaSmoothAlpha,
+                            lumaTarget: config.lumaTarget,
+                            _pad0: 0)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se
@@ -301,8 +411,15 @@ final class ASCIIPipeline {
         return texture
     }
 
+    private struct Textures {
+        let luma, lumaRaw, grid: MTLTexture
+        let dogTemp, dog, sobel, edge: MTLTexture
+        let glyphs: [MTLTexture]
+        let heightTemp, height, spawn, output: MTLTexture
+    }
+
     private static func makeTextures(_ context: MetalContext,
-                                     _ config: PipelineConfig) throws -> (MTLTexture, MTLTexture, MTLTexture, MTLTexture, MTLTexture, MTLTexture) {
+                                     _ config: PipelineConfig) throws -> Textures {
         let width = Int(config.outputSize.x)
         let height = Int(config.outputSize.y)
         let grid = config.gridSize
@@ -332,6 +449,18 @@ final class ASCIIPipeline {
         // cualquier grid que salga de 4K.
         let spawn = try make(.rg16Float, Int(grid.x), 1, "spawn")
         let output = try make(.rgba8Unorm, width, height, "output")
-        return (luma, gridTexture, temp, heightTexture, spawn, output)
+
+        let lumaRaw = try make(.r16Float, width, height, "lumaRaw")
+        let dogTemp = try make(.rg16Float, width, height, "dogTemp")
+        let dog = try make(.r16Float, width, height, "dog")
+        let sobel = try make(.rg16Float, width, height, "sobel")
+        let edge = try make(.rg16Float, Int(grid.x), Int(grid.y), "edge")
+        // RG8Uint: indice de glifo (hasta 255, de sobra para cualquier charset
+        // razonable) y una bandera de si vino de un borde.
+        let glyphs = try (0..<2).map { try make(.rg8Uint, Int(grid.x), Int(grid.y), "glyph\($0)") }
+
+        return Textures(luma: luma, lumaRaw: lumaRaw, grid: gridTexture,
+                        dogTemp: dogTemp, dog: dog, sobel: sobel, edge: edge, glyphs: glyphs,
+                        heightTemp: temp, height: heightTexture, spawn: spawn, output: output)
     }
 }

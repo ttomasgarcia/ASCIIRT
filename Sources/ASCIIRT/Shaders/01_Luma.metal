@@ -8,7 +8,7 @@
 using namespace metal;
 
 kernel void lumaKernel(texture2d<float, access::sample> source [[texture(ASCIIRTTextureIndexSource)]],
-                       texture2d<float, access::write>  luma   [[texture(ASCIIRTTextureIndexLuma)]],
+                       texture2d<float, access::write>  luma   [[texture(ASCIIRTTextureIndexLumaRaw)]],
                        constant RenderParams &params [[buffer(ASCIIRTBufferIndexRenderParams)]],
                        uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= params.outputSize.x || gid.y >= params.outputSize.y) { return; }

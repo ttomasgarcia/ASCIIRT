@@ -19,6 +19,10 @@ struct CameraInfo: Identifiable, Hashable {
 final class CameraSource: NSObject, FrameSource {
     weak var delegate: FrameSourceDelegate?
 
+    /// Se llama en main cuando cambia el dispositivo: no todas las camaras
+    /// soportan lock, y un control que no hace nada es peor que uno ausente.
+    var onExposureLockSupport: ((Bool) -> Void)?
+
     private let session = AVCaptureSession()
     private let output = AVCaptureVideoDataOutput()
     /// Cola serial dedicada: los callbacks de AVFoundation no deben tocar main,
@@ -131,6 +135,34 @@ final class CameraSource: NSObject, FrameSource {
         }
 
         publishFormat(for: device)
+
+        let supported = device.isExposureModeSupported(.locked)
+                     && device.isWhiteBalanceModeSupported(.locked)
+        DispatchQueue.main.async { [weak self] in
+            self?.onExposureLockSupport?(supported)
+        }
+    }
+
+    /// Spec §4a: congelar exposicion y balance de blancos en el hardware. Es la
+    /// mitad de la solucion al hervor de la rampa; la otra es la normalizacion
+    /// en pipeline, que corrige lo que el AGC ya movio.
+    func setExposureLocked(_ locked: Bool) {
+        captureQueue.async { [weak self] in
+            guard let self, let device = self.currentDevice else { return }
+            do {
+                try device.lockForConfiguration()
+                defer { device.unlockForConfiguration() }
+
+                let exposure: AVCaptureDevice.ExposureMode = locked ? .locked : .continuousAutoExposure
+                if device.isExposureModeSupported(exposure) { device.exposureMode = exposure }
+
+                let balance: AVCaptureDevice.WhiteBalanceMode = locked ? .locked : .continuousAutoWhiteBalance
+                if device.isWhiteBalanceModeSupported(balance) { device.whiteBalanceMode = balance }
+            } catch {
+                self.delegate?.frameSource(self, didFail: AppError(
+                    .capture, "No se pudo bloquear la exposicion.", underlying: error))
+            }
+        }
     }
 
     private func publishFormat(for device: AVCaptureDevice) {

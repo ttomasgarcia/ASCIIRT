@@ -19,6 +19,12 @@ librerías ASCII de terceros.
 - **Modo Matrix**: lluvia de glifos que mutan, con relieve por campo de altura
   (luma difuminada + segmentación de sujeto por Vision), origen de gota en el
   punto más brillante de cada columna, y tinte de punta configurable.
+- **Glifos direccionales por borde.** DoG + Sobel + tensor de estructura por
+  tile: los contornos se dibujan con `-` `/` `|` `\` y ganan sobre la rampa de
+  luminancia, que es lo que separa esto de un filtro de brillo.
+- **Histéresis temporal.** Sin ella la salida hierve: sobre escena estática, el
+  30% de los píxeles cambia entre dos frames. Con el default de 0,08 baja a
+  0,02%.
 - **Presets** en JSON, más restauración automática del estado al abrir.
 
 ## Requisitos
@@ -50,8 +56,13 @@ Todo el trabajo por frame ocurre en GPU, en un solo command buffer:
 CVPixelBuffer (BGRA)
   └─> [0] Import        CVMetalTextureCache, zero-copy
   └─> [1] Luma          Rec.709 -> R16F a resolución de salida
+  └─> [2] Normalize     corrección de exposición por media móvil
   └─> [3] Downscale     media por tile -> R16F cols×rows
-  └─> [7] ASCII         luma de tile -> índice de rampa -> glifo del atlas
+  └─> [4] DoG           diferencia de gaussianas, las dos en una pasada
+  └─> [5] Sobel         gradiente H+V sobre la DoG
+  └─> [6] EdgeQuantize  tensor de estructura por tile -> bin direccional
+  └─> [6b] GlyphIndex   bordes sobre luminancia + histéresis temporal
+  └─> [7] ASCII         samplea el glifo elegido del atlas
   └─> [8] Composite
   └─> [9] Fork          -> MTKView
 ```
@@ -61,6 +72,7 @@ Etapas fuera de la numeración base, para el modo Matrix:
 ```
   └─> [20] Relief       gaussiana separable sobre el grid + matte de sujeto
   └─> [21] Spawn        reducción por columna: fila de origen de la gota
+  └─> [22] Stats        media de luminancia, consumida por [2] del frame siguiente
 ```
 
 Los parámetros viajan a los shaders en un único struct `RenderParams` compartido
@@ -87,8 +99,8 @@ Sources/
 | M1 — captura + preview Metal | ✅ |
 | M2 — luma, grid, kernel ASCII | ✅ |
 | M3 — atlas dinámico, calibración, charset | ✅ |
-| M4 — DoG + Sobel + glifos direccionales | pendiente |
-| M5 — histéresis temporal, normalización de exposición | pendiente |
+| M4 — DoG + Sobel + glifos direccionales | ✅ |
+| M5 — histéresis temporal, normalización de exposición | ✅ |
 | M6 — grabación con AVAssetWriter (ProRes) | pendiente |
 | M7 — render offline desacoplado del reloj | pendiente |
 | M8 — resto de formatos de export, pulido | pendiente |

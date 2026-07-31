@@ -92,6 +92,8 @@ static inline RainSample matrixRain(uint2 tile, float relief01, float2 spawn,
 
 kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRTTextureIndexGrid)]],
                         texture2d<float, access::read>  atlas  [[texture(ASCIIRTTextureIndexAtlas)]],
+                        texture2d<float, access::read>  edgeAtlas [[texture(ASCIIRTTextureIndexEdgeAtlas)]],
+                        texture2d<uint,  access::read>  glyphs [[texture(ASCIIRTTextureIndexGlyphNext)]],
                         texture2d<float, access::read>  height [[texture(ASCIIRTTextureIndexHeight)]],
                         texture2d<float, access::read>  spawn  [[texture(ASCIIRTTextureIndexSpawn)]],
                         texture2d<float, access::write> output [[texture(ASCIIRTTextureIndexOutput)]],
@@ -110,12 +112,11 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
 
     const float tileLuma = saturate(grid.read(tile).r);
 
-    // Cuantizacion a indice de rampa. El clamp a rampLength-1 es necesario
-    // porque luma == 1.0 daria exactamente rampLength.
-    const uint lumaIndex = min(uint(tileLuma * float(params.rampLength)),
-                               params.rampLength - 1u);
-
-    uint index = lumaIndex;
+    // La eleccion de glifo (borde vs rampa, mas histeresis) ya la resolvio
+    // 06b_GlyphIndex a resolucion de grid. Aca solo se samplea.
+    const uint2 decision = glyphs.read(tile).rg;
+    uint index = decision.x;
+    bool isEdge = decision.y != 0u;
     float3 color = float3(1.0);
 
     if (params.matrixEnabled != 0u) {
@@ -146,6 +147,9 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                                            ^ (tile.x * 2246822519u + tile.y * 3266489917u))
                                     * float(params.rampLength));
             index = min(churn, params.rampLength - 1u);
+            // La lluvia manda: un glifo direccional congelado en medio del
+            // rastro cortaria la ilusion de que el caracter esta mutando.
+            isEdge = false;
 
             // Blanco y negro: cabeza a blanco pleno, cola cayendo a gris. El
             // corte en 0.82 es angosto a proposito — la cabeza tiene que leerse
@@ -184,7 +188,10 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     const uint2 texel = uint2(index * params.tileSize.x + local.x,
                               params.tileSize.y - 1u - local.y);
 
-    const float ink = atlas.read(texel).r;
+    // Dos atlas y no uno: los cuatro glifos direccionales son fijos y no
+    // dependen del charset del usuario, asi que meterlos en la rampa calibrada
+    // los ordenaria por cobertura junto con el resto y perderian su indice.
+    const float ink = isEdge ? edgeAtlas.read(texel).r : atlas.read(texel).r;
 
     output.write(float4(color * ink, 1.0), gid);
 }

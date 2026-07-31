@@ -49,11 +49,22 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexMatte = 5,    ///< R8 matte de sujeto (Vision), en espacio de la fuente
     ASCIIRTTextureIndexHeight = 6,   ///< R16F campo de altura para el relieve, tamano de grid
     ASCIIRTTextureIndexHeightTemp = 7, ///< R16F intermedia de la gaussiana separable
-    ASCIIRTTextureIndexSpawn = 8,    ///< RG16F cols x 1: (fila de origen, brillo) por columna
+    ASCIIRTTextureIndexSpawn = 8,     ///< RG16F cols x 1: (fila de origen, brillo) por columna
+    ASCIIRTTextureIndexLumaRaw = 9,   ///< R16F sin normalizar, etapa [1]
+    ASCIIRTTextureIndexDoGTemp = 10,  ///< RG16F intermedia de la DoG separable
+    ASCIIRTTextureIndexDoG = 11,      ///< R16F diferencia de gaussianas, etapa [4]
+    ASCIIRTTextureIndexSobel = 12,    ///< RG16F gradiente H+V, etapa [5]
+    ASCIIRTTextureIndexEdge = 13,     ///< RG16F por tile: (bin direccional, magnitud), etapa [6]
+    ASCIIRTTextureIndexGlyphPrev = 14,///< RG8Uint por tile del frame anterior (histeresis)
+    ASCIIRTTextureIndexGlyphNext = 15,///< RG8Uint por tile de este frame
+    ASCIIRTTextureIndexEdgeAtlas = 16,///< R8Unorm: los 4 glifos direccionales
 };
 
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
     ASCIIRTBufferIndexRenderParams = 0,
+    /// Un float: la media movil de luminancia del frame. Vive en GPU entre
+    /// frames para no tener que sincronizar con CPU (spec §4b).
+    ASCIIRTBufferIndexLumaStats = 1,
 };
 
 /// Parametros por frame. Se sube con setBytes (entra holgado en el limite de
@@ -161,9 +172,35 @@ typedef struct {
     /// modulo en vez de un bucle) pero se leeria como una persiana bajando.
     uint32_t matrixDensity;
 
+    // MARK: Bordes (spec §1 etapas [4][5][6])
+
+    /// 0 = bypass de bordes, para comparar contra luminancia pura.
+    uint32_t edgesEnabled;
+    /// Sigmas de la diferencia de gaussianas. sigma1 < sigma2.
+    float dogSigma1;
+    float dogSigma2;
+    /// Cuanto se resta la gaussiana ancha. Cerca de 1 el resultado es casi solo
+    /// borde; por debajo queda algo de la imagen y el borde sale mas suave.
+    float dogTau;
+    /// Por encima de esto el tile usa glifo direccional en vez de rampa.
+    float edgeThreshold;
+
+    // MARK: Temporal (spec §5)
+
+    /// 0 desactiva la histeresis: el comportamiento clasico, que hierve.
+    float hysteresisThreshold;
+
+    // MARK: Exposicion (spec §4b)
+
+    /// Mezcla entre luma cruda (0) y normalizada (1).
+    float autoLevelStrength;
+    /// Alpha de la media movil exponencial de luminancia.
+    float lumaSmoothAlpha;
+    /// Punto medio al que se lleva la luminancia media.
+    float lumaTarget;
+
     /// Padding explicito para cerrar en multiplo de 8.
     uint32_t _pad0;
-    uint32_t _pad1;
 } RenderParams;
 
 #endif /* RenderParams_h */

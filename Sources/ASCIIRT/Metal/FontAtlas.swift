@@ -18,6 +18,9 @@ enum FontSelection: Equatable, Hashable {
 
     /// Monoespaciadas que estan siempre en macOS. Sirven de default y de
     /// comparacion rapida sin abrir el file picker.
+    /// Glifos direccionales, en orden de bin (spec §1, kernel [7]).
+    static let edgeCharacters: [Character] = ["-", "/", "|", "\\"]
+
     static let systemDefaults: [FontSelection] = [
         .system(name: "Menlo-Regular"),
         .system(name: "Monaco"),
@@ -91,6 +94,9 @@ struct GlyphCoverage: Identifiable, Equatable {
 /// tile (spec §2). Nunca por frame.
 struct FontAtlas {
     let texture: MTLTexture
+    /// Cuatro celdas con los glifos direccionales, en el orden de los bins de
+    /// la etapa [6]: 0° `-`, 45° `/`, 90° `|`, 135° `\`.
+    let edgeTexture: MTLTexture
     /// El orden de este array **es** la rampa: cobertura ascendente.
     let ramp: [Character]
     /// Todos los glifos del charset, incluidos los excluidos, para la tabla de UI.
@@ -170,6 +176,18 @@ enum FontAtlasBuilder {
                                       cellHeight: cellHeight,
                                       sourceStride: cellWidth * characters.count)
 
+        // Atlas aparte para los direccionales, con la misma fuente y celda. No
+        // pasan por la calibracion: su indice es el bin, no la cobertura.
+        let edgeChars = FontSelection.edgeCharacters
+        let edgeStrip = try rasterize(characters: edgeChars, font: font, selection: selection,
+                                      cellWidth: cellWidth, cellHeight: cellHeight)
+        let edgeTexture = try makeTexture(device: device,
+                                          strip: edgeStrip,
+                                          order: Array(edgeChars.indices),
+                                          cellWidth: cellWidth,
+                                          cellHeight: cellHeight,
+                                          sourceStride: cellWidth * edgeChars.count)
+
         let coverage = characters.enumerated().map { index, character in
             GlyphCoverage(character: character,
                           coverage: normalized[index],
@@ -177,6 +195,7 @@ enum FontAtlasBuilder {
         }
 
         return FontAtlas(texture: texture,
+                         edgeTexture: edgeTexture,
                          ramp: includedIndices.map { characters[$0] },
                          coverage: coverage,
                          cellWidth: cellWidth,
