@@ -89,6 +89,7 @@ final class AppModel: ObservableObject {
     @Published var eyePulseSpeed: Double = 0.09 { didSet { sync() } }
     @Published var eyePulseFrequency: Double = 5.0 { didSet { sync() } }
     @Published var eyePulseDecay: Double = 4.5 { didSet { sync() } }
+    @Published var eyePulseDrag: Double = 0.6 { didSet { sync() } }
     @Published var eyeDriftAmount: Double = 0.004 { didSet { sync() } }
     @Published var eyeDriftSpeed: Double = 0.25 { didSet { sync() } }
     /// Fuerza del resorte hacia el objetivo.
@@ -438,6 +439,7 @@ final class AppModel: ObservableObject {
         next.eyePulseSpeed = Float(eyePulseSpeed)
         next.eyePulseFrequency = Float(eyePulseFrequency)
         next.eyePulseDecay = Float(eyePulseDecay)
+        next.eyePulseDrag = Float(eyePulseDrag)
         next.eyeDriftAmount = Float(eyeDriftAmount)
         next.eyeDriftSpeed = Float(eyeDriftSpeed)
         next.eyeStiffness = Float(eyeStiffness)
@@ -633,6 +635,7 @@ final class AppModel: ObservableObject {
         preset.eyePulseSpeed = eyePulseSpeed
         preset.eyePulseFrequency = eyePulseFrequency
         preset.eyePulseDecay = eyePulseDecay
+        preset.eyePulseDrag = eyePulseDrag
         preset.eyeDriftAmount = eyeDriftAmount
         preset.eyeDriftSpeed = eyeDriftSpeed
         preset.eyeStiffness = eyeStiffness
@@ -762,6 +765,7 @@ final class AppModel: ObservableObject {
         eyePulseSpeed = preset.eyePulseSpeed
         eyePulseFrequency = preset.eyePulseFrequency
         eyePulseDecay = preset.eyePulseDecay
+        eyePulseDrag = preset.eyePulseDrag
         eyeDriftAmount = preset.eyeDriftAmount
         eyeDriftSpeed = preset.eyeDriftSpeed
         eyeStiffness = preset.eyeStiffness

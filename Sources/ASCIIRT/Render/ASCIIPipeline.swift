@@ -76,6 +76,7 @@ struct PipelineConfig: Equatable {
     var eyePulseSpeed: Float = 0.09
     var eyePulseFrequency: Float = 5.0
     var eyePulseDecay: Float = 4.5
+    var eyePulseDrag: Float = 0.6
     var eyeDriftAmount: Float = 0.004
     var eyeDriftSpeed: Float = 0.25
     var eyeStiffness: Float = 18
@@ -581,6 +582,10 @@ final class ASCIIPipeline {
                             eyeCoreG: config.eyeCoreColor.y,
                             eyeCoreB: config.eyeCoreColor.z,
                             eyeCoreBlend: config.eyeCoreBlend,
+                            eyeVelocityX: eyeMotion.velocity.x,
+                            eyeVelocityY: eyeMotion.velocity.y,
+                            eyePulseDrag: config.eyePulseDrag,
+                            _pad2: 0,
                             trailDisperse: config.trailDisperse)
     }
 

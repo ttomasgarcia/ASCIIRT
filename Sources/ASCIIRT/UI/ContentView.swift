@@ -710,6 +710,8 @@ private struct ControlPanel: View {
                         help: "Velocidad con la que la onda se aleja del centro. En 0 queda congelada como anillos fijos, que es un look en sí mismo. Velocidades bajas se leen como energía que emana; altas, como una alarma.")
             ParamSlider(label: "Frecuencia", value: $model.eyePulseFrequency, range: 0.5...20, decimals: 1,
                         help: "Cuántas ondas conviven en pantalla. Alto da anillos finos y juntos, con aspecto de interferencia; bajo da una sola onda ancha que se lee como una exhalación. Combinado con velocidad baja y frecuencia baja se consigue el pulso más orgánico.")
+            ParamSlider(label: "Rezago", value: $model.eyePulseDrag, range: 0...1,
+                        help: "Cuánto quedan atrás los anillos cuando el ojo se mueve. En 0 son concéntricos perfectos y se teletransportan junto con el ojo, como si no se enteraran de que la cosa se movió. Subiéndolo, cada onda se queda donde fue emitida y el frente se deforma hacia atrás — que es lo que hace una onda de verdad.")
             ParamSlider(label: "Caída", value: $model.eyePulseDecay, range: 0...8, decimals: 1,
                         help: "Cuánto se debilita la onda al alejarse. Alto la mantiene pegada al ojo y el borde de la pantalla queda quieto; bajo la deja llegar lejos y toda la imagen late. Si el efecto te resulta invasivo, este es el parámetro a subir.")
 
