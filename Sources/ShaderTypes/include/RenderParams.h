@@ -326,6 +326,27 @@ typedef struct {
     /// mueren enseguida y otras aguantan, asi que la cola se desarma en puntos
     /// sueltos en vez de simplemente atenuarse.
     float trailDisperse;
+
+    /// Parpadeo del nucleo: cada tanto el punto del centro cambia al color de
+    /// abajo y vuelve. Toca SOLO el nucleo — el iris, el aro y el halo siguen su
+    /// gradiente sin enterarse — porque el objetivo es un acento puntual, y si
+    /// parpadeara todo el ojo se leeria como un corte de luz.
+    ///
+    /// Mientras dura el parpadeo la mezcla del nucleo se fuerza a 1: si respetara
+    /// `eyeCoreBlend`, con la fuerza en 0 el color elegido no se veria nunca y el
+    /// control pareceria roto.
+    uint32_t eyeBlinkEnabled;
+    /// Parpadeos por segundo.
+    float eyeBlinkRate;
+    /// Fraccion del ciclo con el color puesto. Bajo = destello corto; alto = el
+    /// color es el estado normal y lo que parpadea es el original.
+    float eyeBlinkDuty;
+    /// 0 = corte duro, tipo testigo de alarma. 1 = entra y sale suave, mas
+    /// respiracion que parpadeo.
+    float eyeBlinkSoftness;
+    float eyeBlinkR;
+    float eyeBlinkG;
+    float eyeBlinkB;
 } RenderParams;
 
 #endif /* RenderParams_h */

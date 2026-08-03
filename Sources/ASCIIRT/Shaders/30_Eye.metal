@@ -142,7 +142,26 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // aporta luminancia, que es lo que hace falta cuando el gradiente esta
     // animado y un blanco fijo en el medio lo apaga.
     const float3 coreColor = float3(params.eyeCoreR, params.eyeCoreG, params.eyeCoreB);
-    rgb = mix(rgb, coreColor, core * params.eyeCoreBlend);
+
+    // Parpadeo: pulso periodico que cambia SOLO el color del nucleo. La onda es
+    // una ventana con flancos suavizados en vez de un seno para que el tiempo
+    // encendido sea regulable aparte del ritmo — con un seno, medio ciclo esta
+    // siempre prendido y no se puede pedir un destello corto.
+    float blink = 0.0;
+    if (params.eyeBlinkEnabled != 0u) {
+        const float phase = fract(params.time * params.eyeBlinkRate);
+        const float duty = clamp(params.eyeBlinkDuty, 0.01, 0.99);
+        // El flanco nunca es cero: un corte instantaneo titila feo cuando el
+        // ritmo no es multiplo de los fps. Arriba llega a medio pulso, que es
+        // donde la ventana se vuelve un triangulo y el parpadeo se hace respiro.
+        const float edge = mix(0.004, duty * 0.5, saturate(params.eyeBlinkSoftness));
+        blink = smoothstep(0.0, edge, phase) * (1.0 - smoothstep(duty - edge, duty, phase));
+    }
+
+    const float3 blinkColor = float3(params.eyeBlinkR, params.eyeBlinkG, params.eyeBlinkB);
+    const float3 activeCore = mix(coreColor, blinkColor, blink);
+    const float activeBlend = mix(params.eyeCoreBlend, 1.0, blink);
+    rgb = mix(rgb, activeCore, core * activeBlend);
 
     // El alpha lleva la mascara del CUERPO del ojo — nucleo, iris y anillo, sin
     // halo ni pulsos. La etapa de composicion la usa para poder pintar el ojo

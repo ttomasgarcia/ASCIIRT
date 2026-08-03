@@ -108,6 +108,11 @@ struct Preset: Codable, Equatable {
     var eyeIrisOuter: [Double] = [0.35, 0.02, 0.10]
     var eyeCoreColor: [Double] = [1, 1, 1]
     var eyeCoreBlend: Double = 1
+    var eyeBlinkEnabled: Bool = false
+    var eyeBlinkRate: Double = 1
+    var eyeBlinkDuty: Double = 0.18
+    var eyeBlinkSoftness: Double = 0.35
+    var eyeBlinkColor: [Double] = [1, 0.85, 0.2]
     var eyeFieldNoise: Double = 0.55
     var eyeFieldChurn: Double = 6
     var matrixImageMix: Double = 0.75
@@ -210,6 +215,11 @@ struct Preset: Codable, Equatable {
         eyeIrisOuter = c.value(.eyeIrisOuter, d.eyeIrisOuter)
         eyeCoreColor = c.value(.eyeCoreColor, d.eyeCoreColor)
         eyeCoreBlend = c.value(.eyeCoreBlend, d.eyeCoreBlend)
+        eyeBlinkEnabled = c.value(.eyeBlinkEnabled, d.eyeBlinkEnabled)
+        eyeBlinkRate = c.value(.eyeBlinkRate, d.eyeBlinkRate)
+        eyeBlinkDuty = c.value(.eyeBlinkDuty, d.eyeBlinkDuty)
+        eyeBlinkSoftness = c.value(.eyeBlinkSoftness, d.eyeBlinkSoftness)
+        eyeBlinkColor = c.value(.eyeBlinkColor, d.eyeBlinkColor)
         eyeFieldNoise = c.value(.eyeFieldNoise, d.eyeFieldNoise)
         eyeFieldChurn = c.value(.eyeFieldChurn, d.eyeFieldChurn)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)

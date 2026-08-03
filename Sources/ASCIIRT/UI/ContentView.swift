@@ -680,6 +680,23 @@ private struct ControlPanel: View {
             ParamSlider(label: "Fuerza núcleo", value: $model.eyeCoreBlend, range: 0...1,
                         help: "Cuánto pisa el núcleo al color del iris. En 1 el centro es del color de arriba; en 0 no pisa nada y el centro toma el color del gradiente, aportando solo luminancia. Bajalo si el gradiente animado se apaga en el medio.")
 
+            ParamToggle(label: "Parpadeo", isOn: $model.eyeBlinkEnabled,
+                        help: "Hace que el núcleo cambie cada tanto al color de abajo y vuelva. Toca solo el punto del centro: el iris, el aro y el halo siguen con su color. Sirve para dar señal de vida sin mover nada — un testigo que late — y para marcar momentos de la presentación cambiando el ritmo. Mientras dura el destello la fuerza del núcleo se fuerza al máximo, así que el color se ve aunque tengas Fuerza núcleo en 0.")
+            if model.eyeBlinkEnabled {
+                HStack(spacing: 8) {
+                    ParamLabel(text: "Color", help: "El color que toma el núcleo durante el destello. Un ámbar o un blanco sobre iris rojo se lee como aviso; un color cercano al del iris da un latido apenas perceptible en vez de un parpadeo.")
+                    ColorPicker("", selection: $model.eyeBlinkColor, supportsOpacity: false)
+                        .labelsHidden()
+                    Spacer()
+                }
+                ParamSlider(label: "Ritmo", value: $model.eyeBlinkRate, range: 0.1...8, decimals: 2,
+                            help: "Parpadeos por segundo. Cerca de 1 late como un pulso en reposo; arriba de 4 se lee como alarma o como procesamiento. Valores muy bajos (0,1 a 0,3) dan un destello aislado cada varios segundos, que llama más la atención justamente porque no se espera.")
+                ParamSlider(label: "Duración", value: $model.eyeBlinkDuty, range: 0.02...0.98,
+                            help: "Qué parte de cada ciclo pasa con el color puesto. Bajo es un destello corto sobre el color normal; en 0,5 pasa la mitad del tiempo en cada uno y se lee como alternancia; alto invierte la lectura — el color del parpadeo pasa a ser el estado normal y lo que destella es el color de núcleo.")
+                ParamSlider(label: "Dureza", value: $model.eyeBlinkSoftness, range: 0...1,
+                            help: "Cómo entra y sale el color. En 0 el corte es seco, tipo testigo de alarma o cursor de terminal. Subiéndolo el cambio se suaviza hasta volverse una respiración, sin bordes: ahí deja de leerse como parpadeo y pasa a ser un latido. Nunca es un corte perfectamente instantáneo, porque eso titila de forma irregular cuando el ritmo no cae justo en los fps.")
+            }
+
             if model.eyeGradientMode != 0 {
                 ParamSlider(label: "Ciclos", value: $model.eyeGradientCycles, range: 0.5...12, decimals: 1,
                             help: "Cuántas veces se repite la transición de color a lo largo de su eje. En modo angular son los sectores que ves girar alrededor del aro; en radial son anillos concéntricos viajando. Con 1 hay una sola transición; con 6 o más aparece un patrón que se lee como energía circulando.")
