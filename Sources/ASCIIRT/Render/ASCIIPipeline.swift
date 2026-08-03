@@ -80,6 +80,11 @@ struct PipelineConfig: Equatable {
     var eyeDriftSpeed: Float = 0.25
     var eyeStiffness: Float = 18
     var eyeDamping: Float = 5.5
+    var gazeMode: GazeMode = .fixed
+    var gazeRate: Float = 0.25
+    var gazeExtent: SIMD2<Float> = SIMD2(0.22, 0.05)
+    var gazeHold: Float = 0.55
+    var gazeStops: Float = 7
     var eyeSolidAmount: Float = 0
     var eyeSolidGain: Float = 1.0
     var eyeSolidEdge: Float = 0.35
@@ -274,6 +279,11 @@ final class ASCIIPipeline {
             eyeMotion.damping = config.eyeDamping
             eyeMotion.driftAmount = config.eyeDriftAmount
             eyeMotion.driftSpeed = config.eyeDriftSpeed
+            eyeMotion.gazeMode = config.gazeMode
+            eyeMotion.gazeRate = config.gazeRate
+            eyeMotion.gazeExtent = config.gazeExtent
+            eyeMotion.gazeHold = config.gazeHold
+            eyeMotion.gazeStops = config.gazeStops
             eyeMotion.target = config.eyeCenter
             eyeMotion.step(deltaTime: deltaTime, time: currentTime)
         }

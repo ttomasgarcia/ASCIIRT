@@ -8,8 +8,18 @@ import Foundation
 /// y, sobre todo, un preset guardado hoy tiene que abrir en una version futura
 /// que agrego parametros. Por eso todo campo faltante cae en su default en vez
 /// de hacer fallar la decodificacion entera.
+/// Que parte del estado toca un preset al cargarse.
+enum PresetScope: String, Codable, CaseIterable {
+    case full = "completo"
+    case look = "look"
+    case motion = "movimiento"
+}
+
 struct Preset: Codable, Equatable {
     var name: String = "Sin nombre"
+    /// Los presets guardados desde la app son completos; los de movimiento y de
+    /// look se escriben a mano o vienen con la app.
+    var scope: String = PresetScope.full.rawValue
 
     // Grid
     var tileWidth: Int = 8
@@ -78,6 +88,12 @@ struct Preset: Codable, Equatable {
     var eyeDriftSpeed: Double = 0.25
     var eyeStiffness: Double = 18
     var eyeDamping: Double = 5.5
+    var gazeMode: UInt32 = 0
+    var gazeRate: Double = 0.25
+    var gazeExtentX: Double = 0.22
+    var gazeExtentY: Double = 0.05
+    var gazeHold: Double = 0.55
+    var gazeStops: Double = 7
     var eyeSolidAmount: Double = 0
     var eyeSolidGain: Double = 1.0
     var eyeSolidEdge: Double = 0.35
@@ -108,6 +124,7 @@ struct Preset: Codable, Equatable {
         let d = Preset()
 
         name = c.value(.name, d.name)
+        scope = c.value(.scope, d.scope)
         tileWidth = c.value(.tileWidth, d.tileWidth)
         aspectFollowsFont = c.value(.aspectFollowsFont, d.aspectFollowsFont)
         cellAspect = c.value(.cellAspect, d.cellAspect)
@@ -163,6 +180,12 @@ struct Preset: Codable, Equatable {
         eyeDriftSpeed = c.value(.eyeDriftSpeed, d.eyeDriftSpeed)
         eyeStiffness = c.value(.eyeStiffness, d.eyeStiffness)
         eyeDamping = c.value(.eyeDamping, d.eyeDamping)
+        gazeMode = c.value(.gazeMode, d.gazeMode)
+        gazeRate = c.value(.gazeRate, d.gazeRate)
+        gazeExtentX = c.value(.gazeExtentX, d.gazeExtentX)
+        gazeExtentY = c.value(.gazeExtentY, d.gazeExtentY)
+        gazeHold = c.value(.gazeHold, d.gazeHold)
+        gazeStops = c.value(.gazeStops, d.gazeStops)
         eyeSolidAmount = c.value(.eyeSolidAmount, d.eyeSolidAmount)
         eyeSolidGain = c.value(.eyeSolidGain, d.eyeSolidGain)
         eyeSolidEdge = c.value(.eyeSolidEdge, d.eyeSolidEdge)
@@ -230,14 +253,23 @@ enum PresetStore {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     }
 
-    static func list() -> [String] {
+    /// Nombre y alcance de cada preset en disco.
+    ///
+    /// Se lee el archivo entero para sacar un solo campo, pero son unos pocos KB
+    /// y solo pasa al refrescar la lista. La alternativa —guardar el alcance en
+    /// el nombre— haria que renombrar rompa el comportamiento.
+    static func listDetailed() -> [(name: String, scope: PresetScope)] {
         guard let entries = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else {
             return []
         }
         return entries
             .filter { $0.pathExtension == "json" }
-            .map { $0.deletingPathExtension().lastPathComponent }
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            .map { url in
+                let name = url.deletingPathExtension().lastPathComponent
+                let scope = (try? load(from: url)).flatMap { PresetScope(rawValue: $0.scope) } ?? .full
+                return (name, scope)
+            }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     static func url(for name: String) -> URL {

@@ -38,9 +38,13 @@ librerías ASCII de terceros.
   Más invertir y fondo transparente para ProRes 4444 / secuencia PNG.
 - **Arrastre**: el campo del frame anterior sobrevive atenuado, así el ASCII
   deja estela al moverse. Es el mismo mecanismo que el fósforo de un tubo.
-- **Presets** en JSON, más restauración automática del estado al abrir. Diez
-  presets del ojo vienen en `Presets/` — copialos a
-  `~/Library/Application Support/ASCIIRT/Presets/`.
+- **Presets con alcance**: de *look*, de *movimiento* o de *escena* (los dos
+  juntos). Cargar un look no toca el recorrido y viceversa, así cualquier
+  combinación es un par de clics. Vienen 10 de cada uno en `Presets/` — copialos
+  a `~/Library/Application Support/ASCIIRT/Presets/`.
+- **Mirada**: quieto, deriva, barrido, saltos, escaneo en zigzag u órbita, con
+  alcance separado por eje. Todos son funciones puras del tiempo, así que el
+  render offline reproduce la misma secuencia de miradas.
 
 ## Requisitos
 

@@ -1,0 +1,17 @@
+{
+  "eyeCenter": [
+    0.5,
+    0.5
+  ],
+  "eyeDamping": 4.2,
+  "eyeDriftAmount": 0.003,
+  "eyeDriftSpeed": 0.2,
+  "eyeStiffness": 7,
+  "gazeExtentX": 0.1,
+  "gazeExtentY": 0.1,
+  "gazeMode": 1,
+  "gazeRate": 0.09,
+  "name": "M07 Fondo de la sala",
+  "scope": "movimiento",
+  "sourceKind": "Ojo"
+}

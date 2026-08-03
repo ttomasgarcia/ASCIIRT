@@ -80,6 +80,7 @@
   "name": "09 Cometa",
   "outputPreset": "Fuente",
   "reliefRadius": 0,
+  "scope": "look",
   "sourceKind": "Ojo",
   "subjectMatteEnabled": false,
   "tileWidth": 8,

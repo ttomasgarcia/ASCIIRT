@@ -1,0 +1,17 @@
+{
+  "eyeCenter": [
+    0.5,
+    0.5
+  ],
+  "eyeDamping": 7.5,
+  "eyeDriftAmount": 0.002,
+  "eyeDriftSpeed": 0.4,
+  "eyeStiffness": 34,
+  "gazeExtentX": 0.24,
+  "gazeExtentY": 0.07,
+  "gazeMode": 3,
+  "gazeRate": 0.3,
+  "name": "M03 Busca a alguien",
+  "scope": "movimiento",
+  "sourceKind": "Ojo"
+}

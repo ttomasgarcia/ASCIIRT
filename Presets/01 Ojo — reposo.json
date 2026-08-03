@@ -80,6 +80,7 @@
   "name": "01 Ojo — reposo",
   "outputPreset": "Fuente",
   "reliefRadius": 0,
+  "scope": "look",
   "sourceKind": "Ojo",
   "subjectMatteEnabled": false,
   "tileWidth": 8,

@@ -1,0 +1,18 @@
+{
+  "eyeCenter": [
+    0.5,
+    0.5
+  ],
+  "eyeDamping": 14.0,
+  "eyeDriftAmount": 0.001,
+  "eyeDriftSpeed": 0.25,
+  "eyeStiffness": 70,
+  "gazeExtentX": 0.34,
+  "gazeExtentY": 0.02,
+  "gazeMode": 4,
+  "gazeRate": 0.6,
+  "gazeStops": 14,
+  "name": "M09 Escanea y se clava",
+  "scope": "movimiento",
+  "sourceKind": "Ojo"
+}

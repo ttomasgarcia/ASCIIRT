@@ -383,20 +383,13 @@ private struct ControlPanel: View {
 
     private var presetContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            Picker("", selection: Binding(
-                get: { model.currentPresetName ?? "" },
-                set: { if !$0.isEmpty { model.loadPreset(named: $0) } }
-            )) {
-                Text(model.currentPresetName == nil ? "— sin preset —" : "— elegir —").tag("")
-                ForEach(model.presetNames, id: \.self) { name in Text(name).tag(name) }
-            }
-            .labelsHidden()
-            .controlSize(.small)
+            presetPicker("Look", names: model.lookPresets, current: model.currentLook)
+            presetPicker("Movimiento", names: model.motionPresets, current: model.currentMotion)
+            presetPicker("Escena", names: model.fullPresets, current: model.currentPresetName)
 
             HStack(spacing: 6) {
                 Button("Guardar…") { promptSavePreset() }
                 if let current = model.currentPresetName {
-                    Button("Actualizar") { model.savePreset(named: current) }
                     Button(role: .destructive) {
                         model.deletePreset(named: current)
                     } label: {
@@ -414,29 +407,57 @@ private struct ControlPanel: View {
             }
             .controlSize(.small)
 
-            Text("El estado se guarda solo y vuelve al abrir la app.")
+            Text("Look y movimiento son independientes: cargar uno no toca al otro. Escena guarda los dos juntos.")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// NSAlert y no un sheet de SwiftUI: es un campo de texto y un boton, y el
-    /// panel modal de AppKit no necesita estado extra en la vista.
+    private func presetPicker(_ label: String, names: [String], current: String?) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(width: 74, alignment: .leading)
+            Picker("", selection: Binding(
+                get: { current ?? "" },
+                set: { if !$0.isEmpty { model.loadPreset(named: $0) } }
+            )) {
+                Text("—").tag("")
+                ForEach(names, id: \.self) { name in Text(name).tag(name) }
+            }
+            .labelsHidden()
+            .controlSize(.small)
+            .disabled(names.isEmpty)
+        }
+    }
+
+    /// NSAlert y no un sheet de SwiftUI: son dos controles y el panel modal de
+    /// AppKit no necesita estado extra en la vista.
     private func promptSavePreset() {
         let alert = NSAlert()
         alert.messageText = "Guardar preset"
-        alert.informativeText = "Se guarda como JSON en la carpeta de presets."
+        alert.informativeText = "El alcance decide qué toca al cargarlo."
         alert.addButton(withTitle: "Guardar")
         alert.addButton(withTitle: "Cancelar")
 
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 56))
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 30, width: 260, height: 24))
         field.stringValue = model.currentPresetName ?? "Preset 1"
-        alert.accessoryView = field
+        container.addSubview(field)
+
+        let scopePopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        scopePopup.addItems(withTitles: ["Escena (todo)", "Solo look", "Solo movimiento"])
+        container.addSubview(scopePopup)
+
+        alert.accessoryView = container
         alert.window.initialFirstResponder = field
 
-        if alert.runModal() == .alertFirstButtonReturn {
-            model.savePreset(named: field.stringValue)
-        }
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let scope: PresetScope = [.full, .look, .motion][scopePopup.indexOfSelectedItem]
+        model.savePreset(named: field.stringValue, scope: scope)
     }
 
     // MARK: Fuente
@@ -562,7 +583,24 @@ private struct ControlPanel: View {
             ParamSlider(label: "Refresco", value: $model.eyeFieldChurn, range: 0...30, decimals: 1,
                         help: "Cambios por segundo del grano. Alto = el código se refresca solo.")
 
-            PanelGroupLabel(text: "Movimiento")
+            PanelGroupLabel(text: "Mirada")
+            Picker("", selection: $model.gazeMode) {
+                ForEach(GazeMode.allCases) { mode in Text(mode.label).tag(mode) }
+            }
+            .labelsHidden()
+            .controlSize(.small)
+
+            ParamSlider(label: "Ritmo", value: $model.gazeRate, range: 0.02...3,
+                        help: "Barridos o saltos por segundo.")
+            ParamSlider(label: "Alcance X", value: $model.gazeExtentX, range: 0...0.5, decimals: 3,
+                        help: "Un público es ancho y bajo: barrer mucho más en X es lo que hace que parezca que recorre butacas.")
+            ParamSlider(label: "Alcance Y", value: $model.gazeExtentY, range: 0...0.3, decimals: 3)
+            if model.gazeMode == .scan {
+                ParamSlider(label: "Paradas", value: $model.gazeStops, range: 2...16, decimals: 0,
+                            help: "Cuántas posiciones recorre antes de volver.")
+            }
+
+            PanelGroupLabel(text: "Físico")
             ParamSlider(label: "Rigidez", value: $model.eyeStiffness, range: 1...80, decimals: 1,
                         help: "Cuánto tira el resorte hacia el objetivo. Alto = va derecho y rápido.")
             ParamSlider(label: "Rozamiento", value: $model.eyeDamping, range: 0.5...30, decimals: 1,
@@ -571,8 +609,9 @@ private struct ControlPanel: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
 
-            PanelGroupLabel(text: "Deriva")
-            ParamSlider(label: "Amplitud", value: $model.eyeDriftAmount, range: 0...0.08, decimals: 4)
+            PanelGroupLabel(text: "Temblor")
+            ParamSlider(label: "Amplitud", value: $model.eyeDriftAmount, range: 0...0.08, decimals: 4,
+                        help: "Se suma siempre, encima de cualquier mirada. Sin él los modos con pausa se ven congelados.")
             ParamSlider(label: "Velocidad", value: $model.eyeDriftSpeed, range: 0.01...2)
 
             HStack {

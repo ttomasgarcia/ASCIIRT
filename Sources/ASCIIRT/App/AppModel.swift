@@ -96,6 +96,12 @@ final class AppModel: ObservableObject {
     /// Rozamiento. Por debajo de 2·√rigidez el ojo sobrepasa y rebota al
     /// asentarse, que es de donde sale la sensacion de que esta vivo.
     @Published var eyeDamping: Double = 5.5 { didSet { sync() } }
+    @Published var gazeMode: GazeMode = .fixed { didSet { sync() } }
+    @Published var gazeRate: Double = 0.25 { didSet { sync() } }
+    @Published var gazeExtentX: Double = 0.22 { didSet { sync() } }
+    @Published var gazeExtentY: Double = 0.05 { didSet { sync() } }
+    @Published var gazeHold: Double = 0.55 { didSet { sync() } }
+    @Published var gazeStops: Double = 7 { didSet { sync() } }
 
     /// Pleno: cuanto se sale el ojo del ASCII para ganar intensidad.
     @Published var eyeSolidAmount: Double = 0 { didSet { sync() } }
@@ -232,7 +238,14 @@ final class AppModel: ObservableObject {
 
     // MARK: - Presets
 
-    @Published private(set) var presetNames: [String] = []
+    /// Tres cajones separados: un preset de look no toca el recorrido y uno de
+    /// movimiento no toca la forma. El completo guarda las dos cosas y es lo que
+    /// uno arma cuando ya encontro la combinacion.
+    @Published private(set) var lookPresets: [String] = []
+    @Published private(set) var motionPresets: [String] = []
+    @Published private(set) var fullPresets: [String] = []
+    @Published private(set) var currentLook: String?
+    @Published private(set) var currentMotion: String?
     @Published private(set) var currentPresetName: String?
 
     // MARK: - Salida
@@ -369,6 +382,11 @@ final class AppModel: ObservableObject {
         next.eyeDriftSpeed = Float(eyeDriftSpeed)
         next.eyeStiffness = Float(eyeStiffness)
         next.eyeDamping = Float(eyeDamping)
+        next.gazeMode = gazeMode
+        next.gazeRate = Float(gazeRate)
+        next.gazeExtent = SIMD2(Float(gazeExtentX), Float(gazeExtentY))
+        next.gazeHold = Float(gazeHold)
+        next.gazeStops = Float(gazeStops)
         next.eyeSolidAmount = Float(eyeSolidAmount)
         next.eyeSolidGain = Float(eyeSolidGain)
         next.eyeSolidEdge = Float(eyeSolidEdge)
@@ -485,12 +503,16 @@ final class AppModel: ObservableObject {
     // MARK: - Presets
 
     func refreshPresets() {
-        presetNames = PresetStore.list()
+        let all = PresetStore.listDetailed()
+        lookPresets = all.filter { $0.scope == .look }.map(\.name)
+        motionPresets = all.filter { $0.scope == .motion }.map(\.name)
+        fullPresets = all.filter { $0.scope == .full }.map(\.name)
     }
 
-    func snapshot(named name: String) -> Preset {
+    func snapshot(named name: String, scope: PresetScope = .full) -> Preset {
         var preset = Preset()
         preset.name = name
+        preset.scope = scope.rawValue
         preset.tileWidth = Int(tileWidth)
         preset.aspectFollowsFont = aspectFollowsFont
         preset.cellAspect = cellAspect
@@ -545,6 +567,12 @@ final class AppModel: ObservableObject {
         preset.eyeDriftSpeed = eyeDriftSpeed
         preset.eyeStiffness = eyeStiffness
         preset.eyeDamping = eyeDamping
+        preset.gazeMode = gazeMode.rawValue
+        preset.gazeRate = gazeRate
+        preset.gazeExtentX = gazeExtentX
+        preset.gazeExtentY = gazeExtentY
+        preset.gazeHold = gazeHold
+        preset.gazeStops = gazeStops
         preset.eyeSolidAmount = eyeSolidAmount
         preset.eyeSolidGain = eyeSolidGain
         preset.eyeSolidEdge = eyeSolidEdge
@@ -569,6 +597,35 @@ final class AppModel: ObservableObject {
 
     func apply(_ preset: Preset, markCurrent: Bool = true) {
         isApplyingPreset = true
+
+        // Alcance: un preset de movimiento no puede pisar la forma del ojo, ni
+        // al reves. Es lo que permite combinar cualquier look con cualquier
+        // recorrido sin rehacer uno de los dos.
+        let scope = PresetScope(rawValue: preset.scope) ?? .full
+        let wantsMotion = scope != .look
+        let wantsLook = scope != .motion
+
+        if wantsMotion {
+                    gazeMode = GazeMode(rawValue: preset.gazeMode) ?? .fixed
+            gazeRate = preset.gazeRate
+            gazeExtentX = preset.gazeExtentX
+            gazeExtentY = preset.gazeExtentY
+            gazeHold = preset.gazeHold
+            gazeStops = preset.gazeStops
+                    if preset.eyeCenter.count >= 2 {
+                eyeCenter = CGPoint(x: preset.eyeCenter[0], y: preset.eyeCenter[1])
+                renderer.ascii.eyeMotion.snap(to: SIMD2(Float(preset.eyeCenter[0]),
+                                                        Float(preset.eyeCenter[1])))
+            }
+        }
+
+        guard wantsLook else {
+            isApplyingPreset = false
+            syncRenderFlags()
+            sync()
+            if markCurrent { currentMotion = preset.name }
+            return
+        }
 
         tileWidth = UInt32(max(1, preset.tileWidth))
         aspectFollowsFont = preset.aspectFollowsFont
@@ -606,12 +663,6 @@ final class AppModel: ObservableObject {
             backgroundColor = Color(red: preset.background[0], green: preset.background[1], blue: preset.background[2])
         }
 
-        if preset.eyeCenter.count >= 2 {
-            eyeCenter = CGPoint(x: preset.eyeCenter[0], y: preset.eyeCenter[1])
-            // Sin el snap el ojo entraria volando desde donde estuviera, con la
-            // velocidad acumulada de antes.
-            renderer.ascii.eyeMotion.snap(to: SIMD2(Float(preset.eyeCenter[0]), Float(preset.eyeCenter[1])))
-        }
         eyeRadius = preset.eyeRadius
         eyeCoreRadius = preset.eyeCoreRadius
         eyeFalloff = preset.eyeFalloff
@@ -665,18 +716,33 @@ final class AppModel: ObservableObject {
         camera.setExposureLocked(exposureLocked)
         sync()
 
-        if markCurrent { currentPresetName = preset.name }
+        if markCurrent {
+            switch scope {
+            case .look: currentLook = preset.name
+            case .motion: currentMotion = preset.name
+            case .full:
+                currentPresetName = preset.name
+                // Un completo define las dos cosas, asi que los otros dos
+                // selectores dejan de representar lo que hay en pantalla.
+                currentLook = nil
+                currentMotion = nil
+            }
+        }
     }
 
-    func savePreset(named name: String) {
+    func savePreset(named name: String, scope: PresetScope = .full) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             report(AppError(.capture, "El preset necesita un nombre."))
             return
         }
         do {
-            try PresetStore.save(snapshot(named: trimmed), to: PresetStore.url(for: trimmed))
-            currentPresetName = trimmed
+            try PresetStore.save(snapshot(named: trimmed, scope: scope), to: PresetStore.url(for: trimmed))
+            switch scope {
+            case .look: currentLook = trimmed
+            case .motion: currentMotion = trimmed
+            case .full: currentPresetName = trimmed
+            }
             refreshPresets()
         } catch let error as AppError {
             report(error)
@@ -699,6 +765,8 @@ final class AppModel: ObservableObject {
         do {
             try PresetStore.delete(named: name)
             if currentPresetName == name { currentPresetName = nil }
+            if currentLook == name { currentLook = nil }
+            if currentMotion == name { currentMotion = nil }
             refreshPresets()
         } catch let error as AppError {
             report(error)

@@ -1,0 +1,18 @@
+{
+  "eyeCenter": [
+    0.5,
+    0.5
+  ],
+  "eyeDamping": 6.0,
+  "eyeDriftAmount": 0.002,
+  "eyeDriftSpeed": 0.3,
+  "eyeStiffness": 13,
+  "gazeExtentX": 0.26,
+  "gazeExtentY": 0.05,
+  "gazeMode": 4,
+  "gazeRate": 0.22,
+  "gazeStops": 7,
+  "name": "M02 Recorre la sala",
+  "scope": "movimiento",
+  "sourceKind": "Ojo"
+}

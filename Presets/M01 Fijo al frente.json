@@ -1,0 +1,17 @@
+{
+  "eyeCenter": [
+    0.5,
+    0.5
+  ],
+  "eyeDamping": 7.0,
+  "eyeDriftAmount": 0.0015,
+  "eyeDriftSpeed": 0.18,
+  "eyeStiffness": 16,
+  "gazeExtentX": 0.0,
+  "gazeExtentY": 0.0,
+  "gazeMode": 0,
+  "gazeRate": 0.2,
+  "name": "M01 Fijo al frente",
+  "scope": "movimiento",
+  "sourceKind": "Ojo"
+}
