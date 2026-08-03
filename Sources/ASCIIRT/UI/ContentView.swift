@@ -549,7 +549,7 @@ private struct ControlPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            PanelGroupLabel(text: "Forma")
+            PanelGroupLabel(text: "Forma", help: "Geometría del ojo: núcleo caliente, cuerpo del iris y su caída.")
             ParamSlider(label: "Radio", value: $model.eyeRadius, range: 0.02...0.45,
                         decimals: 3, help: "Relativo al lado corto de la salida.")
             ParamSlider(label: "Núcleo", value: $model.eyeCoreRadius, range: 0.02...0.8,
@@ -557,26 +557,27 @@ private struct ControlPanel: View {
             ParamSlider(label: "Dureza", value: $model.eyeFalloff, range: 0.3...8,
                         help: "Exponente de la caída del iris. Alto = borde duro.")
 
-            PanelGroupLabel(text: "Anillo de lente")
-            ParamSlider(label: "Ancho", value: $model.eyeRingWidth, range: 0.005...0.4, decimals: 3)
+            PanelGroupLabel(text: "Anillo de lente", help: "Aro fino en el borde del iris. Existe para que el detector de bordes trace el contorno con - / | \\ en vez de dejar una mancha.")
+            ParamSlider(label: "Ancho", value: $model.eyeRingWidth, range: 0.005...0.4, decimals: 3,
+                        help: "Grosor del aro, como fracción del radio. Fino se lee como lente; ancho se funde con el iris.")
             ParamSlider(label: "Intensidad", value: $model.eyeRingIntensity, range: 0...2,
                         help: "El anillo existe para que el detector de bordes trace el contorno con - / | \\.")
 
-            PanelGroupLabel(text: "Halo")
-            ParamSlider(label: "Radio", value: $model.eyeHaloRadius, range: 0.02...1.5)
+            PanelGroupLabel(text: "Halo", help: "El campo tenue que rodea al ojo. Es de donde sale el código de alrededor.")
+            ParamSlider(label: "Radio", value: $model.eyeHaloRadius, range: 0.02...1.5,
+                        help: "Hasta dónde llega el campo. Grande lo desparrama por toda la pantalla; chico lo deja pegado al ojo.")
             ParamSlider(label: "Intensidad", value: $model.eyeHaloIntensity, range: 0...1,
                         help: "Hace que el código de alrededor se densifique hacia el centro.")
 
             HStack(spacing: 8) {
-                Text("Iris").font(.system(size: 11)).foregroundStyle(.secondary)
-                    .frame(width: PanelMetrics.labelWidth, alignment: .leading)
+                ParamLabel(text: "Iris", help: "Color del cuerpo del ojo. El núcleo quema a blanco por encima de este color, así que un rojo saturado igual da centro blanco.")
                 ColorPicker("", selection: $model.eyeIrisColor, supportsOpacity: false)
                     .labelsHidden()
                 Spacer()
             }
 
             Divider().padding(.vertical, 2)
-            PanelGroupLabel(text: "Pleno")
+            PanelGroupLabel(text: "Pleno", help: "Saca al ojo del ASCII y lo pinta como forma llena, para que pegue más fuerte que el código.")
             ParamSlider(label: "Mezcla", value: $model.eyeSolidAmount, range: 0...1,
                         help: "0 = el ojo es sólo glifos. 1 = disco pleno por encima del ASCII.")
             ParamSlider(label: "Intensidad", value: $model.eyeSolidGain, range: 0...3,
@@ -585,24 +586,29 @@ private struct ControlPanel: View {
                         help: "0 respeta la caída del iris. 1 corta en disco de borde duro.")
 
             Divider().padding(.vertical, 2)
-            PanelGroupLabel(text: "Respiración")
-            ParamSlider(label: "Amplitud", value: $model.eyeBreathAmount, range: 0...0.3, decimals: 3)
-            ParamSlider(label: "Velocidad", value: $model.eyeBreathSpeed, range: 0.01...2)
+            PanelGroupLabel(text: "Respiración", help: "Oscilación lenta del radio. Es lo que hace que el ojo parezca vivo aunque no se mueva de lugar.")
+            ParamSlider(label: "Amplitud", value: $model.eyeBreathAmount, range: 0...0.3, decimals: 3,
+                        help: "Cuánto crece y decrece el radio, en fracción. 0,03 es casi imperceptible; 0,2 late fuerte.")
+            ParamSlider(label: "Velocidad", value: $model.eyeBreathSpeed, range: 0.01...2,
+                        help: "Ciclos por segundo. Por debajo de 0,2 respira; por encima de 0,8 palpita.")
 
-            PanelGroupLabel(text: "Pulsos de energía")
-            ParamSlider(label: "Amplitud", value: $model.eyePulseAmount, range: 0...0.6)
-            ParamSlider(label: "Velocidad", value: $model.eyePulseSpeed, range: 0...1)
-            ParamSlider(label: "Frecuencia", value: $model.eyePulseFrequency, range: 0.5...20, decimals: 1)
+            PanelGroupLabel(text: "Pulsos de energía", help: "Ondas que salen del centro. Como todo pasa por la rampa, no se ven como resplandor sino como una ola de caracteres cambiando de densidad.")
+            ParamSlider(label: "Amplitud", value: $model.eyePulseAmount, range: 0...0.6,
+                        help: "Fuerza de la onda. Alto puede saturar el campo y tapar el degradado del halo.")
+            ParamSlider(label: "Velocidad", value: $model.eyePulseSpeed, range: 0...1,
+                        help: "Qué tan rápido viaja la onda hacia afuera. En 0 queda congelada como anillos fijos.")
+            ParamSlider(label: "Frecuencia", value: $model.eyePulseFrequency, range: 0.5...20, decimals: 1,
+                        help: "Cuántas ondas hay a la vez. Alto da anillos finos y juntos; bajo, una sola onda ancha.")
             ParamSlider(label: "Caída", value: $model.eyePulseDecay, range: 0...8, decimals: 1,
                         help: "Cuánto se apaga la onda con la distancia.")
 
-            PanelGroupLabel(text: "Campo de código")
+            PanelGroupLabel(text: "Campo de código", help: "El grano que convierte el degradado del halo en textura de caracteres.")
             ParamSlider(label: "Grano", value: $model.eyeFieldNoise, range: 0...1.5,
                         help: "Rompe las bandas concéntricas que produce un degradado liso sobre la rampa.")
             ParamSlider(label: "Refresco", value: $model.eyeFieldChurn, range: 0...30, decimals: 1,
                         help: "Cambios por segundo del grano. Alto = el código se refresca solo.")
 
-            PanelGroupLabel(text: "Mirada")
+            PanelGroupLabel(text: "Mirada", help: "Cómo recorre la pantalla. Genera el objetivo; el resorte se encarga de llegar.")
             Picker("", selection: $model.gazeMode) {
                 ForEach(GazeMode.allCases) { mode in Text(mode.label).tag(mode) }
             }
@@ -613,13 +619,14 @@ private struct ControlPanel: View {
                         help: "Barridos o saltos por segundo.")
             ParamSlider(label: "Alcance X", value: $model.gazeExtentX, range: 0...0.5, decimals: 3,
                         help: "Un público es ancho y bajo: barrer mucho más en X es lo que hace que parezca que recorre butacas.")
-            ParamSlider(label: "Alcance Y", value: $model.gazeExtentY, range: 0...0.3, decimals: 3)
+            ParamSlider(label: "Alcance Y", value: $model.gazeExtentY, range: 0...0.3, decimals: 3,
+                        help: "Cuánto sube y baja. Conviene mucho menor que el alcance en X: un público es ancho y bajo.")
             if model.gazeMode == .scan {
                 ParamSlider(label: "Paradas", value: $model.gazeStops, range: 2...16, decimals: 0,
                             help: "Cuántas posiciones recorre antes de volver.")
             }
 
-            PanelGroupLabel(text: "Físico")
+            PanelGroupLabel(text: "Físico", help: "Cómo viaja hasta el objetivo. Es lo que separa un movimiento vivo de un cursor.")
             ParamSlider(label: "Rigidez", value: $model.eyeStiffness, range: 1...80, decimals: 1,
                         help: "Cuánto tira el resorte hacia el objetivo. Alto = va derecho y rápido.")
             ParamSlider(label: "Rozamiento", value: $model.eyeDamping, range: 0.5...30, decimals: 1,
@@ -628,14 +635,17 @@ private struct ControlPanel: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
 
-            PanelGroupLabel(text: "Temblor")
+            PanelGroupLabel(text: "Temblor", help: "Micro-movimiento permanente, encima de cualquier mirada.")
             ParamSlider(label: "Amplitud", value: $model.eyeDriftAmount, range: 0...0.08, decimals: 4,
                         help: "Se suma siempre, encima de cualquier mirada. Sin él los modos con pausa se ven congelados.")
-            ParamSlider(label: "Velocidad", value: $model.eyeDriftSpeed, range: 0.01...2)
+            ParamSlider(label: "Velocidad", value: $model.eyeDriftSpeed, range: 0.01...2,
+                        help: "Frecuencia del temblor. Alto se lee como vibración; bajo, como respiración de la posición.")
 
             HStack {
                 Button("Centrar") { model.centerEye() }
+                    .help("Manda el ojo al centro dejando que el resorte lo lleve.")
                 Button("Fijar") { model.snapEyeToCenter() }
+                    .help("Salta al centro sin animación. Para dejarlo listo antes de que entre gente.")
                 Spacer()
                 Text(String(format: "%.3f, %.3f", model.eyeCenter.x, model.eyeCenter.y))
                     .font(.system(size: 9, design: .monospaced))
@@ -671,12 +681,16 @@ private struct ControlPanel: View {
             ParamToggle(label: "Aspecto de la fuente", isOn: $model.aspectFollowsFont,
                         help: "El alto de celda sigue el aspecto natural de la fuente. Apagalo para deformar el glifo a propósito.")
 
-            ParamSlider(label: "Aspecto", value: $model.cellAspect, range: 0.5...3.0)
+            ParamSlider(label: "Aspecto", value: $model.cellAspect, range: 0.5...3.0,
+                        help: "Alto dividido ancho de la celda. 1 la hace cuadrada y el glifo sale estirado a lo ancho; ~2 es el aspecto natural de una monoespaciada.")
                 .disabled(model.aspectFollowsFont)
 
-            ParamReadout(label: "Celda", value: "\(model.config.tileSize.x)×\(model.config.tileSize.y) px")
-            ParamReadout(label: "Salida", value: "\(model.config.outputSize.x)×\(model.config.outputSize.y)")
-            ParamReadout(label: "Grid", value: "\(model.config.gridSize.x) × \(model.config.gridSize.y)")
+            ParamReadout(label: "Celda", value: "\(model.config.tileSize.x)×\(model.config.tileSize.y) px",
+                         help: "Tamaño de cada celda en píxeles. Cuanto más chica, más caracteres entran y más detalle, pero menos se lee cada glifo.")
+            ParamReadout(label: "Salida", value: "\(model.config.outputSize.x)×\(model.config.outputSize.y)",
+                         help: "Resolución del render. Se fija en Export; el grid se deriva de ella, nunca al revés.")
+            ParamReadout(label: "Grid", value: "\(model.config.gridSize.x) × \(model.config.gridSize.y)",
+                         help: "Columnas × filas de caracteres. Es la resolución real de la imagen ASCII.")
 
             if let warning = model.gridWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
@@ -728,7 +742,8 @@ private struct ControlPanel: View {
             }
             .controlSize(.small)
 
-            ParamReadout(label: "Rampa", value: "\(model.ramp.count) / \(model.coverage.count)")
+            ParamReadout(label: "Rampa", value: "\(model.ramp.count) / \(model.coverage.count)",
+                         help: "Glifos en uso sobre glifos del charset. La rampa se arma midiendo la tinta de cada glifo y ordenándolos de más claro a más denso.")
 
             DisclosureGroup(isExpanded: $showCoverage) {
                 CoverageTable(model: model)
@@ -744,12 +759,15 @@ private struct ControlPanel: View {
 
     private var colorContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            Picker("", selection: $model.colorMode) {
-                ForEach(AppModel.ColorMode.allCases) { mode in Text(mode.label).tag(mode) }
+            HStack(spacing: 6) {
+                Picker("", selection: $model.colorMode) {
+                    ForEach(AppModel.ColorMode.allCases) { mode in Text(mode.label).tag(mode) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Mono: tinta sobre negro. Dos colores: tinta y fondo a elección. Original: cada carácter toma el color promedio de su celda en la imagen.")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
 
             HStack(spacing: 8) {
                 Text(model.colorMode == .original ? "Fondo" : "Tinta")
@@ -788,7 +806,7 @@ private struct ControlPanel: View {
 
     private var exportContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            PanelGroupLabel(text: "Resolución de salida")
+            PanelGroupLabel(text: "Resolución de salida", help: "Tamaño del render. «Fuente» la toma de la cámara o del archivo; los presets la fijan y la imagen se encuadra dentro.")
             Picker("", selection: $model.outputPreset) {
                 ForEach(AppModel.OutputPreset.allCases) { preset in Text(preset.rawValue).tag(preset) }
             }
@@ -796,7 +814,7 @@ private struct ControlPanel: View {
             .labelsHidden()
             .controlSize(.small)
 
-            PanelGroupLabel(text: "Formato")
+            PanelGroupLabel(text: "Formato", help: "Destino del REC y del render offline. ProRes para post, H.264 para mandar, secuencia PNG para máxima calidad con alpha.")
             Picker("", selection: $model.exportCodec) {
                 ForEach(ExportCodec.allCases) { codec in Text(codec.rawValue).tag(codec) }
             }
@@ -815,7 +833,7 @@ private struct ControlPanel: View {
             }
 
             Divider().padding(.vertical, 2)
-            PanelGroupLabel(text: "Render offline")
+            PanelGroupLabel(text: "Render offline", help: "Procesa un archivo cuadro a cuadro sin reloj: cada frame de entrada da exactamente uno de salida, tarde lo que tarde.")
             Text("Desacoplado del reloj: cada frame de entrada produce uno de salida.")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
@@ -843,9 +861,11 @@ private struct ControlPanel: View {
             VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
                 ParamSlider(label: "Umbral", value: $model.edgeThreshold, range: 0...1,
                             help: "Por encima de esto el tile usa - / | \\ en vez de rampa.")
-                PanelGroupLabel(text: "Diferencia de gaussianas")
-                ParamSlider(label: "Sigma 1", value: $model.dogSigma1, range: 0.2...4)
-                ParamSlider(label: "Sigma 2", value: $model.dogSigma2, range: 0.5...10)
+                PanelGroupLabel(text: "Diferencia de gaussianas", help: "Dos desenfoques restados. Lo que queda son los bordes: la diferencia entre un desenfoque fino y uno grueso es justamente el detalle.")
+                ParamSlider(label: "Sigma 1", value: $model.dogSigma1, range: 0.2...4,
+                            help: "Radio del desenfoque fino. Chico detecta bordes finos; grande los engorda.")
+                ParamSlider(label: "Sigma 2", value: $model.dogSigma2, range: 0.5...10,
+                            help: "Radio del desenfoque grueso. Tiene que ser mayor que Sigma 1; cuanto más lejos, más ancho el borde detectado.")
                 ParamSlider(label: "Tau", value: $model.dogTau, range: 0...1.2,
                             help: "Cuánto se resta la gaussiana ancha. Cerca de 1 queda casi solo borde.")
             }
@@ -863,7 +883,7 @@ private struct ControlPanel: View {
             ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
                         help: "Zona muerta en escalones de rampa. En 0 la rampa hierve; por encima de ~2 los cambios lentos se atrasan.")
 
-            PanelGroupLabel(text: "Exposición")
+            PanelGroupLabel(text: "Exposición", help: "El AGC de la cámara mueve la luminancia media constantemente y la rampa hierve aunque la escena esté quieta. Esto lo corrige.")
             ParamToggle(label: "Lock de cámara", isOn: $model.exposureLocked,
                         help: model.supportsExposureLock
                             ? "Congela exposición y balance de blancos en el hardware."
@@ -874,7 +894,8 @@ private struct ControlPanel: View {
                         help: "Mezcla entre luma cruda y normalizada.")
             ParamSlider(label: "Suavizado", value: $model.lumaSmoothAlpha, range: 0.01...0.5,
                         help: "Alpha de la media móvil. Chico reacciona lento pero no persigue al AGC.")
-            ParamSlider(label: "Punto medio", value: $model.lumaTarget, range: 0.2...0.8)
+            ParamSlider(label: "Punto medio", value: $model.lumaTarget, range: 0.2...0.8,
+                        help: "A qué luminancia se lleva el promedio de la imagen. 0,5 la centra en la rampa; más alto la aclara.")
                 .disabled(model.autoLevelStrength <= 0)
         }
     }
@@ -888,7 +909,7 @@ private struct ControlPanel: View {
             // El .disabled va sobre los parametros, no sobre la seccion: si
             // envuelve al toggle tambien se deshabilita a si mismo.
             VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-                PanelGroupLabel(text: "Gota")
+                PanelGroupLabel(text: "Gota", help: "Cada columna tiene su propia velocidad y fase, si no la lluvia se lee como una persiana bajando.")
                 ParamSlider(label: "Velocidad", value: $model.matrixSpeed, range: 1...60, decimals: 0)
                 ParamSlider(label: "Densidad", value: $model.matrixDensity, range: 1...12, decimals: 0,
                             help: "Gotas simultáneas por columna.")
@@ -896,19 +917,19 @@ private struct ControlPanel: View {
                 ParamSlider(label: "Mutación", value: $model.matrixChurn, range: 0...40, decimals: 0,
                             help: "Cambios de glifo por segundo dentro del rastro.")
 
-                PanelGroupLabel(text: "Imagen")
+                PanelGroupLabel(text: "Imagen", help: "Cómo la imagen de fondo compuerta la lluvia.")
                 ParamSlider(label: "Peso", value: $model.matrixImageMix, range: -1...1,
                             help: "Positivo: llueve en la luz. Cero: parejo. Negativo: llueve en las sombras.")
                 ParamSlider(label: "Fondo", value: $model.matrixBaseLevel, range: 0...1,
                             help: "Brillo del ASCII fuera del rastro.")
 
-                PanelGroupLabel(text: "Origen")
+                PanelGroupLabel(text: "Origen", help: "De dónde nace cada gota. Sirve para que el brillo emita en vez de solo iluminarse al pasar.")
                 ParamSlider(label: "Nacer brillo", value: $model.matrixSpawnBias, range: 0...1,
                             help: "0 nace arriba de todo, 1 en la celda más brillante de la columna.")
                 ParamSlider(label: "Fuerza", value: $model.matrixSpawnStrength, range: 0...1,
                             help: "Cuánto modula el brillo del origen la intensidad de la gota.")
 
-                PanelGroupLabel(text: "Volumen")
+                PanelGroupLabel(text: "Volumen", help: "La luminancia funciona como campo de altura y curva el frente de la lluvia sobre la forma.")
                 ParamSlider(label: "Relieve", value: $model.matrixRelief, range: -24...24, decimals: 0,
                             help: "Celdas que se adelanta o atrasa el frente según la altura.")
                 ParamSlider(label: "Suavizado", value: $model.reliefRadius, range: 0...16, decimals: 0,
@@ -918,7 +939,7 @@ private struct ControlPanel: View {
                 ParamSlider(label: "Peso sujeto", value: $model.matteWeight, range: 0...1)
                     .disabled(!model.subjectMatteEnabled)
 
-                PanelGroupLabel(text: "Punta")
+                PanelGroupLabel(text: "Punta", help: "Tinte de la cabeza de cada gota y de las primeras celdas del rastro.")
                 HStack(spacing: 8) {
                     ParamToggle(label: "En color", isOn: $model.matrixHeadTintEnabled)
                     Spacer()

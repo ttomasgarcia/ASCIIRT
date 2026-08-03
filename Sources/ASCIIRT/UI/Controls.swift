@@ -55,13 +55,55 @@ struct PanelSection<Content: View>: View {
 /// Subtitulo dentro de una seccion. Agrupa sin agregar otro nivel de plegado.
 struct PanelGroupLabel: View {
     let text: String
+    var help: String?
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 9, weight: .medium))
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 4)
+        HStack(spacing: 3) {
+            Text(text)
+                .font(.system(size: 9, weight: .medium))
+            HelpMark(help)
+        }
+        .foregroundStyle(.tertiary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+    }
+}
+
+/// Signo de pregunta diminuto con el tooltip del sistema.
+///
+/// El tooltip cuelga del icono y no de la fila entera a proposito: sobre la fila
+/// aparecia al pasar por el slider mientras se arrastraba, justo cuando estorba.
+/// Aca hay que ir a buscarlo, que es lo que uno hace cuando no sabe que hace algo.
+struct HelpMark: View {
+    let text: String?
+
+    init(_ text: String?) { self.text = text }
+
+    var body: some View {
+        if let text, !text.isEmpty {
+            Image(systemName: "questionmark.circle")
+                .font(.system(size: 8.5))
+                .foregroundStyle(.tertiary)
+                .help(text)
+        }
+    }
+}
+
+/// Etiqueta con su signo de pregunta, en el ancho fijo de la grilla del panel.
+struct ParamLabel: View {
+    let text: String
+    var help: String?
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Text(text)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            HelpMark(help)
+            Spacer(minLength: 0)
+        }
+        .frame(width: PanelMetrics.labelWidth, alignment: .leading)
     }
 }
 
@@ -75,11 +117,7 @@ struct ParamSlider: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .frame(width: PanelMetrics.labelWidth, alignment: .leading)
-                .lineLimit(1)
+            ParamLabel(text: label, help: help)
 
             Slider(value: $value, in: range)
                 .controlSize(.mini)
@@ -95,7 +133,6 @@ struct ParamSlider: View {
                 .padding(.horizontal, 4)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
         }
-        .help(help ?? "")
     }
 }
 
@@ -103,13 +140,11 @@ struct ParamSlider: View {
 struct ParamReadout: View {
     let label: String
     let value: String
+    var help: String?
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .frame(width: PanelMetrics.labelWidth, alignment: .leading)
+            ParamLabel(text: label, help: help)
             Spacer(minLength: 0)
             Text(value)
                 .font(.system(size: 10, design: .monospaced))
@@ -126,10 +161,12 @@ struct ParamToggle: View {
 
     var body: some View {
         Toggle(isOn: $isOn) {
-            Text(label).font(.system(size: 11))
+            HStack(spacing: 3) {
+                Text(label).font(.system(size: 11))
+                HelpMark(help)
+            }
         }
         .toggleStyle(.switch)
         .controlSize(.mini)
-        .help(help ?? "")
     }
 }
