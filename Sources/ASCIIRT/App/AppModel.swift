@@ -101,6 +101,9 @@ final class AppModel: ObservableObject {
     @Published var eyeSolidAmount: Double = 0 { didSet { sync() } }
     @Published var eyeSolidGain: Double = 1.0 { didSet { sync() } }
     @Published var eyeSolidEdge: Double = 0.35 { didSet { sync() } }
+
+    /// Arrastre del campo. Sirve para cualquier fuente, no solo el ojo.
+    @Published var trailDecay: Double = 0 { didSet { sync() } }
     @Published var eyeFieldNoise: Double = 0.55 { didSet { sync() } }
     @Published var eyeFieldChurn: Double = 6 { didSet { sync() } }
 
@@ -369,6 +372,7 @@ final class AppModel: ObservableObject {
         next.eyeSolidAmount = Float(eyeSolidAmount)
         next.eyeSolidGain = Float(eyeSolidGain)
         next.eyeSolidEdge = Float(eyeSolidEdge)
+        next.trailDecay = Float(trailDecay)
         next.eyeFieldNoise = Float(eyeFieldNoise)
         next.eyeFieldChurn = Float(eyeFieldChurn)
 
@@ -544,6 +548,7 @@ final class AppModel: ObservableObject {
         preset.eyeSolidAmount = eyeSolidAmount
         preset.eyeSolidGain = eyeSolidGain
         preset.eyeSolidEdge = eyeSolidEdge
+        preset.trailDecay = trailDecay
         preset.eyeFieldNoise = eyeFieldNoise
         preset.eyeFieldChurn = eyeFieldChurn
         preset.matrixImageMix = matrixImageMix
@@ -630,6 +635,7 @@ final class AppModel: ObservableObject {
         eyeSolidAmount = preset.eyeSolidAmount
         eyeSolidGain = preset.eyeSolidGain
         eyeSolidEdge = preset.eyeSolidEdge
+        trailDecay = preset.trailDecay
         eyeFieldNoise = preset.eyeFieldNoise
         eyeFieldChurn = preset.eyeFieldChurn
         // La fuente va al final: cambiarla arranca o detiene captura, y quiero

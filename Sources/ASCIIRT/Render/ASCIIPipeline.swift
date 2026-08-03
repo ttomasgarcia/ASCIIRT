@@ -83,6 +83,9 @@ struct PipelineConfig: Equatable {
     var eyeSolidAmount: Float = 0
     var eyeSolidGain: Float = 1.0
     var eyeSolidEdge: Float = 0.35
+
+    /// Arrastre del campo. Aplica a cualquier fuente, no solo al ojo.
+    var trailDecay: Float = 0
     var eyeFieldNoise: Float = 0.55
     var eyeFieldChurn: Float = 6
 
@@ -127,6 +130,7 @@ final class ASCIIPipeline {
     private let glyphIndexPSO: MTLComputePipelineState
     private let statsPSO: MTLComputePipelineState
     private let eyePSO: MTLComputePipelineState
+    private let trailPSO: MTLComputePipelineState
     private let asciiPSO: MTLComputePipelineState
 
     private var lumaTexture: MTLTexture
@@ -137,6 +141,11 @@ final class ASCIIPipeline {
     private var lumaRawTexture: MTLTexture
     private var colorTexture: MTLTexture
     private var gridColorTexture: MTLTexture
+    /// Ping-pong del arrastre: se lee el campo del frame anterior y se escribe
+    /// el nuevo. Con una sola textura el kernel leeria lo que el mismo acaba de
+    /// escribir en otra celda del mismo dispatch.
+    private var trailTextures: [MTLTexture]
+    private var trailIndex = 0
     private var dogTempTexture: MTLTexture
     private var dogTexture: MTLTexture
     private var sobelTexture: MTLTexture
@@ -192,6 +201,7 @@ final class ASCIIPipeline {
         self.glyphIndexPSO = try ASCIIPipeline.makePSO(context, "glyphIndexKernel")
         self.statsPSO = try ASCIIPipeline.makePSO(context, "lumaStatsKernel")
         self.eyePSO = try ASCIIPipeline.makePSO(context, "eyeKernel")
+        self.trailPSO = try ASCIIPipeline.makePSO(context, "trailKernel")
         self.asciiPSO = try ASCIIPipeline.makePSO(context, "asciiKernel")
 
         let textures = try ASCIIPipeline.makeTextures(context, config)
@@ -200,6 +210,7 @@ final class ASCIIPipeline {
         (lumaRawTexture, dogTempTexture, dogTexture, sobelTexture, edgeTexture, glyphTextures) =
             (textures.lumaRaw, textures.dogTemp, textures.dog, textures.sobel, textures.edge, textures.glyphs)
         (colorTexture, gridColorTexture) = (textures.color, textures.gridColor)
+        self.trailTextures = textures.trail
         self.matteFallback = try ASCIIPipeline.makeFallbackMatte(context)
 
         var initialAverage: Float = 0.5
@@ -235,6 +246,7 @@ final class ASCIIPipeline {
             (lumaRawTexture, dogTempTexture, dogTexture, sobelTexture, edgeTexture, glyphTextures) =
                 (textures.lumaRaw, textures.dogTemp, textures.dog, textures.sobel, textures.edge, textures.glyphs)
             (colorTexture, gridColorTexture) = (textures.color, textures.gridColor)
+            self.trailTextures = textures.trail
         }
         if atlasChanged {
             atlas = try FontAtlasBuilder.build(device: context.device,
@@ -306,6 +318,18 @@ final class ASCIIPipeline {
         encoder.setTexture(gridTexture, index: Int(ASCIIRTTextureIndexGrid.rawValue))
         encoder.setTexture(gridColorTexture, index: Int(ASCIIRTTextureIndexGridColor.rawValue))
         encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: downscalePSO))
+
+        // Arrastre. Si esta activo, todo lo que sigue lee el campo arrastrado en
+        // vez del grid crudo — asi el relieve de la lluvia y la eleccion de
+        // glifo tambien siguen la estela.
+        if config.trailDecay > 0 {
+            trailIndex = 1 - trailIndex
+            encoder.setComputePipelineState(trailPSO)
+            encoder.setTexture(trailTextures[1 - trailIndex], index: Int(ASCIIRTTextureIndexTrailPrev.rawValue))
+            encoder.setTexture(trailTextures[trailIndex], index: Int(ASCIIRTTextureIndexTrailNext.rawValue))
+            encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: trailPSO))
+            encoder.setTexture(trailTextures[trailIndex], index: Int(ASCIIRTTextureIndexGrid.rawValue))
+        }
 
         // [4][5][6] Bordes. Solo si estan activos: son las tres etapas mas caras
         // del pipeline y con el bypass puesto no aportan nada.
@@ -476,7 +500,7 @@ final class ASCIIPipeline {
                             eyeSolidGain: config.eyeSolidGain,
                             eyeSolidEdge: config.eyeSolidEdge,
                             _pad0: 0,
-                            _pad1: 0)
+                            trailDecay: config.trailDecay)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se
@@ -531,6 +555,7 @@ final class ASCIIPipeline {
 
     private struct Textures {
         let luma, lumaRaw, grid, color, gridColor: MTLTexture
+        let trail: [MTLTexture]
         let dogTemp, dog, sobel, edge: MTLTexture
         let glyphs: [MTLTexture]
         let heightTemp, height, spawn, output: MTLTexture
@@ -571,6 +596,7 @@ final class ASCIIPipeline {
         let lumaRaw = try make(.r16Float, width, height, "lumaRaw")
         let color = try make(.rgba8Unorm, width, height, "color")
         let gridColor = try make(.rgba8Unorm, Int(grid.x), Int(grid.y), "gridColor")
+        let trail = try (0..<2).map { try make(.r16Float, Int(grid.x), Int(grid.y), "trail\($0)") }
         let dogTemp = try make(.rg16Float, width, height, "dogTemp")
         let dog = try make(.r16Float, width, height, "dog")
         let sobel = try make(.rg16Float, width, height, "sobel")
@@ -580,6 +606,7 @@ final class ASCIIPipeline {
         let glyphs = try (0..<2).map { try make(.rg8Uint, Int(grid.x), Int(grid.y), "glyph\($0)") }
 
         return Textures(luma: luma, lumaRaw: lumaRaw, grid: gridTexture, color: color, gridColor: gridColor,
+                        trail: trail,
                         dogTemp: dogTemp, dog: dog, sobel: sobel, edge: edge, glyphs: glyphs,
                         heightTemp: temp, height: heightTexture, spawn: spawn, output: output)
     }

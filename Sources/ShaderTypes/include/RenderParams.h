@@ -60,6 +60,8 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexEdgeAtlas = 16,///< R8Unorm: los 4 glifos direccionales
     ASCIIRTTextureIndexColor = 17,    ///< RGBA8 color de la fuente a resolucion de salida
     ASCIIRTTextureIndexGridColor = 18,///< RGBA8 color medio por tile
+    ASCIIRTTextureIndexTrailPrev = 19,///< R16F campo arrastrado del frame anterior
+    ASCIIRTTextureIndexTrailNext = 20,///< R16F campo arrastrado de este frame
 };
 
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
@@ -283,7 +285,10 @@ typedef struct {
 
     /// Padding explicito para cerrar en multiplo de 8.
     uint32_t _pad0;
-    uint32_t _pad1;
+
+    /// Arrastre: cuanto sobrevive el campo del frame anterior. 0 lo apaga, 0.9
+    /// deja una estela larga. Es el mismo mecanismo que el fosforo de un tubo.
+    float trailDecay;
 } RenderParams;
 
 #endif /* RenderParams_h */

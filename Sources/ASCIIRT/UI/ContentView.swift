@@ -800,6 +800,8 @@ private struct ControlPanel: View {
 
     private var temporalContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            ParamSlider(label: "Arrastre", value: $model.trailDecay, range: 0...0.98,
+                        help: "Cuánto sobrevive el campo del frame anterior. Deja estela al moverse, como el fósforo de un tubo.")
             ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
                         help: "Zona muerta en escalones de rampa. En 0 la rampa hierve; por encima de ~2 los cambios lentos se atrasan.")
 

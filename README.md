@@ -36,7 +36,11 @@ librerías ASCII de terceros.
   borde, la histéresis, la lluvia y el export.
 - **Modos de color**: mono, dos colores, o color original promediado por tile.
   Más invertir y fondo transparente para ProRes 4444 / secuencia PNG.
-- **Presets** en JSON, más restauración automática del estado al abrir.
+- **Arrastre**: el campo del frame anterior sobrevive atenuado, así el ASCII
+  deja estela al moverse. Es el mismo mecanismo que el fósforo de un tubo.
+- **Presets** en JSON, más restauración automática del estado al abrir. Diez
+  presets del ojo vienen en `Presets/` — copialos a
+  `~/Library/Application Support/ASCIIRT/Presets/`.
 
 ## Requisitos
 
