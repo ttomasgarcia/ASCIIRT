@@ -75,7 +75,7 @@ struct Preset: Codable, Equatable {
     var eyeFalloff: Double = 2.4
     var eyeRingWidth: Double = 0.055
     var eyeRingIntensity: Double = 0.85
-    var eyeHaloRadius: Double = 0.16
+    var eyeHaloRadius: Double = 0.38
     var eyeHaloIntensity: Double = 0.14
     var eyeIris: [Double] = [1.0, 0.10, 0.05]
     var eyeBreathAmount: Double = 0.03

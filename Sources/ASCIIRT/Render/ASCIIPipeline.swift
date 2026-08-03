@@ -67,7 +67,7 @@ struct PipelineConfig: Equatable {
     var eyeFalloff: Float = 2.4
     var eyeRingWidth: Float = 0.055
     var eyeRingIntensity: Float = 0.85
-    var eyeHaloRadius: Float = 0.16
+    var eyeHaloRadius: Float = 0.38
     var eyeHaloIntensity: Float = 0.14
     var eyeIris: SIMD3<Float> = SIMD3(1.0, 0.10, 0.05)
     var eyeBreathAmount: Float = 0.03

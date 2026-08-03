@@ -600,7 +600,7 @@ private struct ControlPanel: View {
                         help: "Brillo del anillo. Además de verse, tiene una función técnica: el detector de bordes lo encuentra y dibuja el contorno del ojo con glifos direccionales, así que subirlo hace que el círculo salga trazado con caracteres en vez de aproximado por densidad. En cero desaparece esa lectura.")
 
             PanelGroupLabel(text: "Halo", help: "El campo tenue que rodea al ojo. Es de donde sale el código de alrededor.")
-            ParamSlider(label: "Radio", value: $model.eyeHaloRadius, range: 0.02...1.5,
+            ParamSlider(label: "Radio", value: $model.eyeHaloRadius, range: 0.05...2.0,
                         help: "Alcance del campo de código que rodea al ojo. Grande lo desparrama por toda la pantalla y el ojo deja de ser el centro de atención; chico lo deja pegado al ojo como un aura. Es el control principal de cuánta pantalla ocupa el efecto.")
             ParamSlider(label: "Intensidad", value: $model.eyeHaloIntensity, range: 0...1,
                         help: "Densidad del campo de alrededor. Como pasa por la rampa calibrada, subirlo hace que el código se vuelva más denso cerca del ojo y se ralee hacia afuera; ese degradado es lo que hace que el ojo parezca la fuente del código y no algo apoyado encima.")

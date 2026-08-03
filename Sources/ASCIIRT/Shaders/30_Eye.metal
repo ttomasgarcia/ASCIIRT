@@ -60,7 +60,18 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // Halo: caida ancha y tenue. Los tiles lejanos caen en la punta rala de la
     // rampa, asi el codigo de alrededor se densifica hacia el centro en vez de
     // estar repartido parejo.
-    const float halo = exp(-r / max(params.eyeHaloRadius, 1e-4)) * params.eyeHaloIntensity;
+    //
+    // Caida con soporte FINITO y no exponencial. Una exponencial tiene cola
+    // infinita: su parametro no dice hasta donde llega el halo sino cada cuanto
+    // se divide por e, y como el primer escalon de la rampa esta muy abajo, un
+    // valor de 0.5 ya pintaba caracteres hasta las esquinas. Con esta el radio
+    // significa literalmente el borde del campo, y el slider sirve entero.
+    //
+    // (1-t^2)^2 y no (1-t): la derivada es cero en los dos extremos, asi que no
+    // hay ni pico en el centro ni corte visible en el borde.
+    const float haloT = saturate(r / max(params.eyeHaloRadius, 1e-4));
+    const float haloFalloff = (1.0 - haloT * haloT) * (1.0 - haloT * haloT);
+    const float halo = haloFalloff * params.eyeHaloIntensity;
 
     // Pulsos: ondas radiales que salen del centro. La envolvente las apaga con
     // la distancia; sin ella el borde de la pantalla late igual que el centro.

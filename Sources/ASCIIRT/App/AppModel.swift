@@ -80,7 +80,7 @@ final class AppModel: ObservableObject {
     @Published var eyeFalloff: Double = 2.4 { didSet { sync() } }
     @Published var eyeRingWidth: Double = 0.055 { didSet { sync() } }
     @Published var eyeRingIntensity: Double = 0.85 { didSet { sync() } }
-    @Published var eyeHaloRadius: Double = 0.16 { didSet { sync() } }
+    @Published var eyeHaloRadius: Double = 0.38 { didSet { sync() } }
     @Published var eyeHaloIntensity: Double = 0.14 { didSet { sync() } }
     @Published var eyeIrisColor: Color = Color(red: 1.0, green: 0.10, blue: 0.05) { didSet { sync() } }
     @Published var eyeBreathAmount: Double = 0.03 { didSet { sync() } }

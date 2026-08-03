@@ -32,7 +32,7 @@
   "eyeFieldChurn": 5,
   "eyeFieldNoise": 0.5,
   "eyeHaloIntensity": 0.15,
-  "eyeHaloRadius": 0.18,
+  "eyeHaloRadius": 0.414,
   "eyeIris": [
     1.0,
     0.1,
