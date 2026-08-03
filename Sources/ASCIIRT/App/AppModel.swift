@@ -110,6 +110,13 @@ final class AppModel: ObservableObject {
 
     /// Arrastre del campo. Sirve para cualquier fuente, no solo el ojo.
     @Published var trailDecay: Double = 0 { didSet { sync() } }
+
+    /// Interior del ojo.
+    @Published var eyeHollow = false { didSet { sync() } }
+    @Published var eyeGradientMode: UInt32 = 0 { didSet { sync() } }
+    @Published var eyeGradientSpeed: Double = 0.15 { didSet { sync() } }
+    @Published var eyeGradientCycles: Double = 1 { didSet { sync() } }
+    @Published var eyeIrisOuterColor: Color = Color(red: 0.35, green: 0.02, blue: 0.10) { didSet { sync() } }
     @Published var eyeFieldNoise: Double = 0.55 { didSet { sync() } }
     @Published var eyeFieldChurn: Double = 6 { didSet { sync() } }
 
@@ -391,6 +398,11 @@ final class AppModel: ObservableObject {
         next.eyeSolidGain = Float(eyeSolidGain)
         next.eyeSolidEdge = Float(eyeSolidEdge)
         next.trailDecay = Float(trailDecay)
+        next.eyeHollow = eyeHollow
+        next.eyeGradientMode = eyeGradientMode
+        next.eyeGradientSpeed = Float(eyeGradientSpeed)
+        next.eyeGradientCycles = Float(eyeGradientCycles)
+        next.eyeIrisOuter = AppModel.components(of: eyeIrisOuterColor)
         next.eyeFieldNoise = Float(eyeFieldNoise)
         next.eyeFieldChurn = Float(eyeFieldChurn)
 
@@ -577,6 +589,12 @@ final class AppModel: ObservableObject {
         preset.eyeSolidGain = eyeSolidGain
         preset.eyeSolidEdge = eyeSolidEdge
         preset.trailDecay = trailDecay
+        preset.eyeHollow = eyeHollow
+        preset.eyeGradientMode = eyeGradientMode
+        preset.eyeGradientSpeed = eyeGradientSpeed
+        preset.eyeGradientCycles = eyeGradientCycles
+        let outer = AppModel.components(of: eyeIrisOuterColor)
+        preset.eyeIrisOuter = [Double(outer.x), Double(outer.y), Double(outer.z)]
         preset.eyeFieldNoise = eyeFieldNoise
         preset.eyeFieldChurn = eyeFieldChurn
         preset.matrixImageMix = matrixImageMix
@@ -687,6 +705,13 @@ final class AppModel: ObservableObject {
         eyeSolidGain = preset.eyeSolidGain
         eyeSolidEdge = preset.eyeSolidEdge
         trailDecay = preset.trailDecay
+        eyeHollow = preset.eyeHollow
+        eyeGradientMode = preset.eyeGradientMode
+        eyeGradientSpeed = preset.eyeGradientSpeed
+        eyeGradientCycles = preset.eyeGradientCycles
+        if preset.eyeIrisOuter.count >= 3 {
+            eyeIrisOuterColor = Color(red: preset.eyeIrisOuter[0], green: preset.eyeIrisOuter[1], blue: preset.eyeIrisOuter[2])
+        }
         eyeFieldNoise = preset.eyeFieldNoise
         eyeFieldChurn = preset.eyeFieldChurn
         // La fuente va al final: cambiarla arranca o detiene captura, y quiero

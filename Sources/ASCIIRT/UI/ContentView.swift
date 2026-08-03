@@ -551,62 +551,89 @@ private struct ControlPanel: View {
 
             PanelGroupLabel(text: "Forma", help: "Geometría del ojo: núcleo caliente, cuerpo del iris y su caída.")
             ParamSlider(label: "Radio", value: $model.eyeRadius, range: 0.02...0.45,
-                        decimals: 3, help: "Relativo al lado corto de la salida.")
+                        decimals: 3, help: "Tamaño del ojo, medido contra el lado corto de la pantalla para que no cambie al pasar de 16:9 a otro formato. Ojo con achicarlo: por debajo de unas 25 celdas de diámetro el círculo se lee como polígono, porque no hay caracteres suficientes para describir la curva. Si lo querés chico, bajá también el tamaño de celda en Grid.")
             ParamSlider(label: "Núcleo", value: $model.eyeCoreRadius, range: 0.02...0.8,
-                        help: "Fracción del radio que quema a blanco. Es lo único que llega a los glifos más densos.")
+                        help: "Tamaño del punto blanco del centro, como fracción del radio. Es lo único de la imagen que llega a los glifos más densos de la rampa, así que si lo ponés en cero el centro se apaga y el ojo pierde el foco. Subirlo agranda el blanco y el color del iris queda relegado a un aro.")
             ParamSlider(label: "Dureza", value: $model.eyeFalloff, range: 0.3...8,
-                        help: "Exponente de la caída del iris. Alto = borde duro.")
+                        help: "Qué tan rápido se apaga el iris desde el centro hacia el borde. Valores bajos dan una mancha difusa que se funde con el fondo; valores altos dan un disco de borde marcado. Si querés que el ojo se lea como objeto y no como resplandor, subilo por encima de 3.")
 
             PanelGroupLabel(text: "Anillo de lente", help: "Aro fino en el borde del iris. Existe para que el detector de bordes trace el contorno con - / | \\ en vez de dejar una mancha.")
             ParamSlider(label: "Ancho", value: $model.eyeRingWidth, range: 0.005...0.4, decimals: 3,
-                        help: "Grosor del aro, como fracción del radio. Fino se lee como lente; ancho se funde con el iris.")
+                        help: "Grosor del anillo de lente. Fino se lee como el borde de una óptica; ancho se funde con el iris y el ojo pierde el contorno. Es el parámetro que más define si la cosa parece un objeto construido o una mancha luminosa.")
             ParamSlider(label: "Intensidad", value: $model.eyeRingIntensity, range: 0...2,
-                        help: "El anillo existe para que el detector de bordes trace el contorno con - / | \\.")
+                        help: "Brillo del anillo. Además de verse, tiene una función técnica: el detector de bordes lo encuentra y dibuja el contorno del ojo con glifos direccionales, así que subirlo hace que el círculo salga trazado con caracteres en vez de aproximado por densidad. En cero desaparece esa lectura.")
 
             PanelGroupLabel(text: "Halo", help: "El campo tenue que rodea al ojo. Es de donde sale el código de alrededor.")
             ParamSlider(label: "Radio", value: $model.eyeHaloRadius, range: 0.02...1.5,
-                        help: "Hasta dónde llega el campo. Grande lo desparrama por toda la pantalla; chico lo deja pegado al ojo.")
+                        help: "Alcance del campo de código que rodea al ojo. Grande lo desparrama por toda la pantalla y el ojo deja de ser el centro de atención; chico lo deja pegado al ojo como un aura. Es el control principal de cuánta pantalla ocupa el efecto.")
             ParamSlider(label: "Intensidad", value: $model.eyeHaloIntensity, range: 0...1,
-                        help: "Hace que el código de alrededor se densifique hacia el centro.")
+                        help: "Densidad del campo de alrededor. Como pasa por la rampa calibrada, subirlo hace que el código se vuelva más denso cerca del ojo y se ralee hacia afuera; ese degradado es lo que hace que el ojo parezca la fuente del código y no algo apoyado encima.")
+
+            Divider().padding(.vertical, 2)
+            PanelGroupLabel(text: "Interior", help: "Qué pasa adentro del anillo: si hay código y de qué color es el iris.")
+
+            ParamToggle(label: "Sin código adentro", isOn: $model.eyeHollow,
+                        help: "Vacía de caracteres el área de adentro del anillo. El pleno y el aro se siguen dibujando: lo único que desaparece es el ASCII. Sirve cuando el ojo compite con el código y querés que sea una forma limpia con el código solo alrededor.")
+
+            Picker("", selection: $model.eyeGradientMode) {
+                Text("Unicolor").tag(UInt32(0))
+                Text("Radial").tag(UInt32(1))
+                Text("Angular").tag(UInt32(2))
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
 
             HStack(spacing: 8) {
-                ParamLabel(text: "Iris", help: "Color del cuerpo del ojo. El núcleo quema a blanco por encima de este color, así que un rojo saturado igual da centro blanco.")
+                ParamLabel(text: "Iris", help: "Color del iris. Si el gradiente está en Unicolor, es el color de todo el cuerpo; si no, es el extremo cercano de la transición. El núcleo quema a blanco por encima de este color, así que un rojo bien saturado igual te va a dar el centro blanco.")
                 ColorPicker("", selection: $model.eyeIrisColor, supportsOpacity: false)
                     .labelsHidden()
+                if model.eyeGradientMode != 0 {
+                    ColorPicker("", selection: $model.eyeIrisOuterColor, supportsOpacity: false)
+                        .labelsHidden()
+                    HelpMark("Extremo lejano del gradiente. Es el color al que llega la transición; el otro extremo es el color de iris de al lado.", title: "Color exterior")
+                }
                 Spacer()
+            }
+
+            if model.eyeGradientMode != 0 {
+                ParamSlider(label: "Ciclos", value: $model.eyeGradientCycles, range: 0.5...12, decimals: 1,
+                            help: "Cuántas veces se repite la transición de color a lo largo de su eje. En modo angular son los sectores que ves girar alrededor del aro; en radial son anillos concéntricos viajando. Con 1 hay una sola transición; con 6 o más aparece un patrón que se lee como energía circulando.")
+                ParamSlider(label: "Animación", value: $model.eyeGradientSpeed, range: -2...2,
+                            help: "Velocidad de la animación del gradiente. En 0 queda quieto y es solo un degradado; valores bajos dan un movimiento apenas perceptible que hace que el aro respire; negativo invierte el sentido de giro. Es el control que más vida le da al círculo exterior sin cambiar su forma.")
             }
 
             Divider().padding(.vertical, 2)
             PanelGroupLabel(text: "Pleno", help: "Saca al ojo del ASCII y lo pinta como forma llena, para que pegue más fuerte que el código.")
             ParamSlider(label: "Mezcla", value: $model.eyeSolidAmount, range: 0...1,
-                        help: "0 = el ojo es sólo glifos. 1 = disco pleno por encima del ASCII.")
+                        help: "Cuánto reemplaza la forma llena al ASCII dentro del ojo. En 0 el ojo es puro código, con la textura del charset; en 1 es un disco limpio dibujado por encima. Los valores del medio dejan el glifo asomando por debajo, que suele ser el punto más interesante.")
             ParamSlider(label: "Intensidad", value: $model.eyeSolidGain, range: 0...3,
-                        help: "Por encima de 1 el ojo pega más fuerte que el código que lo rodea.")
+                        help: "Ganancia del pleno. Por encima de 1 el ojo brilla más fuerte que el código que lo rodea, que es exactamente para lo que existe: darle una jerarquía que el ASCII solo no puede. Muy alto satura a blanco y perdés el color del iris.")
             ParamSlider(label: "Borde", value: $model.eyeSolidEdge, range: 0...1,
-                        help: "0 respeta la caída del iris. 1 corta en disco de borde duro.")
+                        help: "Dureza del borde del pleno. En 0 el relleno se desvanece siguiendo la caída natural del iris y se funde con el código; en 1 corta en disco de borde limpio. Subilo si querés que se lea como una forma geométrica y no como un resplandor.")
 
             Divider().padding(.vertical, 2)
             PanelGroupLabel(text: "Respiración", help: "Oscilación lenta del radio. Es lo que hace que el ojo parezca vivo aunque no se mueva de lugar.")
             ParamSlider(label: "Amplitud", value: $model.eyeBreathAmount, range: 0...0.3, decimals: 3,
-                        help: "Cuánto crece y decrece el radio, en fracción. 0,03 es casi imperceptible; 0,2 late fuerte.")
+                        help: "Cuánto crece y se achica el ojo al respirar, en fracción del radio. 0,03 es casi imperceptible y sirve para que no parezca una imagen congelada; 0,2 late fuerte y se lee como signo vital. Es lo más barato que podés hacer para que la pantalla no parezca trabada.")
             ParamSlider(label: "Velocidad", value: $model.eyeBreathSpeed, range: 0.01...2,
-                        help: "Ciclos por segundo. Por debajo de 0,2 respira; por encima de 0,8 palpita.")
+                        help: "Velocidad de la respiración. Por debajo de 0,2 respira como algo dormido; entre 0,3 y 0,6 se lee como atención; por encima de 0,8 palpita y empieza a parecer alarma. Es un parámetro emocional más que técnico.")
 
             PanelGroupLabel(text: "Pulsos de energía", help: "Ondas que salen del centro. Como todo pasa por la rampa, no se ven como resplandor sino como una ola de caracteres cambiando de densidad.")
             ParamSlider(label: "Amplitud", value: $model.eyePulseAmount, range: 0...0.6,
-                        help: "Fuerza de la onda. Alto puede saturar el campo y tapar el degradado del halo.")
+                        help: "Fuerza de los pulsos que salen del centro. Como todo pasa por la rampa, la onda no se ve como un brillo sino como caracteres cambiando de densidad al pasar. Muy alto satura el campo y tapa el degradado del halo, con lo que se pierde la sensación de profundidad.")
             ParamSlider(label: "Velocidad", value: $model.eyePulseSpeed, range: 0...1,
-                        help: "Qué tan rápido viaja la onda hacia afuera. En 0 queda congelada como anillos fijos.")
+                        help: "Velocidad con la que la onda se aleja del centro. En 0 queda congelada como anillos fijos, que es un look en sí mismo. Velocidades bajas se leen como energía que emana; altas, como una alarma.")
             ParamSlider(label: "Frecuencia", value: $model.eyePulseFrequency, range: 0.5...20, decimals: 1,
-                        help: "Cuántas ondas hay a la vez. Alto da anillos finos y juntos; bajo, una sola onda ancha.")
+                        help: "Cuántas ondas conviven en pantalla. Alto da anillos finos y juntos, con aspecto de interferencia; bajo da una sola onda ancha que se lee como una exhalación. Combinado con velocidad baja y frecuencia baja se consigue el pulso más orgánico.")
             ParamSlider(label: "Caída", value: $model.eyePulseDecay, range: 0...8, decimals: 1,
-                        help: "Cuánto se apaga la onda con la distancia.")
+                        help: "Cuánto se debilita la onda al alejarse. Alto la mantiene pegada al ojo y el borde de la pantalla queda quieto; bajo la deja llegar lejos y toda la imagen late. Si el efecto te resulta invasivo, este es el parámetro a subir.")
 
             PanelGroupLabel(text: "Campo de código", help: "El grano que convierte el degradado del halo en textura de caracteres.")
             ParamSlider(label: "Grano", value: $model.eyeFieldNoise, range: 0...1.5,
-                        help: "Rompe las bandas concéntricas que produce un degradado liso sobre la rampa.")
+                        help: "Ruido que se suma al campo, celda por celda. Sin él, un degradado suave cuantizado por la rampa sale en anillos concéntricos y se lee como un gradiente mal hecho; con él, el mismo degradado se convierte en textura de caracteres. Es la diferencia entre parecer un render y parecer código.")
             ParamSlider(label: "Refresco", value: $model.eyeFieldChurn, range: 0...30, decimals: 1,
-                        help: "Cambios por segundo del grano. Alto = el código se refresca solo.")
+                        help: "Cada cuánto cambia el grano. En 0 el campo queda quieto y estable; valores altos hacen que el código se refresque solo, como si el sistema estuviera procesando. Ojo que la histéresis puede frenar los cambios más chicos.")
 
             PanelGroupLabel(text: "Mirada", help: "Cómo recorre la pantalla. Genera el objetivo; el resorte se encarga de llegar.")
             Picker("", selection: $model.gazeMode) {
@@ -616,30 +643,30 @@ private struct ControlPanel: View {
             .controlSize(.small)
 
             ParamSlider(label: "Ritmo", value: $model.gazeRate, range: 0.02...3,
-                        help: "Barridos o saltos por segundo.")
+                        help: "Ritmo del recorrido. En los modos continuos son barridos por segundo; en los de pasos, cuántos saltos da. Valores muy bajos, del orden de 0,05, hacen que el movimiento sea tan lento que casi no se percibe pero la pantalla nunca se siente muerta.")
             ParamSlider(label: "Alcance X", value: $model.gazeExtentX, range: 0...0.5, decimals: 3,
-                        help: "Un público es ancho y bajo: barrer mucho más en X es lo que hace que parezca que recorre butacas.")
+                        help: "Cuánto se aleja del centro en horizontal. Es el que hace que parezca que recorre butacas: un público es ancho y bajo, así que este valor tiene que ser bastante mayor que el vertical. Alrededor de 0,25 barre casi toda la pantalla.")
             ParamSlider(label: "Alcance Y", value: $model.gazeExtentY, range: 0...0.3, decimals: 3,
-                        help: "Cuánto sube y baja. Conviene mucho menor que el alcance en X: un público es ancho y bajo.")
+                        help: "Cuánto se aleja del centro en vertical. Conviene mucho menor que el horizontal — si son parecidos el ojo flota en círculos en vez de recorrer una sala. Con valores muy chicos, cerca de 0,02, el recorrido se lee como una sola fila de asientos.")
             if model.gazeMode == .scan {
                 ParamSlider(label: "Paradas", value: $model.gazeStops, range: 2...16, decimals: 0,
-                            help: "Cuántas posiciones recorre antes de volver.")
+                            help: "Cuántas paradas hace antes de volver, en el modo Escaneo. Pocas dan saltos largos y evidentes; muchas dan un barrido casi continuo pero con micro-pausas, que es lo que hace un ojo real al recorrer una fila.")
             }
 
             PanelGroupLabel(text: "Físico", help: "Cómo viaja hasta el objetivo. Es lo que separa un movimiento vivo de un cursor.")
             ParamSlider(label: "Rigidez", value: $model.eyeStiffness, range: 1...80, decimals: 1,
-                        help: "Cuánto tira el resorte hacia el objetivo. Alto = va derecho y rápido.")
+                        help: "Fuerza con la que el ojo va hacia donde tiene que ir. Alto llega rápido y directo, con aspecto mecánico; bajo llega lento y pesado, como si le costara. Junto con el rozamiento define todo el carácter del movimiento.")
             ParamSlider(label: "Rozamiento", value: $model.eyeDamping, range: 0.5...30, decimals: 1,
-                        help: "Por debajo de 2·√rigidez el ojo sobrepasa y rebota al llegar. Ahí es donde se siente vivo.")
+                        help: "Cuánto frena el movimiento. Por debajo del valor crítico el ojo se pasa del objetivo y vuelve, y ese rebote es la mayor parte de la sensación de que algo está vivo; por encima llega lento y sin pasarse. El texto de abajo te dice de qué lado estás.")
             Text(dampingNote)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
 
             PanelGroupLabel(text: "Temblor", help: "Micro-movimiento permanente, encima de cualquier mirada.")
             ParamSlider(label: "Amplitud", value: $model.eyeDriftAmount, range: 0...0.08, decimals: 4,
-                        help: "Se suma siempre, encima de cualquier mirada. Sin él los modos con pausa se ven congelados.")
+                        help: "Micro-temblor permanente, que se suma a cualquier modo de mirada. Existe porque un ojo real nunca está perfectamente quieto: sin él, los modos con pausa se ven congelados durante la pausa y la ilusión se cae. Con 0,002 alcanza.")
             ParamSlider(label: "Velocidad", value: $model.eyeDriftSpeed, range: 0.01...2,
-                        help: "Frecuencia del temblor. Alto se lee como vibración; bajo, como respiración de la posición.")
+                        help: "Velocidad del temblor. Alto se lee como vibración nerviosa o falla eléctrica; bajo, como la respiración de la posición. Combinado con amplitud baja da un movimiento que se percibe sin poder señalarlo.")
 
             HStack {
                 Button("Centrar") { model.centerEye() }
@@ -679,18 +706,18 @@ private struct ControlPanel: View {
             .controlSize(.small)
 
             ParamToggle(label: "Aspecto de la fuente", isOn: $model.aspectFollowsFont,
-                        help: "El alto de celda sigue el aspecto natural de la fuente. Apagalo para deformar el glifo a propósito.")
+                        help: "Deriva el alto de celda de las métricas de la fuente, para que el glifo no salga deformado. Apagalo solo si querés estirar los caracteres a propósito: con el aspecto en 1 la celda es cuadrada y las letras salen anchas, que es un look pero se nota.")
 
             ParamSlider(label: "Aspecto", value: $model.cellAspect, range: 0.5...3.0,
-                        help: "Alto dividido ancho de la celda. 1 la hace cuadrada y el glifo sale estirado a lo ancho; ~2 es el aspecto natural de una monoespaciada.")
+                        help: "Proporción de la celda. En 1 es cuadrada y el glifo sale estirado a lo ancho; alrededor de 2 es el aspecto natural de una monoespaciada y las letras se leen como letras. Solo se puede tocar con el aspecto automático apagado.")
                 .disabled(model.aspectFollowsFont)
 
             ParamReadout(label: "Celda", value: "\(model.config.tileSize.x)×\(model.config.tileSize.y) px",
-                         help: "Tamaño de cada celda en píxeles. Cuanto más chica, más caracteres entran y más detalle, pero menos se lee cada glifo.")
+                         help: "Tamaño en píxeles de cada carácter. Cuanto más chico, más caracteres entran y más detalle tiene la imagen, pero menos se distingue cada glifo. Es el compromiso central de todo el efecto: legibilidad del carácter contra resolución de la imagen.")
             ParamReadout(label: "Salida", value: "\(model.config.outputSize.x)×\(model.config.outputSize.y)",
-                         help: "Resolución del render. Se fija en Export; el grid se deriva de ella, nunca al revés.")
+                         help: "Resolución a la que se genera todo. Se fija en Export; el grid se deriva de ella, nunca al revés. Si no divide entero por el tamaño de celda aparece una advertencia con el valor válido más cercano.")
             ParamReadout(label: "Grid", value: "\(model.config.gridSize.x) × \(model.config.gridSize.y)",
-                         help: "Columnas × filas de caracteres. Es la resolución real de la imagen ASCII.")
+                         help: "Cuántos caracteres hay a lo ancho y a lo alto. Es la resolución real de la imagen ASCII: todo el detalle que ves está limitado por este número, no por la resolución de salida.")
 
             if let warning = model.gridWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
@@ -700,7 +727,7 @@ private struct ControlPanel: View {
             }
 
             ParamToggle(label: "ASCII", isOn: $model.asciiEnabled,
-                        help: "Apagado muestra la imagen cruda, para comparar.")
+                        help: "Apagado muestra la imagen sin convertir. Sirve para comparar y para diagnosticar: si algo se ve raro, apagarlo te dice si el problema está en la fuente o en el pipeline.")
         }
     }
 
@@ -743,7 +770,7 @@ private struct ControlPanel: View {
             .controlSize(.small)
 
             ParamReadout(label: "Rampa", value: "\(model.ramp.count) / \(model.coverage.count)",
-                         help: "Glifos en uso sobre glifos del charset. La rampa se arma midiendo la tinta de cada glifo y ordenándolos de más claro a más denso.")
+                         help: "Glifos que están en la rampa sobre el total del charset. La rampa se arma rasterizando cada glifo, midiendo cuánta tinta ocupa y ordenándolos de más claro a más denso — por eso cambiar de fuente cambia el orden. Menos glifos dan escalones más visibles y se lee más como pantalla.")
 
             DisclosureGroup(isExpanded: $showCoverage) {
                 CoverageTable(model: model)
@@ -766,7 +793,7 @@ private struct ControlPanel: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .controlSize(.small)
-                HelpMark("Mono: tinta sobre negro. Dos colores: tinta y fondo a elección. Original: cada carácter toma el color promedio de su celda en la imagen.")
+                HelpMark("Mono: tinta sobre negro. Dos colores: tinta y fondo a elección. Original: cada carácter toma el color promedio de su celda en la imagen.", title: "Modo de color")
             }
 
             HStack(spacing: 8) {
@@ -789,9 +816,9 @@ private struct ControlPanel: View {
             }
 
             ParamToggle(label: "Invertir", isOn: $model.invert,
-                        help: "Cambia quién es tinta y quién es fondo. No es el negativo fotográfico.")
+                        help: "Intercambia tinta y fondo: donde había carácter queda vacío y viceversa. No es el negativo fotográfico, es el negativo tipográfico. Suele funcionar bien cuando la salida va a papel o a un fondo claro.")
             ParamToggle(label: "Fondo transparente", isOn: $model.transparentBackground,
-                        help: "Solo lo conserva ProRes 4444 y la secuencia PNG; el resto lo aplasta contra negro.")
+                        help: "Deja el fondo transparente en vez de negro. Solo lo conservan ProRes 4444 y la secuencia PNG; los demás formatos lo aplastan contra negro. Úsalo si vas a componer el ASCII sobre otra cosa en post.")
 
             if model.transparentBackground && !model.exportCodec.supportsAlpha {
                 Label("«\(model.exportCodec.rawValue)» no lleva alpha.",
@@ -806,7 +833,7 @@ private struct ControlPanel: View {
 
     private var exportContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            PanelGroupLabel(text: "Resolución de salida", help: "Tamaño del render. «Fuente» la toma de la cámara o del archivo; los presets la fijan y la imagen se encuadra dentro.")
+            PanelGroupLabel(text: "Resolución de salida", help: "Resolución a la que se genera todo. «Fuente» la toma de la cámara o del archivo; los presets la fijan y la imagen entra encuadrada dentro, con negro en lo que sobra. Para proyectar conviene fijarla a la resolución real del proyector.")
             Picker("", selection: $model.outputPreset) {
                 ForEach(AppModel.OutputPreset.allCases) { preset in Text(preset.rawValue).tag(preset) }
             }
@@ -814,7 +841,7 @@ private struct ControlPanel: View {
             .labelsHidden()
             .controlSize(.small)
 
-            PanelGroupLabel(text: "Formato", help: "Destino del REC y del render offline. ProRes para post, H.264 para mandar, secuencia PNG para máxima calidad con alpha.")
+            PanelGroupLabel(text: "Formato", help: "Formato de salida, tanto para REC como para el render offline. ProRes para llevar a post, H.264 para mandar por ahí, secuencia PNG para máxima calidad con alpha. El ASCII es el peor caso posible para un codec de transformada, así que si podés evitá H.264.")
             Picker("", selection: $model.exportCodec) {
                 ForEach(ExportCodec.allCases) { codec in Text(codec.rawValue).tag(codec) }
             }
@@ -833,7 +860,7 @@ private struct ControlPanel: View {
             }
 
             Divider().padding(.vertical, 2)
-            PanelGroupLabel(text: "Render offline", help: "Procesa un archivo cuadro a cuadro sin reloj: cada frame de entrada da exactamente uno de salida, tarde lo que tarde.")
+            PanelGroupLabel(text: "Render offline", help: "Procesa un archivo cuadro a cuadro sin reloj: cada frame de entrada da exactamente uno de salida, tarde lo que tarde. A diferencia del REC, acá no se pierde ningún frame y el resultado es reproducible — dos renders del mismo material dan lo mismo.")
             Text("Desacoplado del reloj: cada frame de entrada produce uno de salida.")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
@@ -856,18 +883,18 @@ private struct ControlPanel: View {
     private var edgesContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             ParamToggle(label: "Glifos de borde", isOn: $model.edgesEnabled,
-                        help: "Apagado deja solo la rampa de luminancia, para comparar.")
+                        help: "Apagado deja solo la rampa de luminancia, sin glifos direccionales. Es la comparación que muestra qué aporta la detección de bordes: con esto encendido los contornos se leen como contornos, apagado son manchas de densidad.")
 
             VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
                 ParamSlider(label: "Umbral", value: $model.edgeThreshold, range: 0...1,
-                            help: "Por encima de esto el tile usa - / | \\ en vez de rampa.")
+                            help: "A partir de qué fuerza de borde el carácter se reemplaza por uno direccional. Bajo lo llena de barras y diagonales, incluso sobre ruido; alto solo marca los contornos más fuertes. Si ves rayitas sueltas donde no hay bordes, subilo.")
                 PanelGroupLabel(text: "Diferencia de gaussianas", help: "Dos desenfoques restados. Lo que queda son los bordes: la diferencia entre un desenfoque fino y uno grueso es justamente el detalle.")
                 ParamSlider(label: "Sigma 1", value: $model.dogSigma1, range: 0.2...4,
-                            help: "Radio del desenfoque fino. Chico detecta bordes finos; grande los engorda.")
+                            help: "Radio del desenfoque fino de la diferencia de gaussianas. Chico detecta bordes finos y detalle; grande los engorda y solo quedan los contornos grandes. Tiene que ser menor que Sigma 2.")
                 ParamSlider(label: "Sigma 2", value: $model.dogSigma2, range: 0.5...10,
-                            help: "Radio del desenfoque grueso. Tiene que ser mayor que Sigma 1; cuanto más lejos, más ancho el borde detectado.")
+                            help: "Radio del desenfoque grueso. Cuanto más lejos esté de Sigma 1, más ancho es el borde que detecta. La distancia entre los dos sigmas es, en la práctica, el grosor del contorno.")
                 ParamSlider(label: "Tau", value: $model.dogTau, range: 0...1.2,
-                            help: "Cuánto se resta la gaussiana ancha. Cerca de 1 queda casi solo borde.")
+                            help: "Cuánto se resta el desenfoque grueso. Cerca de 1 queda casi solo el borde y la imagen desaparece; por debajo sobrevive algo de la imagen y el contorno sale más blando y mezclado con el tono.")
             }
             .disabled(!model.edgesEnabled)
             .opacity(model.edgesEnabled ? 1 : 0.45)
@@ -879,9 +906,9 @@ private struct ControlPanel: View {
     private var temporalContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             ParamSlider(label: "Arrastre", value: $model.trailDecay, range: 0...0.98,
-                        help: "Cuánto sobrevive el campo del frame anterior. Deja estela al moverse, como el fósforo de un tubo.")
+                        help: "Cuánto sobrevive la imagen del frame anterior. Es el fósforo de un tubo: al moverse, el ASCII deja una estela que se apaga sola. En 0 no hay estela; por encima de 0,9 la cola dura tanto que la pantalla nunca termina de limpiarse.")
             ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
-                        help: "Zona muerta en escalones de rampa. En 0 la rampa hierve; por encima de ~2 los cambios lentos se atrasan.")
+                        help: "Cuánto tiene que cambiar la luminancia de una celda para que cambie su carácter, medido en escalones de rampa. En 0 la salida hierve: la luz oscila unas milésimas y el glifo cambia todo el tiempo. Por encima de 2 los cambios lentos se atrasan y el movimiento se ve pegajoso.")
 
             PanelGroupLabel(text: "Exposición", help: "El AGC de la cámara mueve la luminancia media constantemente y la rampa hierve aunque la escena esté quieta. Esto lo corrige.")
             ParamToggle(label: "Lock de cámara", isOn: $model.exposureLocked,
@@ -891,11 +918,11 @@ private struct ControlPanel: View {
                 .disabled(!model.supportsExposureLock)
 
             ParamSlider(label: "Auto nivel", value: $model.autoLevelStrength, range: 0...1,
-                        help: "Mezcla entre luma cruda y normalizada.")
+                        help: "Cuánta corrección de exposición se aplica. En 0 la imagen pasa tal cual; en 1 se remapea para que la luminancia media caiga en el punto medio, lo que estabiliza la rampa cuando la cámara mueve el AGC. Con fuente generativa no hace falta.")
             ParamSlider(label: "Suavizado", value: $model.lumaSmoothAlpha, range: 0.01...0.5,
-                        help: "Alpha de la media móvil. Chico reacciona lento pero no persigue al AGC.")
+                        help: "Qué tan rápido reacciona la corrección de exposición. Chico reacciona lento pero no persigue cada parpadeo del automático de la cámara, que es el objetivo; grande se adapta rápido pero puede oscilar junto con el AGC y empeorar el problema.")
             ParamSlider(label: "Punto medio", value: $model.lumaTarget, range: 0.2...0.8,
-                        help: "A qué luminancia se lleva el promedio de la imagen. 0,5 la centra en la rampa; más alto la aclara.")
+                        help: "A qué luminancia se lleva el promedio de la imagen. 0,5 lo centra en la rampa y usa todo el rango de glifos; más alto aclara y empuja la imagen hacia los caracteres densos; más bajo la oscurece.")
                 .disabled(model.autoLevelStrength <= 0)
         }
     }
@@ -912,30 +939,30 @@ private struct ControlPanel: View {
                 PanelGroupLabel(text: "Gota", help: "Cada columna tiene su propia velocidad y fase, si no la lluvia se lee como una persiana bajando.")
                 ParamSlider(label: "Velocidad", value: $model.matrixSpeed, range: 1...60, decimals: 0)
                 ParamSlider(label: "Densidad", value: $model.matrixDensity, range: 1...12, decimals: 0,
-                            help: "Gotas simultáneas por columna.")
+                            help: "Cuántas gotas caen a la vez en cada columna. Cada una tiene su fase y velocidad propias, así que subirlo no sincroniza nada, solo llena. Densidad alta con rastro largo llena la columna entera y el efecto pasa de lluvia a cortina.")
                 ParamSlider(label: "Rastro", value: $model.matrixTrail, range: 3...60, decimals: 0)
                 ParamSlider(label: "Mutación", value: $model.matrixChurn, range: 0...40, decimals: 0,
-                            help: "Cambios de glifo por segundo dentro del rastro.")
+                            help: "Cada cuánto muta el carácter dentro del rastro de una gota. En 0 la gota arrastra siempre el mismo glifo y se lee como una raya; alto hace que los caracteres cambien mientras caen, que es lo que da la sensación de datos corriendo.")
 
                 PanelGroupLabel(text: "Imagen", help: "Cómo la imagen de fondo compuerta la lluvia.")
                 ParamSlider(label: "Peso", value: $model.matrixImageMix, range: -1...1,
-                            help: "Positivo: llueve en la luz. Cero: parejo. Negativo: llueve en las sombras.")
+                            help: "Cómo la imagen decide dónde llueve. Positivo: la lluvia vive en las zonas claras y el negro queda vacío. Cero: llueve parejo y la imagen solo afecta el recorrido. Negativo: se invierte y la lluvia se mete en las sombras.")
                 ParamSlider(label: "Fondo", value: $model.matrixBaseLevel, range: 0...1,
-                            help: "Brillo del ASCII fuera del rastro.")
+                            help: "Brillo del ASCII de la imagen donde no hay gota. Es la perilla de cuánto se lee lo que hay debajo del efecto: en 0 solo se ve la lluvia sobre negro, en 1 la imagen se lee completa y la lluvia la recorre.")
 
                 PanelGroupLabel(text: "Origen", help: "De dónde nace cada gota. Sirve para que el brillo emita en vez de solo iluminarse al pasar.")
                 ParamSlider(label: "Nacer brillo", value: $model.matrixSpawnBias, range: 0...1,
-                            help: "0 nace arriba de todo, 1 en la celda más brillante de la columna.")
+                            help: "Desde dónde nace cada gota. En 0 caen desde arriba de la pantalla como lluvia normal; en 1 nacen en la celda más brillante de su columna, con lo que el brillo pasa de ser algo que la lluvia ilumina al pasar a ser lo que la emite.")
                 ParamSlider(label: "Fuerza", value: $model.matrixSpawnStrength, range: 0...1,
-                            help: "Cuánto modula el brillo del origen la intensidad de la gota.")
+                            help: "Cuánto influye el brillo del punto de origen en la fuerza de la gota. En 0 todas las gotas son iguales; subiéndolo, una columna cuyo punto más brillante es apenas gris emite una gota débil, y se arma una jerarquía que sigue a la imagen.")
 
                 PanelGroupLabel(text: "Volumen", help: "La luminancia funciona como campo de altura y curva el frente de la lluvia sobre la forma.")
                 ParamSlider(label: "Relieve", value: $model.matrixRelief, range: -24...24, decimals: 0,
-                            help: "Celdas que se adelanta o atrasa el frente según la altura.")
+                            help: "Cuánto se adelanta o atrasa el frente de la lluvia según la altura de cada celda. Es lo que hace que la lluvia se curve sobre la forma en vez de bajar plana: la luz corre adelante y la sombra queda atrás. Negativo invierte qué es lo que sobresale.")
                 ParamSlider(label: "Suavizado", value: $model.reliefRadius, range: 0...16, decimals: 0,
-                            help: "Difumina la altura para que siga la forma y no la textura.")
+                            help: "Difumina el campo de altura antes de usarlo. Sin esto el relieve sigue la textura y no la forma — una remera estampada mete volumen donde no hay. Subilo hasta que el relieve responda a la silueta y no al dibujo.")
                 ParamToggle(label: "Detectar sujeto", isOn: $model.subjectMatteEnabled,
-                            help: "Segmentación de persona por Vision, en la Neural Engine.")
+                            help: "Usa Vision para separar a la persona del fondo y alimentar con eso el campo de altura. No es profundidad real, es figura contra fondo, pero para que la lluvia encuentre volumen eso hace más que cualquier gradiente. Corre en la Neural Engine y cuesta pocos milisegundos.")
                 ParamSlider(label: "Peso sujeto", value: $model.matteWeight, range: 0...1)
                     .disabled(!model.subjectMatteEnabled)
 

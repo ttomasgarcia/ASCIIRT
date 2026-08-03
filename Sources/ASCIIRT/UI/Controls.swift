@@ -61,7 +61,7 @@ struct PanelGroupLabel: View {
         HStack(spacing: 3) {
             Text(text)
                 .font(.system(size: 9, weight: .medium))
-            HelpMark(help)
+            HelpMark(help, title: text)
         }
         .foregroundStyle(.tertiary)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -69,22 +69,44 @@ struct PanelGroupLabel: View {
     }
 }
 
-/// Signo de pregunta diminuto con el tooltip del sistema.
+/// Signo de pregunta diminuto que abre una explicacion al hacer click.
 ///
-/// El tooltip cuelga del icono y no de la fila entera a proposito: sobre la fila
-/// aparecia al pasar por el slider mientras se arrastraba, justo cuando estorba.
-/// Aca hay que ir a buscarlo, que es lo que uno hace cuando no sabe que hace algo.
+/// Click y no tooltip: un tooltip obliga a mantener el mouse quieto y desaparece
+/// al moverlo, asi que solo sirve para textos de una linea. Con popover el texto
+/// se queda mientras se lee y se puede explicar para que sirve el parametro, no
+/// solo que es.
 struct HelpMark: View {
+    let title: String
     let text: String?
+    @State private var isShowing = false
 
-    init(_ text: String?) { self.text = text }
+    init(_ text: String?, title: String = "") {
+        self.text = text
+        self.title = title
+    }
 
     var body: some View {
         if let text, !text.isEmpty {
-            Image(systemName: "questionmark.circle")
-                .font(.system(size: 8.5))
-                .foregroundStyle(.tertiary)
-                .help(text)
+            Button { isShowing.toggle() } label: {
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 9))
+                    .foregroundStyle(isShowing ? Color.accentColor : Color.secondary.opacity(0.55))
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isShowing, arrowEdge: .trailing) {
+                VStack(alignment: .leading, spacing: 7) {
+                    if !title.isEmpty {
+                        Text(title)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    Text(text)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(13)
+                .frame(width: 280, alignment: .leading)
+            }
         }
     }
 }
@@ -100,7 +122,7 @@ struct ParamLabel: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            HelpMark(help)
+            HelpMark(help, title: text)
             Spacer(minLength: 0)
         }
         .frame(width: PanelMetrics.labelWidth, alignment: .leading)
@@ -163,7 +185,7 @@ struct ParamToggle: View {
         Toggle(isOn: $isOn) {
             HStack(spacing: 3) {
                 Text(label).font(.system(size: 11))
-                HelpMark(help)
+                HelpMark(help, title: label)
             }
         }
         .toggleStyle(.switch)

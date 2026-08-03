@@ -86,6 +86,7 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                         texture2d<uint,  access::read>  glyphs [[texture(ASCIIRTTextureIndexGlyphNext)]],
                         texture2d<float, access::read>  gridColor [[texture(ASCIIRTTextureIndexGridColor)]],
                         texture2d<float, access::read>  fullColor [[texture(ASCIIRTTextureIndexColor)]],
+                        texture2d<float, access::read>  eyeMask [[texture(ASCIIRTTextureIndexEyeMask)]],
                         texture2d<float, access::read>  height [[texture(ASCIIRTTextureIndexHeight)]],
                         texture2d<float, access::read>  spawn  [[texture(ASCIIRTTextureIndexSpawn)]],
                         texture2d<float, access::write> output [[texture(ASCIIRTTextureIndexOutput)]],
@@ -206,7 +207,7 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
 
     // Invert cambia quien es tinta y quien es fondo, no el color: invertir el
     // color daria el negativo fotografico, que es otra cosa.
-    const float coverage = params.invert != 0u ? 1.0 - ink : ink;
+    float coverage = params.invert != 0u ? 1.0 - ink : ink;
 
     // Matrix ya trae su composicion resuelta contra negro; los modos de color
     // solo aplican fuera de el.
@@ -214,6 +215,13 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
 
     // Alpha premultiplicado: es lo que espera una pista ProRes 4444. Sin
     // premultiplicar, los bordes antialiaseados del glifo salen con halo.
+    // Vaciar el interior: se quita la tinta del glifo, no el color. Asi el
+    // pleno y el anillo siguen dibujandose y lo unico que desaparece adentro es
+    // el codigo.
+    if (params.eyeHollow != 0u && params.generativeEnabled != 0u) {
+        coverage *= 1.0 - eyeMask.read(gid).r;
+    }
+
     // Pleno del ojo por encima del ASCII. Se lee el color a resolucion completa,
     // no el promedio por tile: el disco tiene que tener borde limpio, y el grid
     // lo escalonaria a la celda.

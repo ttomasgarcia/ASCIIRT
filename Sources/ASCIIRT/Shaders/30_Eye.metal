@@ -17,6 +17,7 @@ using namespace metal;
 
 kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTextureIndexLumaRaw)]],
                       texture2d<float, access::write> color [[texture(ASCIIRTTextureIndexColor)]],
+                      texture2d<float, access::write> mask  [[texture(ASCIIRTTextureIndexEyeMask)]],
                       constant RenderParams &params [[buffer(ASCIIRTBufferIndexRenderParams)]],
                       uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= params.outputSize.x || gid.y >= params.outputSize.y) { return; }
@@ -84,7 +85,28 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // Cuanto pertenece este pixel al ojo. El halo y los pulsos NO tinen: son el
     // campo de codigo alrededor y tienen que quedar del color del modo.
     const float redness = saturate(iris + ring);
-    const float3 irisColor = float3(params.eyeIrisR, params.eyeIrisG, params.eyeIrisB);
+
+    const float3 innerColor = float3(params.eyeIrisR, params.eyeIrisG, params.eyeIrisB);
+    const float3 outerColor = float3(params.eyeIrisOuterR, params.eyeIrisOuterG, params.eyeIrisOuterB);
+
+    // Gradiente del iris. El eje puede ser el radio o el angulo; en los dos
+    // casos se anima corriendo la fase, no interpolando entre colores: correr la
+    // fase hace que el gradiente VIAJE, que es lo que se lee como movimiento.
+    float gradient = 0.0;
+    if (params.eyeGradientMode == 1u) {
+        const float rNorm = r / radius;
+        gradient = fract(rNorm * params.eyeGradientCycles - params.time * params.eyeGradientSpeed);
+    } else if (params.eyeGradientMode == 2u) {
+        const float angle = atan2(p.y, p.x) / (2.0 * M_PI_F) + 0.5;
+        gradient = fract(angle * params.eyeGradientCycles + params.time * params.eyeGradientSpeed);
+    }
+    // Triangulo en vez de rampa: con `fract` sola el gradiente salta del ultimo
+    // color al primero y queda una costura dura girando por el aro.
+    gradient = 1.0 - abs(gradient * 2.0 - 1.0);
+
+    const float3 irisColor = params.eyeGradientMode == 0u
+        ? innerColor
+        : mix(innerColor, outerColor, gradient);
 
     float3 rgb = mix(float3(1.0), irisColor, redness);
     // El nucleo quema a blanco por encima del tinte.
@@ -96,6 +118,12 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // del grid, el disco tendria borde escalonado.
     const float body = saturate(core + iris + ring);
 
+    // Mascara del interior: 1 bien adentro del aro, 0 afuera. La transicion cae
+    // sobre el aro mismo para que al vaciar el interior el borde quede en el
+    // anillo y no un escalon a mitad del iris.
+    const float inner = 1.0 - smoothstep(radius - ringWidth, radius, r);
+
     luma.write(float4(luminance), gid);
     color.write(float4(rgb, body), gid);
+    mask.write(float4(inner), gid);
 }

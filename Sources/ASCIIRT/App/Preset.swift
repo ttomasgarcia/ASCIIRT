@@ -98,6 +98,11 @@ struct Preset: Codable, Equatable {
     var eyeSolidGain: Double = 1.0
     var eyeSolidEdge: Double = 0.35
     var trailDecay: Double = 0
+    var eyeHollow: Bool = false
+    var eyeGradientMode: UInt32 = 0
+    var eyeGradientSpeed: Double = 0.15
+    var eyeGradientCycles: Double = 1
+    var eyeIrisOuter: [Double] = [0.35, 0.02, 0.10]
     var eyeFieldNoise: Double = 0.55
     var eyeFieldChurn: Double = 6
     var matrixImageMix: Double = 0.75
@@ -190,6 +195,11 @@ struct Preset: Codable, Equatable {
         eyeSolidGain = c.value(.eyeSolidGain, d.eyeSolidGain)
         eyeSolidEdge = c.value(.eyeSolidEdge, d.eyeSolidEdge)
         trailDecay = c.value(.trailDecay, d.trailDecay)
+        eyeHollow = c.value(.eyeHollow, d.eyeHollow)
+        eyeGradientMode = c.value(.eyeGradientMode, d.eyeGradientMode)
+        eyeGradientSpeed = c.value(.eyeGradientSpeed, d.eyeGradientSpeed)
+        eyeGradientCycles = c.value(.eyeGradientCycles, d.eyeGradientCycles)
+        eyeIrisOuter = c.value(.eyeIrisOuter, d.eyeIrisOuter)
         eyeFieldNoise = c.value(.eyeFieldNoise, d.eyeFieldNoise)
         eyeFieldChurn = c.value(.eyeFieldChurn, d.eyeFieldChurn)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)

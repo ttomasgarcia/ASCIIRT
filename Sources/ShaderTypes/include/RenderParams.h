@@ -62,6 +62,7 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexGridColor = 18,///< RGBA8 color medio por tile
     ASCIIRTTextureIndexTrailPrev = 19,///< R16F campo arrastrado del frame anterior
     ASCIIRTTextureIndexTrailNext = 20,///< R16F campo arrastrado de este frame
+    ASCIIRTTextureIndexEyeMask = 21,  ///< R8 mascara del interior del ojo, a resolucion completa
 };
 
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
@@ -289,6 +290,28 @@ typedef struct {
     /// Arrastre: cuanto sobrevive el campo del frame anterior. 0 lo apaga, 0.9
     /// deja una estela larga. Es el mismo mecanismo que el fosforo de un tubo.
     float trailDecay;
+
+    // MARK: Interior del ojo
+
+    /// Vacia de glifos el area de adentro del anillo. El pleno y el anillo
+    /// siguen dibujandose; lo que desaparece es el ASCII.
+    uint32_t eyeHollow;
+
+    /// 0 unicolor, 1 gradiente radial que viaja hacia afuera, 2 gradiente
+    /// angular que gira alrededor del centro.
+    uint32_t eyeGradientMode;
+    /// Vueltas o viajes por segundo. Negativo invierte el sentido.
+    float eyeGradientSpeed;
+    /// Repeticiones del gradiente a lo largo de su eje. 1 = una sola transicion.
+    float eyeGradientCycles;
+
+    /// Color del extremo lejano del gradiente. El cercano es el iris.
+    float eyeIrisOuterR;
+    float eyeIrisOuterG;
+    float eyeIrisOuterB;
+
+    /// Padding para cerrar en multiplo de 8.
+    uint32_t _pad1;
 } RenderParams;
 
 #endif /* RenderParams_h */
