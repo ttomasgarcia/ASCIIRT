@@ -331,6 +331,7 @@ private struct ControlPanel: View {
     @State private var showSource = true
     @State private var showGrid = true
     @State private var showCharset = false
+    @State private var showTrail = true
     @State private var showEye = true
     @State private var showColor = false
     @State private var showExport = false
@@ -353,6 +354,13 @@ private struct ControlPanel: View {
                              isExpanded: $showSource) {
                     sourceContent
                 }
+                Divider()
+                PanelSection(title: "Estela", systemImage: "wind",
+                             help: "Un solo control para el rastro que deja el movimiento. Mueve cuatro parámetros a la vez: cuánto sobrevive la imagen del frame anterior, y cuánta inercia tiene el ojo — porque la estela no es sólo el eco, es también que el ojo vaya atrás del objetivo y se pase al llegar. Los sliders individuales quedan visibles y podés retocarlos después; el macro escribe valores reales, no multiplica por detrás.",
+                             isExpanded: $showTrail) {
+                    trailContent
+                }
+
                 if model.sourceKind == .eye {
                     Divider()
                     PanelSection(title: "Ojo", systemImage: "circle.circle",
@@ -571,6 +579,29 @@ private struct ControlPanel: View {
             }
 
             ParamReadout(label: "Entrada", value: model.format?.pretty ?? "—")
+        }
+    }
+
+    // MARK: Estela
+
+    private var trailContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            ParamSlider(label: "Cantidad", value: $model.trailMacro, range: 0...1,
+                        help: "0 apaga la estela y devuelve los cuatro parámetros a su valor neutro. Subiéndolo, la imagen del frame anterior dura más y el ojo se vuelve más pesado, así que el campo se estira mientras viaja. Arriba de 0,8 la cola dura más de un segundo y el efecto pasa de rastro a rastro largo.")
+
+            // Se muestran los valores que el macro acaba de escribir: sin esto
+            // no hay forma de saber que hizo, ni de retocar a partir de ahi.
+            ParamReadout(label: "Arrastre", value: String(format: "%.2f", model.trailDecay),
+                         help: "Lo escribe el macro. Está también en Temporal, donde lo podés ajustar a mano.")
+            ParamReadout(label: "Rigidez", value: String(format: "%.0f", model.eyeStiffness),
+                         help: "Lo escribe el macro. Está también en Ojo → Físico.")
+            ParamReadout(label: "Rozamiento", value: String(format: "%.1f", model.eyeDamping),
+                         help: "Lo escribe el macro. Está también en Ojo → Físico.")
+
+            Text("Tocar los sliders individuales después está bien; el macro no los vuelve a pisar hasta que lo muevas de nuevo.")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -112,6 +112,49 @@ final class AppModel: ObservableObject {
     @Published var eyeSolidEdge: Double = 0.35 { didSet { sync() } }
 
     /// Arrastre del campo. Sirve para cualquier fuente, no solo el ojo.
+    // MARK: - Estela (macro)
+
+    /// Un solo control que escribe los cuatro parametros que hacen la estela.
+    ///
+    /// Escribe los valores reales en vez de multiplicarlos por detras: asi los
+    /// sliders individuales se mueven y se ve exactamente que quedo puesto. Un
+    /// macro que actua en secreto es imposible de depurar cuando algo se ve raro.
+    @Published var trailMacro: Double = 0 { didSet { applyTrailMacro() } }
+
+    /// Valores neutros a los que vuelve el macro en 0.
+    private static let neutralTrail = (decay: 0.0, stiffness: 18.0, damping: 5.5, hysteresis: 0.75)
+
+    private func applyTrailMacro() {
+        // Al cargar un preset los cuatro parametros ya vienen guardados; dejar
+        // que el macro los reescriba pisaria lo que el preset dice.
+        guard !isApplyingPreset else { return }
+
+        let t = min(max(trailMacro, 0), 1)
+        let n = AppModel.neutralTrail
+
+        // El macro se mapea al TIEMPO de desvanecido y no al factor de
+        // decaimiento. El factor es exponencial: entre 0,5 y 0,9 hay medio
+        // segundo de diferencia y entre 0,9 y 0,98 hay dos segundos, asi que
+        // cualquier curva sobre el factor da un slider con todo amontonado en un
+        // extremo. Sobre el tiempo, el recorrido es parejo.
+        let fadeSeconds = 2.0 * pow(t, 1.8)
+        let frames = fadeSeconds * 60
+        // Se despeja el factor que lleva de 1 a medio escalon de rampa en esos
+        // frames. Con frames < 1 da practicamente 0, o sea sin estela.
+        trailDecay = frames < 0.5 ? 0 : pow(0.007, 1.0 / frames)
+
+        // Menos resorte y menos rozamiento: el ojo va mas atras del objetivo y
+        // se pasa al llegar, con lo que el campo se estira mientras viaja. Es la
+        // otra mitad de la sensacion de estela, y sin esto el arrastre solo se
+        // ve como un eco y no como movimiento.
+        eyeStiffness = n.stiffness + (6.0 - n.stiffness) * t
+        eyeDamping = n.damping + (2.6 - n.damping) * t
+
+        // La histeresis baja acompanando: con la estela larga, retener glifos
+        // ademas confunde el residuo de la histeresis con la cola de verdad.
+        hysteresisThreshold = n.hysteresis + (0.30 - n.hysteresis) * t
+    }
+
     @Published var trailDecay: Double = 0 { didSet { sync() } }
 
     /// Interior del ojo.
@@ -599,6 +642,7 @@ final class AppModel: ObservableObject {
         preset.eyeSolidGain = eyeSolidGain
         preset.eyeSolidEdge = eyeSolidEdge
         preset.trailDecay = trailDecay
+        preset.trailMacro = trailMacro
         preset.eyeHollow = eyeHollow
         preset.eyeGradientMode = eyeGradientMode
         preset.eyeGradientSpeed = eyeGradientSpeed
@@ -719,6 +763,7 @@ final class AppModel: ObservableObject {
         eyeSolidGain = preset.eyeSolidGain
         eyeSolidEdge = preset.eyeSolidEdge
         trailDecay = preset.trailDecay
+        trailMacro = preset.trailMacro
         eyeHollow = preset.eyeHollow
         eyeGradientMode = preset.eyeGradientMode
         eyeGradientSpeed = preset.eyeGradientSpeed

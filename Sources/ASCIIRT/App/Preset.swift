@@ -99,6 +99,7 @@ struct Preset: Codable, Equatable {
     var eyeSolidGain: Double = 1.0
     var eyeSolidEdge: Double = 0.35
     var trailDecay: Double = 0
+    var trailMacro: Double = 0
     var eyeHollow: Bool = false
     var eyeGradientMode: UInt32 = 0
     var eyeGradientSpeed: Double = 0.15
@@ -199,6 +200,7 @@ struct Preset: Codable, Equatable {
         eyeSolidGain = c.value(.eyeSolidGain, d.eyeSolidGain)
         eyeSolidEdge = c.value(.eyeSolidEdge, d.eyeSolidEdge)
         trailDecay = c.value(.trailDecay, d.trailDecay)
+        trailMacro = c.value(.trailMacro, d.trailMacro)
         eyeHollow = c.value(.eyeHollow, d.eyeHollow)
         eyeGradientMode = c.value(.eyeGradientMode, d.eyeGradientMode)
         eyeGradientSpeed = c.value(.eyeGradientSpeed, d.eyeGradientSpeed)
