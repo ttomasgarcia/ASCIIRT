@@ -90,15 +90,22 @@ struct ContentView: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
-                                    // El preview esta centrado con aspect fit, asi
-                                    // que hay que descontar las bandas antes de
-                                    // normalizar o el ojo se corre.
+                                    model.isDraggingEye = true
+                                    // El preview esta centrado con aspect fit,
+                                    // asi que hay que descontar las bandas antes
+                                    // de normalizar o el ojo queda corrido
+                                    // respecto del puntero.
                                     let fitted = fittedRect(in: geo.size, aspect: model.outputSize)
                                     guard fitted.width > 0, fitted.height > 0 else { return }
                                     let x = (value.location.x - fitted.minX) / fitted.width
                                     let y = (value.location.y - fitted.minY) / fitted.height
                                     model.eyeCenter = CGPoint(x: min(max(x, -0.5), 1.5),
                                                               y: min(max(y, -0.5), 1.5))
+                                }
+                                .onEnded { _ in
+                                    // Al soltar, la mirada retoma su recorrido
+                                    // desde donde quedo el ojo.
+                                    model.isDraggingEye = false
                                 }
                         )
                 }
@@ -129,6 +136,9 @@ struct ContentView: View {
         .background(.ultraThinMaterial, in: Capsule())
         .padding(10)
         .opacity(model.isRunning ? 1 : 0)
+        // Los indicadores viven encima del preview: sin esto se comen los
+        // clicks en las esquinas y arrastrar el ojo ahi no registra.
+        .allowsHitTesting(false)
     }
 
     /// Estado de grabacion sobre la imagen: mientras se graba, el usuario mira
@@ -158,6 +168,7 @@ struct ContentView: View {
             .padding(.vertical, 5)
             .background(.ultraThinMaterial, in: Capsule())
             .padding(10)
+            .allowsHitTesting(false)
             .onAppear { recordPulse = true }
             .onDisappear { recordPulse = false }
         }

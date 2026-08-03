@@ -102,6 +102,8 @@ final class AppModel: ObservableObject {
     @Published var gazeExtentY: Double = 0.05 { didSet { sync() } }
     @Published var gazeHold: Double = 0.55 { didSet { sync() } }
     @Published var gazeStops: Double = 7 { didSet { sync() } }
+    /// Arrastre en curso sobre el preview.
+    @Published var isDraggingEye = false { didSet { sync() } }
 
     /// Pleno: cuanto se sale el ojo del ASCII para ganar intensidad.
     @Published var eyeSolidAmount: Double = 0 { didSet { sync() } }
@@ -396,6 +398,7 @@ final class AppModel: ObservableObject {
         next.gazeExtent = SIMD2(Float(gazeExtentX), Float(gazeExtentY))
         next.gazeHold = Float(gazeHold)
         next.gazeStops = Float(gazeStops)
+        next.eyeManualOverride = isDraggingEye
         next.eyeSolidAmount = Float(eyeSolidAmount)
         next.eyeSolidGain = Float(eyeSolidGain)
         next.eyeSolidEdge = Float(eyeSolidEdge)

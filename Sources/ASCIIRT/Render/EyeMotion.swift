@@ -70,6 +70,12 @@ struct EyeMotion {
     var driftAmount: Float = 0.004
     var driftSpeed: Float = 0.25
 
+    /// Mientras el usuario arrastra, la mirada no corre el ojo: el objetivo es
+    /// el puntero y nada mas. Sin esto, con cualquier modo que no sea Quieto el
+    /// ojo aparece desplazado hasta un cuarto de pantalla del cursor y parece
+    /// que el arrastre esta descalibrado.
+    var manualOverride = false
+
     private(set) var position = SIMD2<Float>(0.5, 0.5)
     private var velocity = SIMD2<Float>(0, 0)
 
@@ -140,7 +146,9 @@ struct EyeMotion {
     /// Integra un frame. `time` alimenta la deriva; en offline viene del indice
     /// de frame, asi que el resultado es reproducible entre corridas.
     mutating func step(deltaTime: Float, time: Float) {
-        let goal = target + gaze(at: time) + tremor(at: time)
+        // El temblor se mantiene incluso arrastrando: es de amplitud minima y
+        // sacarlo hace que el ojo se sienta muerto justo cuando lo estas tocando.
+        let goal = target + (manualOverride ? .zero : gaze(at: time)) + tremor(at: time)
 
         // Un hitch de render puede dar un dt enorme y un resorte explicita en un
         // solo paso grande. Se acota y se subdivide en pasos chicos: cuesta

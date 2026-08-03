@@ -85,6 +85,8 @@ struct PipelineConfig: Equatable {
     var gazeExtent: SIMD2<Float> = SIMD2(0.22, 0.05)
     var gazeHold: Float = 0.55
     var gazeStops: Float = 7
+    /// Arrastre en curso: la mirada se suspende para que el ojo siga al puntero.
+    var eyeManualOverride = false
     var eyeSolidAmount: Float = 0
     var eyeSolidGain: Float = 1.0
     var eyeSolidEdge: Float = 0.35
@@ -296,6 +298,7 @@ final class ASCIIPipeline {
             eyeMotion.gazeExtent = config.gazeExtent
             eyeMotion.gazeHold = config.gazeHold
             eyeMotion.gazeStops = config.gazeStops
+            eyeMotion.manualOverride = config.eyeManualOverride
             eyeMotion.target = config.eyeCenter
             eyeMotion.step(deltaTime: deltaTime, time: currentTime)
         }
