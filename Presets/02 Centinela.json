@@ -1,5 +1,5 @@
 {
-  "name": "04 Brasa",
+  "name": "02 Centinela",
   "scope": "look",
   "sourceKind": "Ojo",
   "colorMode": 2,
@@ -19,51 +19,51 @@
     0,
     0
   ],
-  "eyeRadius": 0.22,
+  "eyeRadius": 0.18,
   "eyeCoreRadius": 0.22,
-  "eyeFalloff": 1.8,
+  "eyeFalloff": 3.0,
   "eyeRingWidth": 0.05,
   "eyeRingIntensity": 0.85,
-  "eyeHaloRadius": 0.5,
-  "eyeHaloIntensity": 0.2,
+  "eyeHaloRadius": 0.3,
+  "eyeHaloIntensity": 0.14,
   "eyeIris": [
-    1.0,
-    0.35,
-    0.02
+    0.85,
+    0.06,
+    0.03
   ],
   "eyeIrisOuter": [
-    0.25,
-    0.02,
-    0.0
+    0.2,
+    0.01,
+    0.05
   ],
   "eyeGradientMode": 1,
-  "eyeGradientCycles": 2.0,
-  "eyeGradientSpeed": 0.12,
+  "eyeGradientCycles": 1.5,
+  "eyeGradientSpeed": 0.08,
   "eyeCoreColor": [
     1,
-    0.6,
-    0.2
+    0.92,
+    0.85
   ],
-  "eyeCoreBlend": 0.0,
+  "eyeCoreBlend": 0.9,
   "eyeHollow": false,
-  "eyeBlinkEnabled": false,
-  "eyeBlinkRate": 1.0,
-  "eyeBlinkDuty": 0.18,
-  "eyeBlinkSoftness": 0.35,
+  "eyeBlinkEnabled": true,
+  "eyeBlinkRate": 0.5,
+  "eyeBlinkDuty": 0.12,
+  "eyeBlinkSoftness": 0.0,
   "eyeBlinkColor": [
     1,
-    0.85,
-    0.2
+    0.72,
+    0.15
   ],
-  "eyeBreathAmount": 0.05,
-  "eyeBreathSpeed": 0.08,
+  "eyeBreathAmount": 0.04,
+  "eyeBreathSpeed": 0.1,
   "eyePulseAmount": 0.06,
   "eyePulseSpeed": 0.08,
   "eyePulseFrequency": 4.0,
   "eyePulseDecay": 5.0,
-  "eyeFieldNoise": 1.1,
-  "eyeFieldChurn": 3.0,
-  "eyeSolidAmount": 0.0,
-  "eyeSolidGain": 1.0,
-  "eyeSolidEdge": 0.0
+  "eyeFieldNoise": 0.55,
+  "eyeFieldChurn": 4.0,
+  "eyeSolidAmount": 0.45,
+  "eyeSolidGain": 1.2,
+  "eyeSolidEdge": 0.5
 }

@@ -13,5 +13,10 @@
   "gazeRate": 0.2,
   "name": "M01 Fijo al frente",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.1,
+  "trailDecay": 0.0736,
+  "trailDisperse": 0.0,
+  "hysteresisThreshold": 0.705,
+  "trailTint": 0.0
 }

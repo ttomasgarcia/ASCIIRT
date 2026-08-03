@@ -14,5 +14,10 @@
   "gazeStops": 7,
   "name": "M02 Recorre la sala",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.45,
+  "trailDecay": 0.8403,
+  "trailDisperse": 0.1343,
+  "hysteresisThreshold": 0.547,
+  "trailTint": 0.0
 }

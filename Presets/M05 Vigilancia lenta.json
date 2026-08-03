@@ -13,5 +13,10 @@
   "gazeRate": 0.05,
   "name": "M05 Vigilancia lenta",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.55,
+  "trailDecay": 0.8858,
+  "trailDisperse": 0.2463,
+  "hysteresisThreshold": 0.502,
+  "trailTint": 0.15
 }

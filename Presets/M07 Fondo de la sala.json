@@ -13,5 +13,10 @@
   "gazeRate": 0.09,
   "name": "M07 Fondo de la sala",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.5,
+  "trailDecay": 0.8659,
+  "trailDisperse": 0.1903,
+  "hysteresisThreshold": 0.525,
+  "trailTint": 0.1
 }

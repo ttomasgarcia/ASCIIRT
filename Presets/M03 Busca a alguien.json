@@ -13,5 +13,10 @@
   "gazeRate": 0.3,
   "name": "M03 Busca a alguien",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.35,
+  "trailDecay": 0.7606,
+  "trailDisperse": 0.0224,
+  "hysteresisThreshold": 0.593,
+  "trailTint": 0.0
 }

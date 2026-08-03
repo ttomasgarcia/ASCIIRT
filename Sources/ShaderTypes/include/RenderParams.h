@@ -347,6 +347,14 @@ typedef struct {
     float eyeBlinkR;
     float eyeBlinkG;
     float eyeBlinkB;
+
+    /// De que color queda la cola. En 1 conserva el color del ojo, y como el
+    /// cuerpo del ojo es una masa roja grande, la cola se lee como esa masa
+    /// corriendose por la pantalla. En 0 la cola toma el color del codigo apenas
+    /// pasa el frente, asi que lo que queda atras son caracteres y no un fantasma
+    /// del disco. El decaimiento es exponencial: valores intermedios dejan el
+    /// color del ojo cerca del frente y lo van perdiendo a lo largo de la cola.
+    float trailTint;
 } RenderParams;
 
 #endif /* RenderParams_h */

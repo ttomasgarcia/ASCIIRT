@@ -13,5 +13,10 @@
   "gazeRate": 0.055,
   "name": "M10 Ronda",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.7,
+  "trailDecay": 0.9244,
+  "trailDisperse": 0.4142,
+  "hysteresisThreshold": 0.435,
+  "trailTint": 0.25
 }

@@ -14,5 +14,10 @@
   "gazeStops": 14,
   "name": "M09 Escanea y se clava",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.38,
+  "trailDecay": 0.7898,
+  "trailDisperse": 0.056,
+  "hysteresisThreshold": 0.579,
+  "trailTint": 0.0
 }

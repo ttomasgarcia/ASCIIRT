@@ -13,5 +13,10 @@
   "gazeRate": 1.4,
   "name": "M04 Nervioso",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.25,
+  "trailDecay": 0.6057,
+  "trailDisperse": 0.0,
+  "hysteresisThreshold": 0.637,
+  "trailTint": 0.0
 }

@@ -14,5 +14,10 @@
   "gazeStops": 9,
   "name": "M06 Primera fila",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.4,
+  "trailDecay": 0.8064,
+  "trailDisperse": 0.0784,
+  "hysteresisThreshold": 0.57,
+  "trailTint": 0.0
 }

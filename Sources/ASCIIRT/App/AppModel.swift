@@ -175,6 +175,7 @@ final class AppModel: ObservableObject {
     @Published var eyeBlinkDuty: Double = 0.18 { didSet { sync() } }
     @Published var eyeBlinkSoftness: Double = 0.35 { didSet { sync() } }
     @Published var eyeBlinkColor: Color = Color(red: 1, green: 0.85, blue: 0.2) { didSet { sync() } }
+    @Published var trailTint: Double = 0 { didSet { sync() } }
     @Published var eyeFieldNoise: Double = 0.55 { didSet { sync() } }
     @Published var eyeFieldChurn: Double = 6 { didSet { sync() } }
 
@@ -471,6 +472,7 @@ final class AppModel: ObservableObject {
         next.eyeBlinkDuty = Float(eyeBlinkDuty)
         next.eyeBlinkSoftness = Float(eyeBlinkSoftness)
         next.eyeBlinkColor = AppModel.components(of: eyeBlinkColor)
+        next.trailTint = Float(trailTint)
         next.eyeFieldNoise = Float(eyeFieldNoise)
         next.eyeFieldChurn = Float(eyeFieldChurn)
 
@@ -675,6 +677,7 @@ final class AppModel: ObservableObject {
         preset.eyeBlinkSoftness = eyeBlinkSoftness
         let blinkRGB = AppModel.components(of: eyeBlinkColor)
         preset.eyeBlinkColor = [Double(blinkRGB.x), Double(blinkRGB.y), Double(blinkRGB.z)]
+        preset.trailTint = trailTint
         preset.eyeFieldNoise = eyeFieldNoise
         preset.eyeFieldChurn = eyeFieldChurn
         preset.matrixImageMix = matrixImageMix
@@ -711,6 +714,21 @@ final class AppModel: ObservableObject {
             gazeHold = preset.gazeHold
             gazeStops = preset.gazeStops
             eyeClampToScreen = preset.eyeClampToScreen
+
+            // Fisica, temblor y estela van con el movimiento y no con el look.
+            // La estela solo existe cuando algo se mueve, y los cuatro valores
+            // que escribe el macro «Cantidad» —arrastre, disgregacion, rigidez y
+            // rozamiento— tienen que viajar juntos: repartidos entre los dos
+            // alcances, cargar un look con cola larga contra un movimiento rigido
+            // daba eco sin estiramiento, que no es ninguno de los dos efectos.
+            eyeStiffness = preset.eyeStiffness
+            eyeDamping = preset.eyeDamping
+            eyeDriftAmount = preset.eyeDriftAmount
+            eyeDriftSpeed = preset.eyeDriftSpeed
+            trailDecay = preset.trailDecay
+            trailMacro = preset.trailMacro
+            trailDisperse = preset.trailDisperse
+            trailTint = preset.trailTint
                     if preset.eyeCenter.count >= 2 {
                 eyeCenter = CGPoint(x: preset.eyeCenter[0], y: preset.eyeCenter[1])
                 renderer.ascii.eyeMotion.snap(to: SIMD2(Float(preset.eyeCenter[0]),
@@ -778,16 +796,9 @@ final class AppModel: ObservableObject {
         eyePulseSpeed = preset.eyePulseSpeed
         eyePulseFrequency = preset.eyePulseFrequency
         eyePulseDecay = preset.eyePulseDecay
-        eyeDriftAmount = preset.eyeDriftAmount
-        eyeDriftSpeed = preset.eyeDriftSpeed
-        eyeStiffness = preset.eyeStiffness
-        eyeDamping = preset.eyeDamping
         eyeSolidAmount = preset.eyeSolidAmount
         eyeSolidGain = preset.eyeSolidGain
         eyeSolidEdge = preset.eyeSolidEdge
-        trailDecay = preset.trailDecay
-        trailMacro = preset.trailMacro
-        trailDisperse = preset.trailDisperse
         eyeHollow = preset.eyeHollow
         eyeGradientMode = preset.eyeGradientMode
         eyeGradientSpeed = preset.eyeGradientSpeed

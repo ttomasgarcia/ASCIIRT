@@ -50,8 +50,19 @@ kernel void eyeTrailKernel(texture2d<float, access::read>  current  [[texture(AS
 
     const float faded = max(old.a * localDecay - step - extraFloor, 0.0);
 
+    // El color de lo que queda atras se va hacia el color del codigo. Se aplica
+    // por frame, asi que la caida es exponencial: con el tinte en 0 la cola es
+    // codigo desde el primer frame, y con valores intermedios el color del ojo
+    // sobrevive cerca del frente y se pierde a lo largo del rastro.
+    //
+    // Sin esto la cola arrastra el rojo del cuerpo del ojo, y como ese cuerpo es
+    // un disco lleno, lo que se ve no es una estela de caracteres sino el disco
+    // entero corriendose por la pantalla.
+    const float3 codeColor = float3(params.foregroundR, params.foregroundG, params.foregroundB);
+    const float3 agedRGB = mix(codeColor, old.rgb, saturate(params.trailTint));
+
     // Gana el que mas cuerpo tiene, y se lleva SU color. Mezclar los dos daria
     // un promedio entre el iris y lo que haya quedado atras, y la cola saldria
     // de un color que no existe en ningun lado.
-    next.write(now.a >= faded ? now : float4(old.rgb, faded), gid);
+    next.write(now.a >= faded ? now : float4(agedRGB, faded), gid);
 }

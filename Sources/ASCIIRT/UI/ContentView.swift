@@ -338,6 +338,8 @@ private struct ControlPanel: View {
     @State private var showEdges = true
     @State private var showTemporal = false
     @State private var showMatrix = true
+    @State private var showEyeLife = true
+    @State private var showEyeMotion = true
     @State private var showCoverage = false
 
     var body: some View {
@@ -354,20 +356,37 @@ private struct ControlPanel: View {
                              isExpanded: $showSource) {
                     sourceContent
                 }
-                Divider()
-                PanelSection(title: "Estela", systemImage: "wind",
-                             help: "Un solo control para el rastro que deja el movimiento. Mueve cuatro parámetros a la vez: cuánto sobrevive la imagen del frame anterior, y cuánta inercia tiene el ojo — porque la estela no es sólo el eco, es también que el ojo vaya atrás del objetivo y se pase al llegar. Los sliders individuales quedan visibles y podés retocarlos después; el macro escribe valores reales, no multiplica por detrás.",
-                             isExpanded: $showTrail) {
-                    trailContent
-                }
-
+                // Las tres secciones del ojo estan separadas por lo que HACEN, y
+                // el corte coincide con el alcance de los presets: forma y vida
+                // son «look», movimiento y estela son «movimiento». Antes era una
+                // sola seccion con todo adentro y la inercia aparecia dos veces,
+                // en dos grupos distintos, con dos textos de ayuda distintos.
                 if model.sourceKind == .eye {
                     Divider()
-                    PanelSection(title: "Ojo", systemImage: "circle.circle",
-                             help: "La fuente generativa: un ojo que no viene de ninguna cámara. Está armado por capas —núcleo, iris, anillo de lente, halo y pulsos— y cada una tiene su función. El anillo, por ejemplo, existe para que el detector de bordes trace el contorno con caracteres. Como el resultado pasa por la rampa, la animación no se ve como brillo sino como caracteres cambiando de densidad.",
+                    PanelSection(title: "Ojo · forma", systemImage: "circle.circle",
+                             help: "Cómo es el ojo cuando está quieto: núcleo, iris, anillo de lente, halo y relleno. Está armado por capas y cada una tiene su función — el anillo, por ejemplo, existe para que el detector de bordes trace el contorno con caracteres en vez de dejar una mancha. Todo esto es lo que guarda un preset de «look».",
                              isExpanded: $showEye) {
-                        eyeContent
+                        eyeShapeContent
                     }
+                    Divider()
+                    PanelSection(title: "Ojo · vida", systemImage: "waveform.path.ecg",
+                             help: "Lo que se mueve sin que el ojo cambie de lugar: respiración, parpadeo del núcleo, pulsos de energía y el grano del campo de código. Es lo que hace que la pantalla no parezca congelada cuando el ojo está fijo. Como todo pasa por la rampa, nada de esto se ve como brillo: se ve como caracteres cambiando de densidad. También es parte del «look».",
+                             isExpanded: $showEyeLife) {
+                        eyeLifeContent
+                    }
+                    Divider()
+                    PanelSection(title: "Ojo · movimiento", systemImage: "scope",
+                             help: "Cómo recorre la pantalla y cómo viaja hasta cada punto. La mirada genera un objetivo y el resorte se encarga de llegar: esa separación es lo que hace que el movimiento se lea como algo vivo y no como un cursor. Es lo que guarda un preset de «movimiento», independiente del look.",
+                             isExpanded: $showEyeMotion) {
+                        eyeMotionContent
+                    }
+                }
+
+                Divider()
+                PanelSection(title: "Estela", systemImage: "wind",
+                             help: "El rastro que deja el movimiento. «Cantidad» es el control rápido: escribe de una vez el arrastre, la disgregación y la inercia del ojo, porque la estela no es sólo el eco — es también que el ojo vaya atrás del objetivo y se pase al llegar. Escribe valores reales, así que los sliders que toca se mueven y ves exactamente qué quedó puesto.",
+                             isExpanded: $showTrail) {
+                    trailContent
                 }
                 Divider()
                 PanelSection(title: "Grid", systemImage: "grid",
@@ -595,23 +614,26 @@ private struct ControlPanel: View {
             ParamSlider(label: "Disgregación", value: $model.trailDisperse, range: 0...1,
                         help: "Cuánto varía el desvanecido celda por celda. En 0 la cola baja pareja y se apaga entera; subiéndolo, unas celdas llegan a cero antes que otras y la cola se agujerea a medida que envejece. No la acorta: el alcance máximo lo fija el Arrastre. Es la diferencia entre apagarse y deshacerse.")
 
-            PanelGroupLabel(text: "Inercia del ojo", help: "La otra mitad de la estela. Un ojo que llega instantáneo a su objetivo no estira nada por más arrastre que tenga; con inercia va atrás del objetivo y el campo se estira mientras viaja. Vive acá porque es parte de la estela, pero es el mismo par de valores que usan los presets de movimiento.")
-            ParamSlider(label: "Rigidez", value: $model.eyeStiffness, range: 1...80, decimals: 1,
-                        help: "Cuánto tira el resorte hacia el objetivo. Alto llega rápido y directo, con aspecto mecánico y poco rastro; bajo llega lento y pesado, y el campo se estira mientras viaja.")
-            ParamSlider(label: "Rozamiento", value: $model.eyeDamping, range: 0.5...30, decimals: 1,
-                        help: "Cuánto frena el movimiento. Por debajo del valor crítico el ojo se pasa del objetivo y vuelve, y ese rebote es la mayor parte de la sensación de que algo está vivo; por encima llega lento y sin pasarse. El texto de abajo te dice de qué lado estás.")
-            Text(dampingNote)
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
+            if model.sourceKind == .eye {
+                ParamSlider(label: "Color", value: $model.trailTint, range: 0...1,
+                            help: "De qué color queda la cola. En 0 lo que queda atrás toma el color del código: la estela se lee como caracteres. En 1 conserva el color del ojo, y como el cuerpo del ojo es una masa roja llena, la cola se lee como esa masa corriéndose por la pantalla — que es un efecto muy distinto y bastante más pesado. El valor se aplica por frame, así que en los intermedios el color del ojo sobrevive cerca del frente y se va perdiendo a lo largo del rastro.")
+            }
 
             ParamReadout(label: "Histéresis", value: String(format: "%.2f", model.hysteresisThreshold),
-                         help: "El macro también la baja al subir la estela: con la cola larga, retener glifos confunde el residuo de la histéresis con el rastro de verdad. El slider está en Temporal, que es donde vive junto al resto de lo temporal.")
+                         help: "«Cantidad» también la baja al subir la estela: con la cola larga, retener glifos confunde el residuo de la histéresis con el rastro de verdad. El slider está en Temporal, que es donde vive junto al resto de lo temporal.")
+
+            if model.sourceKind == .eye {
+                Text("«Cantidad» también escribe la rigidez y el rozamiento, que están en Ojo · movimiento.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    // MARK: Ojo
+    // MARK: Ojo · forma
 
-    private var eyeContent: some View {
+    private var eyeShapeContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             if model.colorMode != .original {
                 Label("El iris rojo se ve con Color → Original.", systemImage: "info.circle")
@@ -680,7 +702,36 @@ private struct ControlPanel: View {
             ParamSlider(label: "Fuerza núcleo", value: $model.eyeCoreBlend, range: 0...1,
                         help: "Cuánto pisa el núcleo al color del iris. En 1 el centro es del color de arriba; en 0 no pisa nada y el centro toma el color del gradiente, aportando solo luminancia. Bajalo si el gradiente animado se apaga en el medio.")
 
-            ParamToggle(label: "Parpadeo", isOn: $model.eyeBlinkEnabled,
+            if model.eyeGradientMode != 0 {
+                ParamSlider(label: "Ciclos", value: $model.eyeGradientCycles, range: 0.5...12, decimals: 1,
+                            help: "Cuántas veces se repite la transición de color a lo largo de su eje. En modo angular son los sectores que ves girar alrededor del aro; en radial son anillos concéntricos viajando. Con 1 hay una sola transición; con 6 o más aparece un patrón que se lee como energía circulando.")
+                ParamSlider(label: "Animación", value: $model.eyeGradientSpeed, range: -2...2,
+                            help: "Velocidad de la animación del gradiente. En 0 queda quieto y es solo un degradado; valores bajos dan un movimiento apenas perceptible que hace que el aro respire; negativo invierte el sentido de giro. Es el control que más vida le da al círculo exterior sin cambiar su forma.")
+            }
+
+            Divider().padding(.vertical, 2)
+            PanelGroupLabel(text: "Pleno", help: "Saca al ojo del ASCII y lo pinta como forma llena, para que pegue más fuerte que el código.")
+            ParamSlider(label: "Mezcla", value: $model.eyeSolidAmount, range: 0...1,
+                        help: "Cuánto reemplaza la forma llena al ASCII dentro del ojo. En 0 el ojo es puro código, con la textura del charset; en 1 es un disco limpio dibujado por encima. Los valores del medio dejan el glifo asomando por debajo, que suele ser el punto más interesante.")
+            ParamSlider(label: "Intensidad", value: $model.eyeSolidGain, range: 0...3,
+                        help: "Ganancia del pleno. Por encima de 1 el ojo brilla más fuerte que el código que lo rodea, que es exactamente para lo que existe: darle una jerarquía que el ASCII solo no puede. Muy alto satura a blanco y perdés el color del iris.")
+            ParamSlider(label: "Borde", value: $model.eyeSolidEdge, range: 0...1,
+                        help: "Dureza del borde del pleno. En 0 el relleno se desvanece siguiendo la caída natural del iris y se funde con el código; en 1 corta en disco de borde limpio. Subilo si querés que se lea como una forma geométrica y no como un resplandor.")
+        }
+    }
+
+    // MARK: Ojo · vida
+
+    private var eyeLifeContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            PanelGroupLabel(text: "Respiración", help: "Oscilación lenta del radio. Es lo que hace que el ojo parezca vivo aunque no se mueva de lugar.")
+            ParamSlider(label: "Amplitud", value: $model.eyeBreathAmount, range: 0...0.3, decimals: 3,
+                        help: "Cuánto crece y se achica el ojo al respirar, en fracción del radio. 0,03 es casi imperceptible y sirve para que no parezca una imagen congelada; 0,2 late fuerte y se lee como signo vital. Es lo más barato que podés hacer para que la pantalla no parezca trabada.")
+            ParamSlider(label: "Velocidad", value: $model.eyeBreathSpeed, range: 0.01...2,
+                        help: "Velocidad de la respiración. Por debajo de 0,2 respira como algo dormido; entre 0,3 y 0,6 se lee como atención; por encima de 0,8 palpita y empieza a parecer alarma. Es un parámetro emocional más que técnico.")
+
+            PanelGroupLabel(text: "Parpadeo del núcleo", help: "El punto del centro cambia cada tanto de color y vuelve. Toca sólo el núcleo: el iris, el aro y el halo siguen con su color.")
+            ParamToggle(label: "Activo", isOn: $model.eyeBlinkEnabled,
                         help: "Hace que el núcleo cambie cada tanto al color de abajo y vuelva. Toca solo el punto del centro: el iris, el aro y el halo siguen con su color. Sirve para dar señal de vida sin mover nada — un testigo que late — y para marcar momentos de la presentación cambiando el ritmo. Mientras dura el destello la fuerza del núcleo se fuerza al máximo, así que el color se ve aunque tengas Fuerza núcleo en 0.")
             if model.eyeBlinkEnabled {
                 HStack(spacing: 8) {
@@ -697,29 +748,6 @@ private struct ControlPanel: View {
                             help: "Cómo entra y sale el color. En 0 el corte es seco, tipo testigo de alarma o cursor de terminal. Subiéndolo el cambio se suaviza hasta volverse una respiración, sin bordes: ahí deja de leerse como parpadeo y pasa a ser un latido. Nunca es un corte perfectamente instantáneo, porque eso titila de forma irregular cuando el ritmo no cae justo en los fps.")
             }
 
-            if model.eyeGradientMode != 0 {
-                ParamSlider(label: "Ciclos", value: $model.eyeGradientCycles, range: 0.5...12, decimals: 1,
-                            help: "Cuántas veces se repite la transición de color a lo largo de su eje. En modo angular son los sectores que ves girar alrededor del aro; en radial son anillos concéntricos viajando. Con 1 hay una sola transición; con 6 o más aparece un patrón que se lee como energía circulando.")
-                ParamSlider(label: "Animación", value: $model.eyeGradientSpeed, range: -2...2,
-                            help: "Velocidad de la animación del gradiente. En 0 queda quieto y es solo un degradado; valores bajos dan un movimiento apenas perceptible que hace que el aro respire; negativo invierte el sentido de giro. Es el control que más vida le da al círculo exterior sin cambiar su forma.")
-            }
-
-            Divider().padding(.vertical, 2)
-            PanelGroupLabel(text: "Pleno", help: "Saca al ojo del ASCII y lo pinta como forma llena, para que pegue más fuerte que el código.")
-            ParamSlider(label: "Mezcla", value: $model.eyeSolidAmount, range: 0...1,
-                        help: "Cuánto reemplaza la forma llena al ASCII dentro del ojo. En 0 el ojo es puro código, con la textura del charset; en 1 es un disco limpio dibujado por encima. Los valores del medio dejan el glifo asomando por debajo, que suele ser el punto más interesante.")
-            ParamSlider(label: "Intensidad", value: $model.eyeSolidGain, range: 0...3,
-                        help: "Ganancia del pleno. Por encima de 1 el ojo brilla más fuerte que el código que lo rodea, que es exactamente para lo que existe: darle una jerarquía que el ASCII solo no puede. Muy alto satura a blanco y perdés el color del iris.")
-            ParamSlider(label: "Borde", value: $model.eyeSolidEdge, range: 0...1,
-                        help: "Dureza del borde del pleno. En 0 el relleno se desvanece siguiendo la caída natural del iris y se funde con el código; en 1 corta en disco de borde limpio. Subilo si querés que se lea como una forma geométrica y no como un resplandor.")
-
-            Divider().padding(.vertical, 2)
-            PanelGroupLabel(text: "Respiración", help: "Oscilación lenta del radio. Es lo que hace que el ojo parezca vivo aunque no se mueva de lugar.")
-            ParamSlider(label: "Amplitud", value: $model.eyeBreathAmount, range: 0...0.3, decimals: 3,
-                        help: "Cuánto crece y se achica el ojo al respirar, en fracción del radio. 0,03 es casi imperceptible y sirve para que no parezca una imagen congelada; 0,2 late fuerte y se lee como signo vital. Es lo más barato que podés hacer para que la pantalla no parezca trabada.")
-            ParamSlider(label: "Velocidad", value: $model.eyeBreathSpeed, range: 0.01...2,
-                        help: "Velocidad de la respiración. Por debajo de 0,2 respira como algo dormido; entre 0,3 y 0,6 se lee como atención; por encima de 0,8 palpita y empieza a parecer alarma. Es un parámetro emocional más que técnico.")
-
             PanelGroupLabel(text: "Pulsos de energía", help: "Ondas que salen del centro. Como todo pasa por la rampa, no se ven como resplandor sino como una ola de caracteres cambiando de densidad.")
             ParamSlider(label: "Amplitud", value: $model.eyePulseAmount, range: 0...0.6,
                         help: "Fuerza de los pulsos que salen del centro. Como todo pasa por la rampa, la onda no se ve como un brillo sino como caracteres cambiando de densidad al pasar. Muy alto satura el campo y tapa el degradado del halo, con lo que se pierde la sensación de profundidad.")
@@ -735,7 +763,13 @@ private struct ControlPanel: View {
                         help: "Ruido que se suma al campo, celda por celda. Sin él, un degradado suave cuantizado por la rampa sale en anillos concéntricos y se lee como un gradiente mal hecho; con él, el mismo degradado se convierte en textura de caracteres. Es la diferencia entre parecer un render y parecer código.")
             ParamSlider(label: "Refresco", value: $model.eyeFieldChurn, range: 0...30, decimals: 1,
                         help: "Cada cuánto cambia el grano. En 0 el campo queda quieto y estable; valores altos hacen que el código se refresque solo, como si el sistema estuviera procesando. Ojo que la histéresis puede frenar los cambios más chicos.")
+        }
+    }
 
+    // MARK: Ojo · movimiento
+
+    private var eyeMotionContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             PanelGroupLabel(text: "Mirada", help: "Cómo recorre la pantalla. Genera el objetivo; el resorte se encarga de llegar.")
             HStack(spacing: 6) {
                 Picker("", selection: $model.gazeMode) {

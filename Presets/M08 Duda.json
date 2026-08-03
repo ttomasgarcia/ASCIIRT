@@ -13,5 +13,10 @@
   "gazeRate": 0.12,
   "name": "M08 Duda",
   "scope": "movimiento",
-  "sourceKind": "Ojo"
+  "sourceKind": "Ojo",
+  "trailMacro": 0.3,
+  "trailDecay": 0.6969,
+  "trailDisperse": 0.0,
+  "hysteresisThreshold": 0.615,
+  "trailTint": 0.0
 }
