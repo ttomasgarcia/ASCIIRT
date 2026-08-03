@@ -536,6 +536,15 @@ private struct ControlPanel: View {
             }
 
             Divider().padding(.vertical, 2)
+            PanelGroupLabel(text: "Pleno")
+            ParamSlider(label: "Mezcla", value: $model.eyeSolidAmount, range: 0...1,
+                        help: "0 = el ojo es sólo glifos. 1 = disco pleno por encima del ASCII.")
+            ParamSlider(label: "Intensidad", value: $model.eyeSolidGain, range: 0...3,
+                        help: "Por encima de 1 el ojo pega más fuerte que el código que lo rodea.")
+            ParamSlider(label: "Borde", value: $model.eyeSolidEdge, range: 0...1,
+                        help: "0 respeta la caída del iris. 1 corta en disco de borde duro.")
+
+            Divider().padding(.vertical, 2)
             PanelGroupLabel(text: "Respiración")
             ParamSlider(label: "Amplitud", value: $model.eyeBreathAmount, range: 0...0.3, decimals: 3)
             ParamSlider(label: "Velocidad", value: $model.eyeBreathSpeed, range: 0.01...2)
@@ -791,8 +800,8 @@ private struct ControlPanel: View {
 
     private var temporalContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...0.5,
-                        help: "En 0 es el comportamiento clásico y la rampa hierve. 0,08 es el default.")
+            ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
+                        help: "Zona muerta en escalones de rampa. En 0 la rampa hierve; por encima de ~2 los cambios lentos se atrasan.")
 
             PanelGroupLabel(text: "Exposición")
             ParamToggle(label: "Lock de cámara", isOn: $model.exposureLocked,

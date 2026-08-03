@@ -38,15 +38,29 @@ kernel void glyphIndexKernel(texture2d<float, access::read> grid [[texture(ASCII
     // 5) Histeresis temporal (spec §5). Sin esto la salida parpadea frame a
     //    frame: la luma de un tile quieto oscila unas milesimas y cruza el
     //    limite entre dos glifos vecinos todo el tiempo.
+    //
+    //    Dos desvios de la formula literal de la spec, los dos por el mismo
+    //    defecto: comparar contra el CENTRO del escalon anterior con un umbral
+    //    en unidades absolutas de luminancia deja tiles congelados para siempre.
+    //    Con 69 glifos cada escalon vale 0.0145, asi que un umbral de 0.08 es una
+    //    zona muerta de +-5.5 escalones: un tile que se apaga del todo queda a
+    //    0.07 de su glifo viejo, nunca supera el umbral, y se queda prendido.
+    //    Se veia como una estela que el ojo dejaba encendida a su paso.
+    //
+    //    a) El umbral se mide en ESCALONES de rampa, no en luminancia absoluta.
+    //       Asi el control significa lo mismo con 10 glifos que con 69.
+    //    b) Se compara contra el BORDE entre el glifo viejo y el nuevo, no
+    //       contra el centro del viejo — un disparador de Schmitt. Eso lo hace
+    //       imposible de trabar: cuanto mas lejos se va la luma, mas lejos queda
+    //       del borde, y en algun momento cambia si o si.
     if (params.hysteresisThreshold > 0.0) {
         const uint2 prev = previous.read(gid).rg;
         // Solo se conserva si el frame anterior tambien resolvio por rampa: un
         // indice heredado de un glifo direccional no significa lo mismo.
-        if (prev.y == 0u && prev.x < params.rampLength) {
-            // Luminancia que representa el glifo anterior: el centro de su
-            // escalon en la rampa.
-            const float prevLuma = (float(prev.x) + 0.5) / float(params.rampLength);
-            if (abs(tileLuma - prevLuma) <= params.hysteresisThreshold) {
+        if (prev.y == 0u && prev.x < params.rampLength && fresh != prev.x) {
+            const float step = 1.0 / float(params.rampLength);
+            const float boundary = float(fresh > prev.x ? prev.x + 1u : prev.x) * step;
+            if (abs(tileLuma - boundary) <= params.hysteresisThreshold * step) {
                 next.write(uint4(prev.x, 0u, 0u, 0u), gid);
                 return;
             }

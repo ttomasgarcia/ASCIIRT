@@ -189,7 +189,10 @@ typedef struct {
 
     // MARK: Temporal (spec §5)
 
-    /// 0 desactiva la histeresis: el comportamiento clasico, que hierve.
+    /// Zona muerta de la histeresis, medida en ESCALONES de rampa y no en
+    /// luminancia absoluta. En escalones el control significa lo mismo con 10
+    /// glifos que con 69; en absoluto, con una rampa larga la zona muerta abarca
+    /// varios glifos y los tiles se traban. 0 desactiva la histeresis.
     float hysteresisThreshold;
 
     // MARK: Exposicion (spec §4b)
@@ -269,8 +272,18 @@ typedef struct {
     /// el codigo se refresca solo.
     float eyeFieldChurn;
 
+    /// Cuanto reemplaza el pleno al ASCII dentro del cuerpo del ojo. 0 = todo
+    /// glifos como hasta ahora, 1 = disco pleno.
+    float eyeSolidAmount;
+    /// Ganancia del pleno. Por encima de 1 el ojo pega mas fuerte que el ASCII
+    /// que lo rodea, que es justamente para lo que existe.
+    float eyeSolidGain;
+    /// 0 usa la caida natural del iris; 1 corta en disco de borde duro.
+    float eyeSolidEdge;
+
     /// Padding explicito para cerrar en multiplo de 8.
     uint32_t _pad0;
+    uint32_t _pad1;
 } RenderParams;
 
 #endif /* RenderParams_h */

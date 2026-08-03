@@ -38,7 +38,7 @@ struct Preset: Codable, Equatable {
     var edgeThreshold: Double = 0.12
 
     // Temporal y exposicion
-    var hysteresisThreshold: Double = 0.08
+    var hysteresisThreshold: Double = 0.75
     var autoLevelStrength: Double = 0.0
     var lumaSmoothAlpha: Double = 0.05
     var lumaTarget: Double = 0.5
@@ -78,6 +78,9 @@ struct Preset: Codable, Equatable {
     var eyeDriftSpeed: Double = 0.25
     var eyeStiffness: Double = 18
     var eyeDamping: Double = 5.5
+    var eyeSolidAmount: Double = 0
+    var eyeSolidGain: Double = 1.0
+    var eyeSolidEdge: Double = 0.35
     var eyeFieldNoise: Double = 0.55
     var eyeFieldChurn: Double = 6
     var matrixImageMix: Double = 0.75
@@ -159,6 +162,9 @@ struct Preset: Codable, Equatable {
         eyeDriftSpeed = c.value(.eyeDriftSpeed, d.eyeDriftSpeed)
         eyeStiffness = c.value(.eyeStiffness, d.eyeStiffness)
         eyeDamping = c.value(.eyeDamping, d.eyeDamping)
+        eyeSolidAmount = c.value(.eyeSolidAmount, d.eyeSolidAmount)
+        eyeSolidGain = c.value(.eyeSolidGain, d.eyeSolidGain)
+        eyeSolidEdge = c.value(.eyeSolidEdge, d.eyeSolidEdge)
         eyeFieldNoise = c.value(.eyeFieldNoise, d.eyeFieldNoise)
         eyeFieldChurn = c.value(.eyeFieldChurn, d.eyeFieldChurn)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)

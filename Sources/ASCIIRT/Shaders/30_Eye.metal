@@ -90,6 +90,12 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // El nucleo quema a blanco por encima del tinte.
     rgb = mix(rgb, float3(1.0), core);
 
+    // El alpha lleva la mascara del CUERPO del ojo — nucleo, iris y anillo, sin
+    // halo ni pulsos. La etapa de composicion la usa para poder pintar el ojo
+    // como pleno por encima de los glifos. Va a resolucion completa: si saliera
+    // del grid, el disco tendria borde escalonado.
+    const float body = saturate(core + iris + ring);
+
     luma.write(float4(luminance), gid);
-    color.write(float4(rgb, 1.0), gid);
+    color.write(float4(rgb, body), gid);
 }

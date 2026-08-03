@@ -85,6 +85,7 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                         texture2d<float, access::read>  edgeAtlas [[texture(ASCIIRTTextureIndexEdgeAtlas)]],
                         texture2d<uint,  access::read>  glyphs [[texture(ASCIIRTTextureIndexGlyphNext)]],
                         texture2d<float, access::read>  gridColor [[texture(ASCIIRTTextureIndexGridColor)]],
+                        texture2d<float, access::read>  fullColor [[texture(ASCIIRTTextureIndexColor)]],
                         texture2d<float, access::read>  height [[texture(ASCIIRTTextureIndexHeight)]],
                         texture2d<float, access::read>  spawn  [[texture(ASCIIRTTextureIndexSpawn)]],
                         texture2d<float, access::write> output [[texture(ASCIIRTTextureIndexOutput)]],
@@ -213,6 +214,25 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
 
     // Alpha premultiplicado: es lo que espera una pista ProRes 4444. Sin
     // premultiplicar, los bordes antialiaseados del glifo salen con halo.
-    const float alpha = params.transparentBackground != 0u ? coverage : 1.0;
-    output.write(float4(params.transparentBackground != 0u ? rgb * alpha : rgb, alpha), gid);
+    // Pleno del ojo por encima del ASCII. Se lee el color a resolucion completa,
+    // no el promedio por tile: el disco tiene que tener borde limpio, y el grid
+    // lo escalonaria a la celda.
+    float3 finalRGB = rgb;
+    float finalCoverage = coverage;
+
+    if (params.eyeSolidAmount > 0.0) {
+        const float4 source = fullColor.read(gid);
+        // El borde: en 0 se respeta la caida del iris, en 1 se corta en disco.
+        const float low = mix(0.0, 0.48, params.eyeSolidEdge);
+        const float high = mix(1.0, 0.52, params.eyeSolidEdge);
+        const float mask = smoothstep(low, high, source.a) * params.eyeSolidAmount;
+
+        finalRGB = mix(finalRGB, source.rgb * params.eyeSolidGain, mask);
+        // Con fondo transparente el pleno tiene que ser opaco: si heredara la
+        // cobertura del glifo saldria calado por dentro.
+        finalCoverage = max(finalCoverage, mask);
+    }
+
+    const float alpha = params.transparentBackground != 0u ? finalCoverage : 1.0;
+    output.write(float4(params.transparentBackground != 0u ? finalRGB * alpha : finalRGB, alpha), gid);
 }

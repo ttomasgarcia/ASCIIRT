@@ -43,7 +43,7 @@ struct PipelineConfig: Equatable {
     var edgeThreshold: Float = 0.12
 
     // MARK: Temporal y exposicion (M5)
-    var hysteresisThreshold: Float = 0.08
+    var hysteresisThreshold: Float = 0.75
     var autoLevelStrength: Float = 0.0
     var lumaSmoothAlpha: Float = 0.05
     var lumaTarget: Float = 0.5
@@ -80,6 +80,9 @@ struct PipelineConfig: Equatable {
     var eyeDriftSpeed: Float = 0.25
     var eyeStiffness: Float = 18
     var eyeDamping: Float = 5.5
+    var eyeSolidAmount: Float = 0
+    var eyeSolidGain: Float = 1.0
+    var eyeSolidEdge: Float = 0.35
     var eyeFieldNoise: Float = 0.55
     var eyeFieldChurn: Float = 6
 
@@ -364,6 +367,7 @@ final class ASCIIPipeline {
         encoder.setTexture(atlas.edgeTexture, index: Int(ASCIIRTTextureIndexEdgeAtlas.rawValue))
         encoder.setTexture(glyphTextures[glyphIndex], index: Int(ASCIIRTTextureIndexGlyphNext.rawValue))
         encoder.setTexture(gridColorTexture, index: Int(ASCIIRTTextureIndexGridColor.rawValue))
+        encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
         encoder.setTexture(outputTexture, index: Int(ASCIIRTTextureIndexOutput.rawValue))
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: asciiThreadgroup())
 
@@ -468,7 +472,11 @@ final class ASCIIPipeline {
                             eyePulseDecay: config.eyePulseDecay,
                             eyeFieldNoise: config.eyeFieldNoise,
                             eyeFieldChurn: config.eyeFieldChurn,
-                            _pad0: 0)
+                            eyeSolidAmount: config.eyeSolidAmount,
+                            eyeSolidGain: config.eyeSolidGain,
+                            eyeSolidEdge: config.eyeSolidEdge,
+                            _pad0: 0,
+                            _pad1: 0)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

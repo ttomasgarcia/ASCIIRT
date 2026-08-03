@@ -123,8 +123,9 @@ archivo, presets con persistencia.
 ### Verificado con medición
 
 - **Histéresis**: sobre escena estática, la fracción de píxeles que cambia entre
-  dos frames pasa de 30,63 % con el umbral en 0 a 0,02 % en 0,08 y 0,00 % en
-  0,25 (spec §10).
+  dos frames pasa de 30,63 % con el umbral en 0 a 0,02 % con histéresis activa
+  (spec §10). El umbral se mide en escalones de rampa, no en luminancia
+  absoluta — ver el comentario en `06b_GlyphIndex.metal`.
 - **Rampa calibrada**: 69 de 69 glifos ordenados por cobertura medida.
 - **Presets**: round-trip de 14 valores distintivos, todos sobreviven a
   guardar → cerrar → abrir.

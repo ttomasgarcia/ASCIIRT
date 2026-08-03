@@ -22,7 +22,7 @@ kernel void lumaKernel(texture2d<float, access::sample> source [[texture(ASCIIRT
     // Encuadre "fit": lo que cae afuera de la fuente es negro, no borde estirado.
     if (any(uvSrc < 0.0) || any(uvSrc > 1.0)) {
         luma.write(float4(0.0), gid);
-        color.write(float4(0.0, 0.0, 0.0, 1.0), gid);
+        color.write(float4(0.0), gid);
         return;
     }
 
@@ -38,5 +38,7 @@ kernel void lumaKernel(texture2d<float, access::sample> source [[texture(ASCIIRT
     // El color se guarda aparte de la luma porque el modo "color original por
     // tile" (spec §8) lo necesita despues de promediar, y reconstruirlo desde la
     // luma seria imposible.
-    color.write(float4(rgb, 1.0), gid);
+    // Alpha 0: el canal lleva la mascara del cuerpo del ojo y una imagen de
+    // camara no tiene ninguno.
+    color.write(float4(rgb, 0.0), gid);
 }

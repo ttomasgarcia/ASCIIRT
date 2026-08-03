@@ -96,6 +96,11 @@ final class AppModel: ObservableObject {
     /// Rozamiento. Por debajo de 2·√rigidez el ojo sobrepasa y rebota al
     /// asentarse, que es de donde sale la sensacion de que esta vivo.
     @Published var eyeDamping: Double = 5.5 { didSet { sync() } }
+
+    /// Pleno: cuanto se sale el ojo del ASCII para ganar intensidad.
+    @Published var eyeSolidAmount: Double = 0 { didSet { sync() } }
+    @Published var eyeSolidGain: Double = 1.0 { didSet { sync() } }
+    @Published var eyeSolidEdge: Double = 0.35 { didSet { sync() } }
     @Published var eyeFieldNoise: Double = 0.55 { didSet { sync() } }
     @Published var eyeFieldChurn: Double = 6 { didSet { sync() } }
 
@@ -163,7 +168,7 @@ final class AppModel: ObservableObject {
 
     // MARK: - Temporal y exposicion (M5)
 
-    @Published var hysteresisThreshold: Double = 0.08 { didSet { sync() } }
+    @Published var hysteresisThreshold: Double = 0.75 { didSet { sync() } }
     @Published var autoLevelStrength: Double = 0.0 { didSet { sync() } }
     @Published var lumaSmoothAlpha: Double = 0.05 { didSet { sync() } }
     @Published var lumaTarget: Double = 0.5 { didSet { sync() } }
@@ -361,6 +366,9 @@ final class AppModel: ObservableObject {
         next.eyeDriftSpeed = Float(eyeDriftSpeed)
         next.eyeStiffness = Float(eyeStiffness)
         next.eyeDamping = Float(eyeDamping)
+        next.eyeSolidAmount = Float(eyeSolidAmount)
+        next.eyeSolidGain = Float(eyeSolidGain)
+        next.eyeSolidEdge = Float(eyeSolidEdge)
         next.eyeFieldNoise = Float(eyeFieldNoise)
         next.eyeFieldChurn = Float(eyeFieldChurn)
 
@@ -533,6 +541,9 @@ final class AppModel: ObservableObject {
         preset.eyeDriftSpeed = eyeDriftSpeed
         preset.eyeStiffness = eyeStiffness
         preset.eyeDamping = eyeDamping
+        preset.eyeSolidAmount = eyeSolidAmount
+        preset.eyeSolidGain = eyeSolidGain
+        preset.eyeSolidEdge = eyeSolidEdge
         preset.eyeFieldNoise = eyeFieldNoise
         preset.eyeFieldChurn = eyeFieldChurn
         preset.matrixImageMix = matrixImageMix
@@ -616,6 +627,9 @@ final class AppModel: ObservableObject {
         eyeDriftSpeed = preset.eyeDriftSpeed
         eyeStiffness = preset.eyeStiffness
         eyeDamping = preset.eyeDamping
+        eyeSolidAmount = preset.eyeSolidAmount
+        eyeSolidGain = preset.eyeSolidGain
+        eyeSolidEdge = preset.eyeSolidEdge
         eyeFieldNoise = preset.eyeFieldNoise
         eyeFieldChurn = preset.eyeFieldChurn
         // La fuente va al final: cambiarla arranca o detiene captura, y quiero
