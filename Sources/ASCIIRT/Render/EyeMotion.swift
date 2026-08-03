@@ -76,6 +76,12 @@ struct EyeMotion {
     /// que el arrastre esta descalibrado.
     var manualOverride = false
 
+    /// Margen que el ojo no puede cruzar, en coordenadas normalizadas y por eje.
+    /// Lo calcula el pipeline a partir del radio del halo y del aspecto de la
+    /// salida, porque es el unico lugar que conoce los dos.
+    var clampMargin = SIMD2<Float>(0, 0)
+    var clampEnabled = true
+
     private(set) var position = SIMD2<Float>(0.5, 0.5)
     private var velocity = SIMD2<Float>(0, 0)
 
@@ -157,14 +163,40 @@ struct EyeMotion {
         let steps = max(Int((clamped / 0.008).rounded(.up)), 1)
         let h = clamped / Float(steps)
 
+        // El objetivo tambien se acota: si el resorte apuntara afuera, el ojo
+        // quedaria empujando contra la pared todo el tiempo y el temblor se
+        // aplastaria contra el borde en vez de leerse.
+        let bounded = clampEnabled ? clamp(goal) : goal
+
         for _ in 0..<steps {
             // Euler semi-implicito: se actualiza la velocidad primero y la
             // posicion con la velocidad nueva. Es incondicionalmente mas estable
             // que el explicito para un resorte, al mismo costo.
-            let acceleration = (goal - position) * stiffness - velocity * damping
+            let acceleration = (bounded - position) * stiffness - velocity * damping
             velocity += acceleration * h
             position += velocity * h
+
+            guard clampEnabled else { continue }
+            // Ademas de acotar el objetivo hay que acotar la posicion: con poca
+            // amortiguacion el sobrepaso se pasa igual del limite. Al chocar se
+            // anula la velocidad de ese eje nada mas, asi que el ojo puede seguir
+            // deslizandose a lo largo del borde en vez de frenar en seco.
+            let limited = clamp(position)
+            if limited.x != position.x { velocity.x = 0 }
+            if limited.y != position.y { velocity.y = 0 }
+            position = limited
         }
+    }
+
+    /// Acota un punto al rectangulo util. Si el margen pedido no entra —halo mas
+    /// grande que media pantalla— el eje queda clavado al centro, que es la
+    /// consecuencia honesta de la regla: con un halo asi el ojo no se puede mover
+    /// sin que el campo se salga de cuadro.
+    private func clamp(_ point: SIMD2<Float>) -> SIMD2<Float> {
+        let mx = min(clampMargin.x, 0.5)
+        let my = min(clampMargin.y, 0.5)
+        return SIMD2(min(max(point.x, mx), 1 - mx),
+                     min(max(point.y, my), 1 - my))
     }
 
     /// Salto instantaneo, sin fisica. Para "Centrar" y para no arrastrar

@@ -94,6 +94,7 @@ struct Preset: Codable, Equatable {
     var gazeExtentY: Double = 0.05
     var gazeHold: Double = 0.55
     var gazeStops: Double = 7
+    var eyeClampToScreen: Bool = true
     var eyeSolidAmount: Double = 0
     var eyeSolidGain: Double = 1.0
     var eyeSolidEdge: Double = 0.35
@@ -193,6 +194,7 @@ struct Preset: Codable, Equatable {
         gazeExtentY = c.value(.gazeExtentY, d.gazeExtentY)
         gazeHold = c.value(.gazeHold, d.gazeHold)
         gazeStops = c.value(.gazeStops, d.gazeStops)
+        eyeClampToScreen = c.value(.eyeClampToScreen, d.eyeClampToScreen)
         eyeSolidAmount = c.value(.eyeSolidAmount, d.eyeSolidAmount)
         eyeSolidGain = c.value(.eyeSolidGain, d.eyeSolidGain)
         eyeSolidEdge = c.value(.eyeSolidEdge, d.eyeSolidEdge)

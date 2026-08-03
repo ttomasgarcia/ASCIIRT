@@ -104,6 +104,7 @@ final class AppModel: ObservableObject {
     @Published var gazeStops: Double = 7 { didSet { sync() } }
     /// Arrastre en curso sobre el preview.
     @Published var isDraggingEye = false { didSet { sync() } }
+    @Published var eyeClampToScreen = true { didSet { sync() } }
 
     /// Pleno: cuanto se sale el ojo del ASCII para ganar intensidad.
     @Published var eyeSolidAmount: Double = 0 { didSet { sync() } }
@@ -399,6 +400,7 @@ final class AppModel: ObservableObject {
         next.gazeHold = Float(gazeHold)
         next.gazeStops = Float(gazeStops)
         next.eyeManualOverride = isDraggingEye
+        next.eyeClampToScreen = eyeClampToScreen
         next.eyeSolidAmount = Float(eyeSolidAmount)
         next.eyeSolidGain = Float(eyeSolidGain)
         next.eyeSolidEdge = Float(eyeSolidEdge)
@@ -592,6 +594,7 @@ final class AppModel: ObservableObject {
         preset.gazeExtentY = gazeExtentY
         preset.gazeHold = gazeHold
         preset.gazeStops = gazeStops
+        preset.eyeClampToScreen = eyeClampToScreen
         preset.eyeSolidAmount = eyeSolidAmount
         preset.eyeSolidGain = eyeSolidGain
         preset.eyeSolidEdge = eyeSolidEdge
@@ -640,6 +643,7 @@ final class AppModel: ObservableObject {
             gazeExtentY = preset.gazeExtentY
             gazeHold = preset.gazeHold
             gazeStops = preset.gazeStops
+            eyeClampToScreen = preset.eyeClampToScreen
                     if preset.eyeCenter.count >= 2 {
                 eyeCenter = CGPoint(x: preset.eyeCenter[0], y: preset.eyeCenter[1])
                 renderer.ascii.eyeMotion.snap(to: SIMD2(Float(preset.eyeCenter[0]),

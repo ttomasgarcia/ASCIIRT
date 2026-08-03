@@ -87,6 +87,8 @@ struct PipelineConfig: Equatable {
     var gazeStops: Float = 7
     /// Arrastre en curso: la mirada se suspende para que el ojo siga al puntero.
     var eyeManualOverride = false
+    /// El ojo no puede salirse de cuadro; el margen es el radio del halo.
+    var eyeClampToScreen = true
     var eyeSolidAmount: Float = 0
     var eyeSolidGain: Float = 1.0
     var eyeSolidEdge: Float = 0.35
@@ -299,6 +301,13 @@ final class ASCIIPipeline {
             eyeMotion.gazeHold = config.gazeHold
             eyeMotion.gazeStops = config.gazeStops
             eyeMotion.manualOverride = config.eyeManualOverride
+            eyeMotion.clampEnabled = config.eyeClampToScreen
+            // El radio del halo esta en unidades de media altura; para llevarlo
+            // a coordenadas normalizadas hay que dividir el eje vertical por 2 y
+            // el horizontal ademas por el aspecto, que es como lo mide el shader.
+            let aspect = Float(config.outputSize.x) / Float(max(config.outputSize.y, 1))
+            let marginY = config.eyeHaloRadius * 0.5
+            eyeMotion.clampMargin = SIMD2(marginY / aspect, marginY)
             eyeMotion.target = config.eyeCenter
             eyeMotion.step(deltaTime: deltaTime, time: currentTime)
         }

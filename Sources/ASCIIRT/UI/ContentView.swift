@@ -706,6 +706,9 @@ private struct ControlPanel: View {
                             help: "Cuántas paradas hace antes de volver, en el modo Escaneo. Pocas dan saltos largos y evidentes; muchas dan un barrido casi continuo pero con micro-pausas, que es lo que hace un ojo real al recorrer una fila.")
             }
 
+            ParamToggle(label: "No salir de cuadro", isOn: $model.eyeClampToScreen,
+                        help: "El ojo no puede cruzar el borde, y el margen que respeta es el radio del halo: se frena justo cuando el campo tocaría el borde de la pantalla. Vale para el arrastre y para todos los modos de mirada. Si el halo es más grande que media pantalla, ese eje queda clavado al centro — con un campo así el ojo no se puede mover sin que se salga de cuadro.")
+
             PanelGroupLabel(text: "Físico", help: "Cómo viaja hasta el objetivo. Es lo que separa un movimiento vivo de un cursor.")
             ParamSlider(label: "Rigidez", value: $model.eyeStiffness, range: 1...80, decimals: 1,
                         help: "Fuerza con la que el ojo va hacia donde tiene que ir. Alto llega rápido y directo, con aspecto mecánico; bajo llega lento y pesado, como si le costara. Junto con el rozamiento define todo el carácter del movimiento.")
