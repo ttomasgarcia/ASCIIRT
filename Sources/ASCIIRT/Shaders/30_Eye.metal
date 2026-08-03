@@ -67,10 +67,16 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // valor de 0.5 ya pintaba caracteres hasta las esquinas. Con esta el radio
     // significa literalmente el borde del campo, y el slider sirve entero.
     //
-    // (1-t^2)^2 y no (1-t): la derivada es cero en los dos extremos, asi que no
-    // hay ni pico en el centro ni corte visible en el borde.
+    // (1-t^2)^3 y no (1-t): la derivada es cero en los dos extremos, asi que no
+    // hay ni pico en el centro ni corte visible en el borde. El cubo en vez del
+    // cuadrado concentra mas el campo cerca del ojo: con el cuadrado la densidad
+    // quedaba casi pareja en todo el radio y el degradado no se leia.
+    //
+    // Unidades: r esta medido contra la MEDIA altura de la salida, asi que el
+    // borde vertical cae en 0.5 y las esquinas de un 16:9 en ~1.02.
     const float haloT = saturate(r / max(params.eyeHaloRadius, 1e-4));
-    const float haloFalloff = (1.0 - haloT * haloT) * (1.0 - haloT * haloT);
+    const float haloBase = 1.0 - haloT * haloT;
+    const float haloFalloff = haloBase * haloBase * haloBase;
     const float halo = haloFalloff * params.eyeHaloIntensity;
 
     // Pulsos: ondas radiales que salen del centro. La envolvente las apaga con
