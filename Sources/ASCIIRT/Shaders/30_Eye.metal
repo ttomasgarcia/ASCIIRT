@@ -89,26 +89,41 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // ya hay, que ademas es lo que lo hace leerse como una ola atravesando el
     // codigo y no como un resplandor encendiendose.
     //
-    // El frente no es una circunferencia. La fase se corre segun el angulo con
-    // tres armonicos lentos y desfasados entre si: los anillos perfectos se leen
-    // como un patron de test, y basta con deformarlos un poco para que pasen a
-    // leerse como algo que emana. Los armonicos van a velocidades distintas, asi
-    // que la deformacion tampoco se repite.
-    const float theta = atan2(p.y, p.x);
-    const float wobble = sin(theta * 2.0 + params.time * 0.23) * 0.55
-                       + sin(theta * 3.0 - params.time * 0.17) * 0.35
-                       + sin(theta * 5.0 + params.time * 0.31) * 0.20;
+    // El frente no es una circunferencia: se deforma corriendo el RADIO con un
+    // campo de ruido.
+    //
+    // Antes esto eran tres armonicos sumados sobre el ANGULO, y no alcanzaba. Un
+    // termino que depende solo del angulo deforma todos los anillos igual, asi
+    // que las jorobas quedan alineadas a lo largo del radio y aparecen como
+    // rayos fijos saliendo del centro — el patron que se notaba. Ademas una suma
+    // de senos en el angulo es periodica por definicion: con armonicos 2, 3 y 5
+    // el dibujo se repite entero cada vuelta.
+    //
+    // Con ruido en (x, y, t) cada anillo se deforma distinto, la deformacion
+    // deriva sola con el tiempo, y no hay periodo que encontrar.
     const float shape = saturate(params.eyePulseShape);
 
-    // Dos octavas. La segunda va a 1.7 veces la frecuencia y 0.63 veces la
-    // velocidad: al no ser multiplos enteros, la suma no vuelve a alinearse
-    // nunca y el frente no se ve periodico aunque cada octava por separado lo
-    // sea. Los pesos suman 1 para que la amplitud siga significando lo mismo.
-    const float phase1 = (r - params.time * params.eyePulseSpeed) * params.eyePulseFrequency
-                       + wobble * shape;
-    const float phase2 = (r - params.time * params.eyePulseSpeed * 0.63) * params.eyePulseFrequency * 1.7
-                       + wobble * shape * 1.6;
-    const float wave = sin(phase1 * kTau) * 0.68 + sin(phase2 * kTau) * 0.32;
+    // La deformacion se mide en LARGOS DE ONDA y no en unidades de pantalla: asi
+    // significa lo mismo con la frecuencia en 1 que en 20. Media longitud de onda
+    // ya alcanza para que dos partes del mismo frente esten en oposicion.
+    const float wavelength = 1.0 / max(params.eyePulseFrequency, 1e-3);
+    const float warp = fbm3(float3(p * 2.6, params.time * 0.13));
+    const float rw = r + warp * shape * wavelength * 0.60;
+
+    // Dos octavas radiales. La segunda va a 1.7 veces la frecuencia y 0.63 veces
+    // la velocidad: al no ser multiplos enteros la suma no vuelve a alinearse, y
+    // los frentes no salen igualmente espaciados. Los pesos suman 1 para que la
+    // amplitud siga significando lo mismo.
+    const float phase1 = (rw - params.time * params.eyePulseSpeed) * params.eyePulseFrequency;
+    const float phase2 = (rw - params.time * params.eyePulseSpeed * 0.63) * params.eyePulseFrequency * 1.7;
+    const float waveRaw = sin(phase1 * kTau) * 0.68 + sin(phase2 * kTau) * 0.32;
+
+    // Y la fuerza tampoco es pareja: un segundo campo de ruido, mas grande y mas
+    // lento, hace que el pulso sea fuerte en unas zonas y casi nulo en otras. Sin
+    // esto el frente ya sale irregular pero late todo a la vez, que sigue
+    // delatando que atras hay una sola funcion.
+    const float breakup = fbm3(float3(p * 1.1 + 31.7, params.time * 0.07));
+    const float wave = waveRaw * mix(1.0, saturate(0.55 + breakup), shape);
 
     // La envolvente arranca de la forma del halo —no de su intensidad— asi que
     // los pulsos viven donde vive el campo de codigo y no aparecen anillos en el
