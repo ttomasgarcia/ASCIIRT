@@ -587,23 +587,25 @@ private struct ControlPanel: View {
     private var trailContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             ParamSlider(label: "Cantidad", value: $model.trailMacro, range: 0...1,
-                        help: "0 apaga la estela y devuelve los cuatro parámetros a su valor neutro. Subiéndolo, la imagen del frame anterior dura más y el ojo se vuelve más pesado, así que el campo se estira mientras viaja. Arriba de 0,8 la cola dura más de un segundo y el efecto pasa de rastro a rastro largo.")
+                        help: "El control rápido: mueve los cuatro de abajo a la vez. 0 apaga la estela y devuelve todo a su valor neutro. Subiéndolo, la imagen del frame anterior dura más y el ojo se vuelve más pesado, así que el rastro se estira. Después podés retocar cualquiera de los cuatro a mano; el macro no los vuelve a pisar hasta que lo muevas de nuevo.")
 
-            // Se muestran los valores que el macro acaba de escribir: sin esto
-            // no hay forma de saber que hizo, ni de retocar a partir de ahi.
-            ParamReadout(label: "Arrastre", value: String(format: "%.2f", model.trailDecay),
-                         help: "Lo escribe el macro. Está también en Temporal, donde lo podés ajustar a mano.")
-            ParamReadout(label: "Rigidez", value: String(format: "%.0f", model.eyeStiffness),
-                         help: "Lo escribe el macro. Está también en Ojo → Físico.")
-            ParamReadout(label: "Rozamiento", value: String(format: "%.1f", model.eyeDamping),
-                         help: "Lo escribe el macro. Está también en Ojo → Físico.")
-            ParamReadout(label: "Disgregación", value: String(format: "%.2f", model.trailDisperse),
-                         help: "Lo escribe el macro, y entra recién pasado un tercio del recorrido: con colas cortas el desarme no se llega a ver y sólo ensucia el borde. Está también en Temporal.")
+            PanelGroupLabel(text: "Rastro", help: "Cuánto sobrevive la imagen del frame anterior, y cómo se deshace. La estela es de caracteres: el disco, el aro y el núcleo del ojo no dejan rastro.")
+            ParamSlider(label: "Arrastre", value: $model.trailDecay, range: 0...0.98,
+                        help: "Cuánto sobrevive el campo del frame anterior. Es el mismo mecanismo que el fósforo de un tubo. En 0 no hay estela; 0,90 tarda 0,7 s en apagarse del todo y 0,98 tarda 2,6 s. Sirve para cualquier fuente, no sólo el ojo.")
+            ParamSlider(label: "Disgregación", value: $model.trailDisperse, range: 0...1,
+                        help: "Cuánto varía el desvanecido celda por celda. En 0 la cola baja pareja y se apaga entera; subiéndolo, unas celdas llegan a cero antes que otras y la cola se agujerea a medida que envejece. No la acorta: el alcance máximo lo fija el Arrastre. Es la diferencia entre apagarse y deshacerse.")
 
-            Text("Tocar los sliders individuales después está bien; el macro no los vuelve a pisar hasta que lo muevas de nuevo.")
+            PanelGroupLabel(text: "Inercia del ojo", help: "La otra mitad de la estela. Un ojo que llega instantáneo a su objetivo no estira nada por más arrastre que tenga; con inercia va atrás del objetivo y el campo se estira mientras viaja. Vive acá porque es parte de la estela, pero es el mismo par de valores que usan los presets de movimiento.")
+            ParamSlider(label: "Rigidez", value: $model.eyeStiffness, range: 1...80, decimals: 1,
+                        help: "Cuánto tira el resorte hacia el objetivo. Alto llega rápido y directo, con aspecto mecánico y poco rastro; bajo llega lento y pesado, y el campo se estira mientras viaja.")
+            ParamSlider(label: "Rozamiento", value: $model.eyeDamping, range: 0.5...30, decimals: 1,
+                        help: "Cuánto frena el movimiento. Por debajo del valor crítico el ojo se pasa del objetivo y vuelve, y ese rebote es la mayor parte de la sensación de que algo está vivo; por encima llega lento y sin pasarse. El texto de abajo te dice de qué lado estás.")
+            Text(dampingNote)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+
+            ParamReadout(label: "Histéresis", value: String(format: "%.2f", model.hysteresisThreshold),
+                         help: "El macro también la baja al subir la estela: con la cola larga, retener glifos confunde el residuo de la histéresis con el rastro de verdad. El slider está en Temporal, que es donde vive junto al resto de lo temporal.")
         }
     }
 
@@ -1015,10 +1017,9 @@ private struct ControlPanel: View {
 
     private var temporalContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            ParamSlider(label: "Arrastre", value: $model.trailDecay, range: 0...0.98,
-                        help: "Cuánto sobrevive la imagen del frame anterior. Es el fósforo de un tubo: al moverse, el ASCII deja una estela que se apaga sola. En 0 no hay estela; por encima de 0,9 la cola dura tanto que la pantalla nunca termina de limpiarse.")
-            ParamSlider(label: "Disgregación", value: $model.trailDisperse, range: 0...1,
-                        help: "Cuánto varía el desvanecido celda por celda. En 0 la cola baja pareja y se apaga entera; subiéndolo, unas celdas mueren enseguida y otras aguantan, así que la estela se desarma en puntos sueltos en vez de sólo atenuarse. Es la diferencia entre apagarse y deshacerse.")
+            // Arrastre y disgregación se mudaron a la sección Estela, junto con
+            // la inercia del ojo: tener el rastro partido en dos secciones
+            // obligaba a saltar de una a otra para ajustar una sola cosa.
             ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
                         help: "Cuánto tiene que cambiar la luminancia de una celda para que cambie su carácter, medido en escalones de rampa. En 0 la salida hierve: la luz oscila unas milésimas y el glifo cambia todo el tiempo. Por encima de 2 los cambios lentos se atrasan y el movimiento se ve pegajoso.")
 
