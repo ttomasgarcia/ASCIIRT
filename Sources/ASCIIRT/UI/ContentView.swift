@@ -443,8 +443,13 @@ private struct ControlPanel: View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             presetPicker("Look", names: model.lookPresets, current: model.currentLook,
                          help: "Forma y color del ojo: radio, núcleo, anillo, halo, pleno, gradiente, respiración, pulsos y grano. No toca el recorrido, así que podés cambiar de aspecto sin perder el movimiento que ya ajustaste.")
-            presetPicker("Movimiento", names: model.motionPresets, current: model.currentMotion,
-                         help: "Cómo recorre la pantalla: modo de mirada, ritmo, alcance, física del resorte y temblor. No toca la forma del ojo. Los diez que vienen van de mirar fijo al frente a escanear la sala butaca por butaca.")
+            // Un preset de movimiento son mirada, fisica, temblor y estela: todo
+            // del ojo. Con camara o archivo el selector estaria ahi para cargar
+            // algo que no cambia nada de lo que se ve.
+            if model.sourceKind == .eye {
+                presetPicker("Movimiento", names: model.motionPresets, current: model.currentMotion,
+                             help: "Cómo recorre la pantalla: modo de mirada, ritmo, alcance, física del resorte, temblor y estela. No toca la forma del ojo. Los diez que vienen van de mirar fijo al frente a escanear la sala butaca por butaca.")
+            }
             presetPicker("Escena", names: model.fullPresets, current: model.currentPresetName,
                          help: "Look y movimiento juntos, más todo lo demás: grid, charset, color, bordes, temporal y formato de export. Es lo que guardás cuando ya encontraste la combinación y no querés volver a armarla.")
 
@@ -460,7 +465,9 @@ private struct ControlPanel: View {
             }
             .controlSize(.small)
 
-            Text("Look y movimiento son independientes: cargar uno no toca al otro. Escena guarda los dos juntos.")
+            Text(model.sourceKind == .eye
+                 ? "Look y movimiento son independientes: cargar uno no toca al otro. Escena guarda los dos juntos."
+                 : "Los presets de movimiento son del ojo y aparecen al elegir esa fuente.")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -597,7 +604,9 @@ private struct ControlPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            ParamReadout(label: "Entrada", value: model.format?.pretty ?? "—")
+            if model.sourceKind != .eye {
+                ParamReadout(label: "Entrada", value: model.format?.pretty ?? "—")
+            }
         }
     }
 
@@ -606,7 +615,9 @@ private struct ControlPanel: View {
     private var trailContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             ParamSlider(label: "Cantidad", value: $model.trailMacro, range: 0...1,
-                        help: "El control rápido: mueve los cuatro de abajo a la vez. 0 apaga la estela y devuelve todo a su valor neutro. Subiéndolo, la imagen del frame anterior dura más y el ojo se vuelve más pesado, así que el rastro se estira. Después podés retocar cualquiera de los cuatro a mano; el macro no los vuelve a pisar hasta que lo muevas de nuevo.")
+                        help: model.sourceKind == .eye
+                            ? "El control rápido: mueve a la vez el arrastre, la disgregación y la inercia del ojo. 0 apaga la estela y devuelve todo a su valor neutro. Subiéndolo, la imagen del frame anterior dura más y el ojo se vuelve más pesado, así que el rastro se estira. Después podés retocar cualquiera a mano; no los vuelve a pisar hasta que lo muevas de nuevo."
+                            : "El control rápido: escribe el arrastre y la disgregación de una vez, y baja la histéresis para acompañar. 0 apaga la estela. Con cámara o archivo la estela es sólo el eco del frame anterior — la parte de inercia del control es del ojo y no hace nada acá.")
 
             PanelGroupLabel(text: "Rastro", help: "Cuánto sobrevive la imagen del frame anterior, y cómo se deshace. La estela es de caracteres: el disco, el aro y el núcleo del ojo no dejan rastro.")
             ParamSlider(label: "Arrastre", value: $model.trailDecay, range: 0...0.98,
@@ -1019,6 +1030,9 @@ private struct ControlPanel: View {
                 ParamReadout(label: "Perdidos", value: "\(model.recordStats.framesDropped)")
             }
 
+            // El render offline recorre un archivo de entrada. Con camara o con
+            // el ojo no hay cuadros que recorrer: lo que se graba es el REC.
+            if model.sourceKind == .file {
             Divider().padding(.vertical, 2)
             PanelGroupLabel(text: "Render offline", help: "Procesa un archivo cuadro a cuadro sin reloj: cada frame de entrada da exactamente uno de salida, tarde lo que tarde. A diferencia del REC, acá no se pierde ningún frame y el resultado es reproducible — dos renders del mismo material dan lo mismo.")
             Text("Desacoplado del reloj: cada frame de entrada produce uno de salida.")
@@ -1039,6 +1053,7 @@ private struct ControlPanel: View {
                 Label(summary, systemImage: "checkmark.circle.fill")
                     .font(.system(size: 9))
                     .foregroundStyle(.green)
+            }
             }
         }
     }
@@ -1076,12 +1091,18 @@ private struct ControlPanel: View {
             ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
                         help: "Cuánto tiene que cambiar la luminancia de una celda para que cambie su carácter, medido en escalones de rampa. En 0 la salida hierve: la luz oscila unas milésimas y el glifo cambia todo el tiempo. Por encima de 2 los cambios lentos se atrasan y el movimiento se ve pegajoso.")
 
+            // Todo este grupo existe para pelear contra una exposicion que se
+            // mueve sola. La fuente generativa produce la misma luminancia todos
+            // los frames, asi que aca no hay nada que corregir.
+            if model.sourceKind != .eye {
             PanelGroupLabel(text: "Exposición", help: "El AGC de la cámara mueve la luminancia media constantemente y la rampa hierve aunque la escena esté quieta. Esto lo corrige.")
-            ParamToggle(label: "Lock de cámara", isOn: $model.exposureLocked,
-                        help: model.supportsExposureLock
-                            ? "Congela exposición y balance de blancos en el hardware."
-                            : "Esta cámara no soporta lock de exposición.")
-                .disabled(!model.supportsExposureLock)
+            if model.sourceKind == .camera {
+                ParamToggle(label: "Lock de cámara", isOn: $model.exposureLocked,
+                            help: model.supportsExposureLock
+                                ? "Congela exposición y balance de blancos en el hardware."
+                                : "Esta cámara no soporta lock de exposición.")
+                    .disabled(!model.supportsExposureLock)
+            }
 
             ParamSlider(label: "Auto nivel", value: $model.autoLevelStrength, range: 0...1,
                         help: "Cuánta corrección de exposición se aplica. En 0 la imagen pasa tal cual; en 1 se remapea para que la luminancia media caiga en el punto medio, lo que estabiliza la rampa cuando la cámara mueve el AGC. Con fuente generativa no hace falta.")
@@ -1090,6 +1111,7 @@ private struct ControlPanel: View {
             ParamSlider(label: "Punto medio", value: $model.lumaTarget, range: 0.2...0.8,
                         help: "A qué luminancia se lleva el promedio de la imagen. 0,5 lo centra en la rampa y usa todo el rango de glifos; más alto aclara y empuja la imagen hacia los caracteres densos; más bajo la oscurece.")
                 .disabled(model.autoLevelStrength <= 0)
+            }
         }
     }
 
@@ -1127,10 +1149,12 @@ private struct ControlPanel: View {
                             help: "Cuánto se adelanta o atrasa el frente de la lluvia según la altura de cada celda. Es lo que hace que la lluvia se curve sobre la forma en vez de bajar plana: la luz corre adelante y la sombra queda atrás. Negativo invierte qué es lo que sobresale.")
                 ParamSlider(label: "Suavizado", value: $model.reliefRadius, range: 0...16, decimals: 0,
                             help: "Difumina el campo de altura antes de usarlo. Sin esto el relieve sigue la textura y no la forma — una remera estampada mete volumen donde no hay. Subilo hasta que el relieve responda a la silueta y no al dibujo.")
-                ParamToggle(label: "Detectar sujeto", isOn: $model.subjectMatteEnabled,
-                            help: "Usa Vision para separar a la persona del fondo y alimentar con eso el campo de altura. No es profundidad real, es figura contra fondo, pero para que la lluvia encuentre volumen eso hace más que cualquier gradiente. Corre en la Neural Engine y cuesta pocos milisegundos.")
-                ParamSlider(label: "Peso sujeto", value: $model.matteWeight, range: 0...1)
-                    .disabled(!model.subjectMatteEnabled)
+                if model.sourceKind != .eye {
+                    ParamToggle(label: "Detectar sujeto", isOn: $model.subjectMatteEnabled,
+                                help: "Usa Vision para separar a la persona del fondo y alimentar con eso el campo de altura. No es profundidad real, es figura contra fondo, pero para que la lluvia encuentre volumen eso hace más que cualquier gradiente. Corre en la Neural Engine y cuesta pocos milisegundos.")
+                    ParamSlider(label: "Peso sujeto", value: $model.matteWeight, range: 0...1)
+                        .disabled(!model.subjectMatteEnabled)
+                }
 
                 PanelGroupLabel(text: "Punta", help: "Tinte de la cabeza de cada gota y de las primeras celdas del rastro.")
                 HStack(spacing: 8) {
