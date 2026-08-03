@@ -15,31 +15,44 @@ enum PanelMetrics {
 struct PanelSection<Content: View>: View {
     let title: String
     let systemImage: String
+    var help: String?
     @Binding var isExpanded: Bool
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 10, weight: .medium))
-                        .frame(width: 13)
-                    Text(title.uppercased())
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .kerning(0.6)
-                    Spacer()
+            // Dos botones y no uno: el signo de pregunta es un boton, y un boton
+            // adentro del label de otro boton no recibe bien los clicks.
+            HStack(spacing: 6) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 7) {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 10, weight: .medium))
+                            .frame(width: 13)
+                        Text(title.uppercased())
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .kerning(0.6)
+                        Spacer()
+                    }
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                HelpMark(help, title: title)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+                } label: {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 8, weight: .bold))
                         .rotationEffect(.degrees(isExpanded ? 0 : -90))
                         .foregroundStyle(.tertiary)
                 }
-                .foregroundStyle(.secondary)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.vertical, 7)
 
             if isExpanded {

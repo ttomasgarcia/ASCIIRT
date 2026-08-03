@@ -117,6 +117,8 @@ final class AppModel: ObservableObject {
     @Published var eyeGradientSpeed: Double = 0.15 { didSet { sync() } }
     @Published var eyeGradientCycles: Double = 1 { didSet { sync() } }
     @Published var eyeIrisOuterColor: Color = Color(red: 0.35, green: 0.02, blue: 0.10) { didSet { sync() } }
+    @Published var eyeCoreColor: Color = .white { didSet { sync() } }
+    @Published var eyeCoreBlend: Double = 1 { didSet { sync() } }
     @Published var eyeFieldNoise: Double = 0.55 { didSet { sync() } }
     @Published var eyeFieldChurn: Double = 6 { didSet { sync() } }
 
@@ -403,6 +405,8 @@ final class AppModel: ObservableObject {
         next.eyeGradientSpeed = Float(eyeGradientSpeed)
         next.eyeGradientCycles = Float(eyeGradientCycles)
         next.eyeIrisOuter = AppModel.components(of: eyeIrisOuterColor)
+        next.eyeCoreColor = AppModel.components(of: eyeCoreColor)
+        next.eyeCoreBlend = Float(eyeCoreBlend)
         next.eyeFieldNoise = Float(eyeFieldNoise)
         next.eyeFieldChurn = Float(eyeFieldChurn)
 
@@ -595,6 +599,9 @@ final class AppModel: ObservableObject {
         preset.eyeGradientCycles = eyeGradientCycles
         let outer = AppModel.components(of: eyeIrisOuterColor)
         preset.eyeIrisOuter = [Double(outer.x), Double(outer.y), Double(outer.z)]
+        let coreRGB = AppModel.components(of: eyeCoreColor)
+        preset.eyeCoreColor = [Double(coreRGB.x), Double(coreRGB.y), Double(coreRGB.z)]
+        preset.eyeCoreBlend = eyeCoreBlend
         preset.eyeFieldNoise = eyeFieldNoise
         preset.eyeFieldChurn = eyeFieldChurn
         preset.matrixImageMix = matrixImageMix
@@ -712,6 +719,10 @@ final class AppModel: ObservableObject {
         if preset.eyeIrisOuter.count >= 3 {
             eyeIrisOuterColor = Color(red: preset.eyeIrisOuter[0], green: preset.eyeIrisOuter[1], blue: preset.eyeIrisOuter[2])
         }
+        if preset.eyeCoreColor.count >= 3 {
+            eyeCoreColor = Color(red: preset.eyeCoreColor[0], green: preset.eyeCoreColor[1], blue: preset.eyeCoreColor[2])
+        }
+        eyeCoreBlend = preset.eyeCoreBlend
         eyeFieldNoise = preset.eyeFieldNoise
         eyeFieldChurn = preset.eyeFieldChurn
         // La fuente va al final: cambiarla arranca o detiene captura, y quiero

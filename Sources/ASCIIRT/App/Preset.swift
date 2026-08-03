@@ -103,6 +103,8 @@ struct Preset: Codable, Equatable {
     var eyeGradientSpeed: Double = 0.15
     var eyeGradientCycles: Double = 1
     var eyeIrisOuter: [Double] = [0.35, 0.02, 0.10]
+    var eyeCoreColor: [Double] = [1, 1, 1]
+    var eyeCoreBlend: Double = 1
     var eyeFieldNoise: Double = 0.55
     var eyeFieldChurn: Double = 6
     var matrixImageMix: Double = 0.75
@@ -200,6 +202,8 @@ struct Preset: Codable, Equatable {
         eyeGradientSpeed = c.value(.eyeGradientSpeed, d.eyeGradientSpeed)
         eyeGradientCycles = c.value(.eyeGradientCycles, d.eyeGradientCycles)
         eyeIrisOuter = c.value(.eyeIrisOuter, d.eyeIrisOuter)
+        eyeCoreColor = c.value(.eyeCoreColor, d.eyeCoreColor)
+        eyeCoreBlend = c.value(.eyeCoreBlend, d.eyeCoreBlend)
         eyeFieldNoise = c.value(.eyeFieldNoise, d.eyeFieldNoise)
         eyeFieldChurn = c.value(.eyeFieldChurn, d.eyeFieldChurn)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)

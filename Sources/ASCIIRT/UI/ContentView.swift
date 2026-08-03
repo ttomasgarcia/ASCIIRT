@@ -331,45 +331,65 @@ private struct ControlPanel: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                PanelSection(title: "Presets", systemImage: "square.stack.3d.up", isExpanded: $showPresets) {
+                PanelSection(title: "Presets", systemImage: "square.stack.3d.up",
+                             help: "Tres cajones independientes. Un preset de «look» define la forma y el color del ojo; uno de «movimiento» define cómo recorre la pantalla; uno de «escena» guarda las dos cosas juntas. Cargar un look no pisa el recorrido y viceversa, así que probar diez looks contra diez recorridos es cuestión de clics y no de rehacer nada. Los archivos son JSON en una carpeta que podés abrir, versionar o mandar por mail.",
+                             isExpanded: $showPresets) {
                     presetContent
                 }
                 Divider()
-                PanelSection(title: "Fuente", systemImage: "video", isExpanded: $showSource) {
+                PanelSection(title: "Fuente", systemImage: "video",
+                             help: "De dónde sale la imagen. Cámara y Archivo transforman algo que entra; Ojo no tiene entrada, la genera. Los tres pasan por exactamente el mismo pipeline de abajo, así que todo lo que configures acá abajo funciona igual con cualquiera de los tres.",
+                             isExpanded: $showSource) {
                     sourceContent
                 }
                 if model.sourceKind == .eye {
                     Divider()
-                    PanelSection(title: "Ojo", systemImage: "circle.circle", isExpanded: $showEye) {
+                    PanelSection(title: "Ojo", systemImage: "circle.circle",
+                             help: "La fuente generativa: un ojo que no viene de ninguna cámara. Está armado por capas —núcleo, iris, anillo de lente, halo y pulsos— y cada una tiene su función. El anillo, por ejemplo, existe para que el detector de bordes trace el contorno con caracteres. Como el resultado pasa por la rampa, la animación no se ve como brillo sino como caracteres cambiando de densidad.",
+                             isExpanded: $showEye) {
                         eyeContent
                     }
                 }
                 Divider()
-                PanelSection(title: "Grid", systemImage: "grid", isExpanded: $showGrid) {
+                PanelSection(title: "Grid", systemImage: "grid",
+                             help: "El tamaño de cada carácter y, por lo tanto, cuántos entran en pantalla. Es el compromiso central del efecto: celdas chicas dan más detalle en la imagen pero menos legibilidad en cada glifo. La resolución de salida manda y el grid se deriva de ella, nunca al revés.",
+                             isExpanded: $showGrid) {
                     gridContent
                 }
                 Divider()
-                PanelSection(title: "Charset", systemImage: "textformat", isExpanded: $showCharset) {
+                PanelSection(title: "Charset", systemImage: "textformat",
+                             help: "Qué caracteres se usan y con qué fuente. El orden no se asume: se rasteriza cada glifo, se mide cuánta tinta ocupa y se ordenan de más claro a más denso. Por eso cambiar de fuente reordena la rampa y cambia visiblemente la salida. Menos glifos dan escalones más marcados y se lee más como pantalla que como foto.",
+                             isExpanded: $showCharset) {
                     charsetContent
                 }
                 Divider()
-                PanelSection(title: "Color", systemImage: "paintpalette", isExpanded: $showColor) {
+                PanelSection(title: "Color", systemImage: "paintpalette",
+                             help: "Cómo se pinta el resultado. Mono y Dos colores usan las tintas que elijas; Original le da a cada carácter el color promedio de su celda en la imagen. El promedio por celda y no el color del píxel: pintando cada píxel del glifo con su color, el carácter se convierte en una ventana a la imagen y se pierde la lectura tipográfica.",
+                             isExpanded: $showColor) {
                     colorContent
                 }
                 Divider()
-                PanelSection(title: "Export", systemImage: "square.and.arrow.down", isExpanded: $showExport) {
+                PanelSection(title: "Export", systemImage: "square.and.arrow.down",
+                             help: "A dónde va la imagen. El botón REC de la barra graba en vivo lo que ves; el render offline procesa un archivo cuadro a cuadro sin reloj, garantizando que cada frame de entrada da uno de salida. El frame nunca vuelve a la CPU en ninguno de los dos caminos, salvo en secuencia PNG, que es compresión sobre bytes y no tiene ruta de hardware.",
+                             isExpanded: $showExport) {
                     exportContent
                 }
                 Divider()
-                PanelSection(title: "Bordes", systemImage: "scribble", isExpanded: $showEdges) {
+                PanelSection(title: "Bordes", systemImage: "scribble",
+                             help: "Detección de contornos, para que los bordes se dibujen con - / | \\ en lugar de resolverse como manchas de densidad. Es lo que separa esto de un filtro de brillo. Los bordes ganan sobre la luminancia: si un tile tiene un contorno fuerte, se dibuja el contorno y no el tono.",
+                             isExpanded: $showEdges) {
                     edgesContent
                 }
                 Divider()
-                PanelSection(title: "Temporal", systemImage: "waveform.path", isExpanded: $showTemporal) {
+                PanelSection(title: "Temporal", systemImage: "waveform.path",
+                             help: "Todo lo que tiene que ver con el tiempo: cuánto dura la imagen de un frame en el siguiente, cuánto tiene que cambiar algo para que el carácter cambie, y cómo se compensa el automático de exposición de la cámara. Sin histéresis la salida hierve aunque la escena esté quieta, y eso es lo que más delata que es un filtro.",
+                             isExpanded: $showTemporal) {
                     temporalContent
                 }
                 Divider()
-                PanelSection(title: "Matrix", systemImage: "cloud.rain", isExpanded: $showMatrix) {
+                PanelSection(title: "Matrix", systemImage: "cloud.rain",
+                             help: "Lluvia de caracteres que mutan mientras caen. Convive con cualquier fuente: sobre cámara, sobre archivo o sobre el ojo. La imagen no queda tapada sino que compuerta la lluvia y le da relieve, así que la figura sigue leyéndose dentro del efecto.",
+                             isExpanded: $showMatrix) {
                     matrixContent
                 }
             }
@@ -383,9 +403,12 @@ private struct ControlPanel: View {
 
     private var presetContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            presetPicker("Look", names: model.lookPresets, current: model.currentLook)
-            presetPicker("Movimiento", names: model.motionPresets, current: model.currentMotion)
-            presetPicker("Escena", names: model.fullPresets, current: model.currentPresetName)
+            presetPicker("Look", names: model.lookPresets, current: model.currentLook,
+                         help: "Forma y color del ojo: radio, núcleo, anillo, halo, pleno, gradiente, respiración, pulsos y grano. No toca el recorrido, así que podés cambiar de aspecto sin perder el movimiento que ya ajustaste.")
+            presetPicker("Movimiento", names: model.motionPresets, current: model.currentMotion,
+                         help: "Cómo recorre la pantalla: modo de mirada, ritmo, alcance, física del resorte y temblor. No toca la forma del ojo. Los diez que vienen van de mirar fijo al frente a escanear la sala butaca por butaca.")
+            presetPicker("Escena", names: model.fullPresets, current: model.currentPresetName,
+                         help: "Look y movimiento juntos, más todo lo demás: grid, charset, color, bordes, temporal y formato de export. Es lo que guardás cuando ya encontraste la combinación y no querés volver a armarla.")
 
             HStack(spacing: 6) {
                 Button("Guardar…") { promptSavePreset() }
@@ -406,12 +429,10 @@ private struct ControlPanel: View {
         }
     }
 
-    private func presetPicker(_ label: String, names: [String], current: String?) -> some View {
+    private func presetPicker(_ label: String, names: [String], current: String?,
+                              help: String) -> some View {
         HStack(spacing: 6) {
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .frame(width: 74, alignment: .leading)
+            ParamLabel(text: label, help: help)
             Picker("", selection: Binding(
                 get: { current ?? "" },
                 set: { if !$0.isEmpty { model.loadPreset(named: $0) } }
@@ -483,12 +504,16 @@ private struct ControlPanel: View {
 
     private var sourceContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            Picker("", selection: $model.sourceKind) {
-                ForEach(SourceKind.allCases) { kind in Text(kind.rawValue).tag(kind) }
+            HStack(spacing: 6) {
+                Picker("", selection: $model.sourceKind) {
+                    ForEach(SourceKind.allCases) { kind in Text(kind.rawValue).tag(kind) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Cámara: cualquier dispositivo del sistema, incluida la Continuity Camera del iPhone. Archivo: un video, con player propio y scrub cuadro a cuadro. Ojo: sin entrada, la imagen la genera el pipeline. Los tres terminan en el mismo lugar, así que todos los parámetros de abajo aplican igual.",
+                         title: "Fuente")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
 
             switch model.sourceKind {
             case .camera:
@@ -575,14 +600,18 @@ private struct ControlPanel: View {
             ParamToggle(label: "Sin código adentro", isOn: $model.eyeHollow,
                         help: "Vacía de caracteres el área de adentro del anillo. El pleno y el aro se siguen dibujando: lo único que desaparece es el ASCII. Sirve cuando el ojo compite con el código y querés que sea una forma limpia con el código solo alrededor.")
 
-            Picker("", selection: $model.eyeGradientMode) {
-                Text("Unicolor").tag(UInt32(0))
-                Text("Radial").tag(UInt32(1))
-                Text("Angular").tag(UInt32(2))
+            HStack(spacing: 6) {
+                Picker("", selection: $model.eyeGradientMode) {
+                    Text("Unicolor").tag(UInt32(0))
+                    Text("Radial").tag(UInt32(1))
+                    Text("Angular").tag(UInt32(2))
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Unicolor: el iris es de un solo color. Radial: la transición corre del centro hacia el borde y las bandas viajan hacia afuera. Angular: la transición da la vuelta al ojo y los sectores giran. El angular es el que más vida le da al aro exterior, porque el movimiento se lee como algo circulando y no como un cambio de color.",
+                         title: "Gradiente del iris")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
 
             HStack(spacing: 8) {
                 ParamLabel(text: "Iris", help: "Color del iris. Si el gradiente está en Unicolor, es el color de todo el cuerpo; si no, es el extremo cercano de la transición. El núcleo quema a blanco por encima de este color, así que un rojo bien saturado igual te va a dar el centro blanco.")
@@ -595,6 +624,15 @@ private struct ControlPanel: View {
                 }
                 Spacer()
             }
+
+            HStack(spacing: 8) {
+                ParamLabel(text: "Núcleo", help: "Color del punto del centro. Era blanco fijo y con el gradiente animado ese blanco se comía el centro justo donde más se mira. Ponelo del color del iris para que el gradiente llegue hasta el medio, o de un color distinto para que el centro sea otro acento.")
+                ColorPicker("", selection: $model.eyeCoreColor, supportsOpacity: false)
+                    .labelsHidden()
+                Spacer()
+            }
+            ParamSlider(label: "Fuerza núcleo", value: $model.eyeCoreBlend, range: 0...1,
+                        help: "Cuánto pisa el núcleo al color del iris. En 1 el centro es del color de arriba; en 0 no pisa nada y el centro toma el color del gradiente, aportando solo luminancia. Bajalo si el gradiente animado se apaga en el medio.")
 
             if model.eyeGradientMode != 0 {
                 ParamSlider(label: "Ciclos", value: $model.eyeGradientCycles, range: 0.5...12, decimals: 1,
@@ -636,11 +674,15 @@ private struct ControlPanel: View {
                         help: "Cada cuánto cambia el grano. En 0 el campo queda quieto y estable; valores altos hacen que el código se refresque solo, como si el sistema estuviera procesando. Ojo que la histéresis puede frenar los cambios más chicos.")
 
             PanelGroupLabel(text: "Mirada", help: "Cómo recorre la pantalla. Genera el objetivo; el resorte se encarga de llegar.")
-            Picker("", selection: $model.gazeMode) {
-                ForEach(GazeMode.allCases) { mode in Text(mode.label).tag(mode) }
+            HStack(spacing: 6) {
+                Picker("", selection: $model.gazeMode) {
+                    ForEach(GazeMode.allCases) { mode in Text(mode.label).tag(mode) }
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Quieto: se queda donde lo dejaste. Deriva: vagabundea sin rumbo. Barrido: recorrido continuo de ida y vuelta. Saltos: se clava en un punto, espera y salta a otro. Escaneo: recorre posiciones en zigzag, como quien pasa la vista por una fila. Órbita: da la vuelta. Todos generan un objetivo; el resorte se encarga de llegar, y ahí es donde el movimiento se vuelve creíble.",
+                         title: "Modo de mirada")
             }
-            .labelsHidden()
-            .controlSize(.small)
 
             ParamSlider(label: "Ritmo", value: $model.gazeRate, range: 0.02...3,
                         help: "Ritmo del recorrido. En los modos continuos son barridos por segundo; en los de pasos, cuántos saltos da. Valores muy bajos, del orden de 0,05, hacen que el movimiento sea tan lento que casi no se percibe pero la pantalla nunca se siente muerta.")
@@ -698,12 +740,16 @@ private struct ControlPanel: View {
 
     private var gridContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            Picker("", selection: $model.tileWidth) {
-                ForEach(model.tileSizes, id: \.self) { size in Text("\(size)").tag(size) }
+            HStack(spacing: 6) {
+                Picker("", selection: $model.tileWidth) {
+                    ForEach(model.tileSizes, id: \.self) { size in Text("\(size)").tag(size) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Ancho de celda en píxeles; el alto sale del aspecto de la fuente. 8 da la imagen más detallada y es el piso útil: por debajo el glifo no tiene píxeles suficientes para distinguirse de su vecino en la rampa. 24 y 32 dan un ASCII grueso, de cartel, donde cada carácter se lee de lejos.",
+                         title: "Ancho de celda")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
 
             ParamToggle(label: "Aspecto de la fuente", isOn: $model.aspectFollowsFont,
                         help: "Deriva el alto de celda de las métricas de la fuente, para que el glifo no salga deformado. Apagalo solo si querés estirar los caracteres a propósito: con el aspecto en 1 la celda es cuadrada y las letras salen anchas, que es un look pero se nota.")
@@ -751,6 +797,8 @@ private struct ControlPanel: View {
 
                 Button { openFont() } label: { Image(systemName: "plus") }
                     .help("Cargar un .ttf/.otf")
+                HelpMark("La fuente es la textura real de la pieza. Cambiarla vuelve a medir la tinta de cada glifo y reordena la rampa, así que la salida cambia de forma visible aunque no toques nada más. Las monoespaciadas de bloque funcionan mejor para estética de terminal que las tipográficas finas.",
+                         title: "Fuente tipográfica")
             }
             .controlSize(.small)
 
@@ -765,6 +813,8 @@ private struct ControlPanel: View {
             HStack(spacing: 6) {
                 Button("Recalibrar") { model.applyCharset() }
                 Button("Default") { model.resetCharset() }
+                HelpMark("El campo de arriba no se aplica mientras tipeás: recalibrar en cada tecla rearmaría el atlas de la fuente carácter por carácter. Recalibrar lee el campo, rasteriza cada glifo, mide su tinta y arma la rampa de nuevo. Default vuelve al charset original y limpia las exclusiones.",
+                         title: "Recalibrar")
                 Spacer()
             }
             .controlSize(.small)
@@ -775,9 +825,13 @@ private struct ControlPanel: View {
             DisclosureGroup(isExpanded: $showCoverage) {
                 CoverageTable(model: model)
             } label: {
-                Text("Cobertura calibrada")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("Cobertura calibrada")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    HelpMark("La rampa leída de arriba a abajo, con la tinta medida de cada glifo. Sirve para entender por qué un carácter cayó donde cayó, y para sacar los que molestan: si ves un salto grande entre dos valores, ahí la rampa tiene un hueco y el degradado va a mostrar una banda. Destildar un glifo lo saca sin borrarlo del charset.",
+                             title: "Cobertura calibrada")
+                }
             }
         }
     }
@@ -834,12 +888,16 @@ private struct ControlPanel: View {
     private var exportContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             PanelGroupLabel(text: "Resolución de salida", help: "Resolución a la que se genera todo. «Fuente» la toma de la cámara o del archivo; los presets la fijan y la imagen entra encuadrada dentro, con negro en lo que sobra. Para proyectar conviene fijarla a la resolución real del proyector.")
-            Picker("", selection: $model.outputPreset) {
-                ForEach(AppModel.OutputPreset.allCases) { preset in Text(preset.rawValue).tag(preset) }
+            HStack(spacing: 6) {
+                Picker("", selection: $model.outputPreset) {
+                    ForEach(AppModel.OutputPreset.allCases) { preset in Text(preset.rawValue).tag(preset) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("«Fuente» toma la resolución de la cámara o del archivo. Los presets la fijan y la imagen entra encuadrada, con negro en lo que sobra — nunca se recorta en silencio. Para proyectar conviene fijarla a la resolución real del proyector, así lo que ves es exactamente lo que sale.",
+                         title: "Resolución de salida")
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
 
             PanelGroupLabel(text: "Formato", help: "Formato de salida, tanto para REC como para el render offline. ProRes para llevar a post, H.264 para mandar por ahí, secuencia PNG para máxima calidad con alpha. El ASCII es el peor caso posible para un codec de transformada, así que si podés evitá H.264.")
             Picker("", selection: $model.exportCodec) {
@@ -866,9 +924,14 @@ private struct ControlPanel: View {
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button("Renderizar archivo…") { model.startOfflineRender() }
-                .controlSize(.small)
-                .disabled(model.fileURL == nil || model.isRendering)
+            HStack(spacing: 6) {
+                Button("Renderizar archivo…") { model.startOfflineRender() }
+                    .controlSize(.small)
+                    .disabled(model.fileURL == nil || model.isRendering)
+                HelpMark("Solo se habilita con un archivo abierto en la fuente Archivo. A diferencia del REC, acá no hay reloj que respetar: cada frame de entrada produce exactamente uno de salida, tarde lo que tarde, y el resultado es reproducible entre corridas. El audio del archivo pasa sin recodificar.",
+                         title: "Renderizar archivo")
+                Spacer()
+            }
 
             if let summary = model.lastRenderSummary {
                 Label(summary, systemImage: "checkmark.circle.fill")

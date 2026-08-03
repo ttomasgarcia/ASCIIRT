@@ -108,9 +108,24 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
         ? innerColor
         : mix(innerColor, outerColor, gradient);
 
-    float3 rgb = mix(float3(1.0), irisColor, redness);
-    // El nucleo quema a blanco por encima del tinte.
-    rgb = mix(rgb, float3(1.0), core);
+    // El color del campo de codigo. Sale del color de tinta elegido en Color, no
+    // de un blanco fijo: en modo "original por tile" es el unico lugar desde
+    // donde se puede decidir de que color sale el codigo de alrededor.
+    const float3 fieldColor = float3(params.foregroundR, params.foregroundG, params.foregroundB);
+
+    // La transicion al color del iris arranca apenas hay cuerpo y termina
+    // enseguida. Sin esto el aro se desvanecia HACIA el color del campo y dejaba
+    // un borde claro alrededor del circulo: la caida del anillo llevaba `redness`
+    // de 1 a 0 y el color con ella, cosa que en el pleno se ve como halo blanco
+    // porque ahi el color se usa a brillo pleno, no atenuado por la luminancia.
+    float3 rgb = mix(fieldColor, irisColor, smoothstep(0.02, 0.30, redness));
+
+    // El nucleo pisa el color del iris segun su propia mezcla. En 0 no pisa
+    // nada: el centro se queda con el color del gradiente y el nucleo solo
+    // aporta luminancia, que es lo que hace falta cuando el gradiente esta
+    // animado y un blanco fijo en el medio lo apaga.
+    const float3 coreColor = float3(params.eyeCoreR, params.eyeCoreG, params.eyeCoreB);
+    rgb = mix(rgb, coreColor, core * params.eyeCoreBlend);
 
     // El alpha lleva la mascara del CUERPO del ojo — nucleo, iris y anillo, sin
     // halo ni pulsos. La etapa de composicion la usa para poder pintar el ojo

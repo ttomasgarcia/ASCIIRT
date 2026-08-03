@@ -98,6 +98,8 @@ struct PipelineConfig: Equatable {
     var eyeGradientSpeed: Float = 0.15
     var eyeGradientCycles: Float = 1
     var eyeIrisOuter: SIMD3<Float> = SIMD3(0.35, 0.02, 0.10)
+    var eyeCoreColor: SIMD3<Float> = SIMD3(1, 1, 1)
+    var eyeCoreBlend: Float = 1
     var eyeFieldNoise: Float = 0.55
     var eyeFieldChurn: Float = 6
 
@@ -530,6 +532,10 @@ final class ASCIIPipeline {
                             eyeIrisOuterR: config.eyeIrisOuter.x,
                             eyeIrisOuterG: config.eyeIrisOuter.y,
                             eyeIrisOuterB: config.eyeIrisOuter.z,
+                            eyeCoreR: config.eyeCoreColor.x,
+                            eyeCoreG: config.eyeCoreColor.y,
+                            eyeCoreB: config.eyeCoreColor.z,
+                            eyeCoreBlend: config.eyeCoreBlend,
                             _pad1: 0)
     }
 

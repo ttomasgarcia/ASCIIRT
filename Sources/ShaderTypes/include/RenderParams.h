@@ -310,6 +310,15 @@ typedef struct {
     float eyeIrisOuterG;
     float eyeIrisOuterB;
 
+    /// Color del nucleo. Era blanco fijo, y con el gradiente animado ese blanco
+    /// se comia el centro del efecto justo donde mas se mira.
+    float eyeCoreR;
+    float eyeCoreG;
+    float eyeCoreB;
+    /// Cuanto pisa el nucleo al color del iris. En 0 el centro toma el color del
+    /// gradiente y el nucleo solo aporta luminancia.
+    float eyeCoreBlend;
+
     /// Padding para cerrar en multiplo de 8.
     uint32_t _pad1;
 } RenderParams;
