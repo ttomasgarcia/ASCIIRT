@@ -27,10 +27,17 @@ kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCII
     if (gid.x >= params.gridSize.x || gid.y >= params.gridSize.y) { return; }
 
     const float current = grid.read(gid).r;
-    const float faded = previous.read(gid).r * params.trailDecay;
 
-    // Piso: por debajo del primer escalon de la rampa el glifo ya es un espacio,
-    // asi que seguir arrastrando decimales invisibles solo alarga el calculo.
+    // Decaimiento multiplicativo MAS una resta fija. Solo con multiplicacion la
+    // cola es una exponencial: se acerca a cero pero nunca llega, y con factores
+    // altos se queda decadas de frames por encima del primer escalon de la rampa
+    // — que es todo lo que hace falta para que quede un caracter encendido.
+    // La resta garantiza que llegue a cero exacto en tiempo acotado.
+    const float step = 1.0 / max(float(params.rampLength), 1.0);
+    const float faded = max(previous.read(gid).r * params.trailDecay - step * 0.05, 0.0);
+
+    // Por debajo de medio escalon el glifo ya es el mas ralo de la rampa; dejar
+    // decimales invisibles solo posterga el apagado.
     const float value = max(current, faded);
-    next.write(float4(value > 1.0 / 512.0 ? value : 0.0), gid);
+    next.write(float4(value > step * 0.5 ? value : 0.0), gid);
 }

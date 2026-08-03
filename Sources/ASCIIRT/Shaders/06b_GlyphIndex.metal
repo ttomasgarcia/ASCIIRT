@@ -57,7 +57,10 @@ kernel void glyphIndexKernel(texture2d<float, access::read> grid [[texture(ASCII
         const uint2 prev = previous.read(gid).rg;
         // Solo se conserva si el frame anterior tambien resolvio por rampa: un
         // indice heredado de un glifo direccional no significa lo mismo.
-        if (prev.y == 0u && prev.x < params.rampLength && fresh != prev.x) {
+        // Apagarse siempre se permite. Un caracter que deberia estar apagado y
+        // sigue encendido se nota muchisimo mas que uno que quedo un escalon
+        // corrido, y es lo que dejaba residuos de la estela colgados en pantalla.
+        if (prev.y == 0u && prev.x < params.rampLength && fresh != prev.x && fresh != 0u) {
             const float step = 1.0 / float(params.rampLength);
             const float boundary = float(fresh > prev.x ? prev.x + 1u : prev.x) * step;
             if (abs(tileLuma - boundary) <= params.hysteresisThreshold * step) {
