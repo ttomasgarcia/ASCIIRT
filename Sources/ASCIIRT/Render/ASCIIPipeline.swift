@@ -150,6 +150,7 @@ final class ASCIIPipeline {
     private let statsPSO: MTLComputePipelineState
     private let eyePSO: MTLComputePipelineState
     private let trailPSO: MTLComputePipelineState
+    private let eyeTrailPSO: MTLComputePipelineState
     private let asciiPSO: MTLComputePipelineState
 
     private var lumaTexture: MTLTexture
@@ -166,6 +167,9 @@ final class ASCIIPipeline {
     /// escribir en otra celda del mismo dispatch.
     private var trailTextures: [MTLTexture]
     private var trailIndex = 0
+    /// Ping-pong de la estela del ojo, a resolucion completa.
+    private var eyeTrailTextures: [MTLTexture]
+    private var eyeTrailIndex = 0
     private var dogTempTexture: MTLTexture
     private var dogTexture: MTLTexture
     private var sobelTexture: MTLTexture
@@ -222,6 +226,7 @@ final class ASCIIPipeline {
         self.statsPSO = try ASCIIPipeline.makePSO(context, "lumaStatsKernel")
         self.eyePSO = try ASCIIPipeline.makePSO(context, "eyeKernel")
         self.trailPSO = try ASCIIPipeline.makePSO(context, "trailKernel")
+        self.eyeTrailPSO = try ASCIIPipeline.makePSO(context, "eyeTrailKernel")
         self.asciiPSO = try ASCIIPipeline.makePSO(context, "asciiKernel")
 
         let textures = try ASCIIPipeline.makeTextures(context, config)
@@ -232,6 +237,7 @@ final class ASCIIPipeline {
         (colorTexture, gridColorTexture) = (textures.color, textures.gridColor)
         self.eyeMaskTexture = textures.eyeMask
         self.trailTextures = textures.trail
+        self.eyeTrailTextures = textures.eyeTrail
         self.matteFallback = try ASCIIPipeline.makeFallbackMatte(context)
 
         var initialAverage: Float = 0.5
@@ -269,6 +275,7 @@ final class ASCIIPipeline {
             (colorTexture, gridColorTexture) = (textures.color, textures.gridColor)
             self.eyeMaskTexture = textures.eyeMask
             self.trailTextures = textures.trail
+            self.eyeTrailTextures = textures.eyeTrail
         }
         if atlasChanged {
             atlas = try FontAtlasBuilder.build(device: context.device,
@@ -313,6 +320,12 @@ final class ASCIIPipeline {
             eyeMotion.step(deltaTime: deltaTime, time: currentTime)
         }
 
+        // Que textura de color ve el resto del pipeline. La estela del ojo la
+        // reemplaza por su version arrastrada, y hay que arrastrar esa decision
+        // hasta la etapa ASCII: ahi se vuelve a bindear para el pleno, y con la
+        // textura cruda el disco no dejaba rastro por mas que el resto si.
+        var activeColorTexture = colorTexture
+
         var params = makeParams(sourceWidth: source?.width ?? Int(config.outputSize.x),
                                 sourceHeight: source?.height ?? Int(config.outputSize.y))
         let outputThreads = MTLSize(width: Int(config.outputSize.x),
@@ -338,6 +351,22 @@ final class ASCIIPipeline {
             encoder.setComputePipelineState(eyePSO)
             encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
             encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: eyePSO))
+
+            // Estela del ojo. Va aca, antes del downscale, para que el color por
+            // tile y el pleno vean la version arrastrada: si corriera despues,
+            // la cola tendria la densidad del rastro pero el color del campo.
+            if config.trailDecay > 0 {
+                eyeTrailIndex = 1 - eyeTrailIndex
+                encoder.setComputePipelineState(eyeTrailPSO)
+                encoder.setTexture(eyeTrailTextures[1 - eyeTrailIndex],
+                                   index: Int(ASCIIRTTextureIndexEyeTrailPrev.rawValue))
+                encoder.setTexture(eyeTrailTextures[eyeTrailIndex],
+                                   index: Int(ASCIIRTTextureIndexEyeTrailNext.rawValue))
+                encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: eyeTrailPSO))
+                activeColorTexture = eyeTrailTextures[eyeTrailIndex]
+                encoder.setTexture(activeColorTexture,
+                                   index: Int(ASCIIRTTextureIndexColor.rawValue))
+            }
         } else {
             encoder.setComputePipelineState(lumaPSO)
             encoder.setTexture(source, index: Int(ASCIIRTTextureIndexSource.rawValue))
@@ -427,7 +456,7 @@ final class ASCIIPipeline {
         encoder.setTexture(atlas.edgeTexture, index: Int(ASCIIRTTextureIndexEdgeAtlas.rawValue))
         encoder.setTexture(glyphTextures[glyphIndex], index: Int(ASCIIRTTextureIndexGlyphNext.rawValue))
         encoder.setTexture(gridColorTexture, index: Int(ASCIIRTTextureIndexGridColor.rawValue))
-        encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
+        encoder.setTexture(activeColorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
         encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
         encoder.setTexture(outputTexture, index: Int(ASCIIRTTextureIndexOutput.rawValue))
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: asciiThreadgroup())
@@ -605,6 +634,7 @@ final class ASCIIPipeline {
     private struct Textures {
         let luma, lumaRaw, grid, color, gridColor, eyeMask: MTLTexture
         let trail: [MTLTexture]
+        let eyeTrail: [MTLTexture]
         let dogTemp, dog, sobel, edge: MTLTexture
         let glyphs: [MTLTexture]
         let heightTemp, height, spawn, output: MTLTexture
@@ -647,6 +677,7 @@ final class ASCIIPipeline {
         let gridColor = try make(.rgba8Unorm, Int(grid.x), Int(grid.y), "gridColor")
         let eyeMask = try make(.r8Unorm, width, height, "eyeMask")
         let trail = try (0..<2).map { try make(.r16Float, Int(grid.x), Int(grid.y), "trail\($0)") }
+        let eyeTrail = try (0..<2).map { try make(.rgba8Unorm, width, height, "eyeTrail\($0)") }
         let dogTemp = try make(.rg16Float, width, height, "dogTemp")
         let dog = try make(.r16Float, width, height, "dog")
         let sobel = try make(.rg16Float, width, height, "sobel")
@@ -656,7 +687,7 @@ final class ASCIIPipeline {
         let glyphs = try (0..<2).map { try make(.rg8Uint, Int(grid.x), Int(grid.y), "glyph\($0)") }
 
         return Textures(luma: luma, lumaRaw: lumaRaw, grid: gridTexture, color: color, gridColor: gridColor, eyeMask: eyeMask,
-                        trail: trail,
+                        trail: trail, eyeTrail: eyeTrail,
                         dogTemp: dogTemp, dog: dog, sobel: sobel, edge: edge, glyphs: glyphs,
                         heightTemp: temp, height: heightTexture, spawn: spawn, output: output)
     }

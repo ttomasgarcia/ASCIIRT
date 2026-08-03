@@ -46,9 +46,19 @@ kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCII
     const uint cellHash = mixHash(gid.x) ^ (gid.y * 0x9e3779b9u);
     const uint timeStep = uint(max(params.time, 0.0) * 10.0);
     const float jitter = hash11(cellHash ^ mixHash(timeStep));
-    const float localDecay = params.trailDecay * (1.0 - params.trailDisperse * jitter);
+    // La disgregacion NO toca el factor de decaimiento: agrega un piso extra que
+    // se resta por frame, distinto en cada celda.
+    //
+    // Escalar el factor por celda bajaba el promedio y acortaba la cola entera,
+    // y descartar celdas enteras las mataba a todas porque el patron se
+    // re-sortea y tarde o temprano a cada una le toca. Restando, la celda con
+    // sorteo cero conserva el largo nominal —o sea que el alcance maximo del
+    // rastro no cambia— y las demas llegan a cero antes, asi que la cola se va
+    // agujereando a medida que envejece en vez de acortarse.
+    const float localDecay = params.trailDecay;
+    const float extraFloor = params.trailDisperse * jitter * step * 0.25;
 
-    const float faded = max(previous.read(gid).r * localDecay - step * 0.05, 0.0);
+    const float faded = max(previous.read(gid).r * localDecay - step * 0.05 - extraFloor, 0.0);
 
     // Por debajo de medio escalon el glifo ya es el mas ralo de la rampa; dejar
     // decimales invisibles solo posterga el apagado.

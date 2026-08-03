@@ -63,6 +63,8 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexTrailPrev = 19,///< R16F campo arrastrado del frame anterior
     ASCIIRTTextureIndexTrailNext = 20,///< R16F campo arrastrado de este frame
     ASCIIRTTextureIndexEyeMask = 21,  ///< R8 mascara del interior del ojo, a resolucion completa
+    ASCIIRTTextureIndexEyeTrailPrev = 22, ///< RGBA8 color+cuerpo del ojo arrastrado, frame anterior
+    ASCIIRTTextureIndexEyeTrailNext = 23, ///< RGBA8 color+cuerpo del ojo arrastrado, este frame
 };
 
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
