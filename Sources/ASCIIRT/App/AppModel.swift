@@ -150,12 +150,17 @@ final class AppModel: ObservableObject {
         eyeStiffness = n.stiffness + (6.0 - n.stiffness) * t
         eyeDamping = n.damping + (2.6 - n.damping) * t
 
+        // La disgregacion entra despues del primer tercio: con colas cortas
+        // desarmar no se llega a ver, solo ensucia el borde de la estela.
+        trailDisperse = t < 0.33 ? 0 : (t - 0.33) / 0.67 * 0.75
+
         // La histeresis baja acompanando: con la estela larga, retener glifos
         // ademas confunde el residuo de la histeresis con la cola de verdad.
         hysteresisThreshold = n.hysteresis + (0.30 - n.hysteresis) * t
     }
 
     @Published var trailDecay: Double = 0 { didSet { sync() } }
+    @Published var trailDisperse: Double = 0 { didSet { sync() } }
 
     /// Interior del ojo.
     @Published var eyeHollow = false { didSet { sync() } }
@@ -448,6 +453,7 @@ final class AppModel: ObservableObject {
         next.eyeSolidGain = Float(eyeSolidGain)
         next.eyeSolidEdge = Float(eyeSolidEdge)
         next.trailDecay = Float(trailDecay)
+        next.trailDisperse = Float(trailDisperse)
         next.eyeHollow = eyeHollow
         next.eyeGradientMode = eyeGradientMode
         next.eyeGradientSpeed = Float(eyeGradientSpeed)
@@ -643,6 +649,7 @@ final class AppModel: ObservableObject {
         preset.eyeSolidEdge = eyeSolidEdge
         preset.trailDecay = trailDecay
         preset.trailMacro = trailMacro
+        preset.trailDisperse = trailDisperse
         preset.eyeHollow = eyeHollow
         preset.eyeGradientMode = eyeGradientMode
         preset.eyeGradientSpeed = eyeGradientSpeed
@@ -764,6 +771,7 @@ final class AppModel: ObservableObject {
         eyeSolidEdge = preset.eyeSolidEdge
         trailDecay = preset.trailDecay
         trailMacro = preset.trailMacro
+        trailDisperse = preset.trailDisperse
         eyeHollow = preset.eyeHollow
         eyeGradientMode = preset.eyeGradientMode
         eyeGradientSpeed = preset.eyeGradientSpeed

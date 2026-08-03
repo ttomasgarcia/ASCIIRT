@@ -319,8 +319,11 @@ typedef struct {
     /// gradiente y el nucleo solo aporta luminancia.
     float eyeCoreBlend;
 
-    /// Padding para cerrar en multiplo de 8.
-    uint32_t _pad1;
+    /// Disgregacion de la estela: cuanto varia el decaimiento celda por celda.
+    /// En 0 la cola baja pareja y se apaga entera; subiendolo, unas celdas
+    /// mueren enseguida y otras aguantan, asi que la cola se desarma en puntos
+    /// sueltos en vez de simplemente atenuarse.
+    float trailDisperse;
 } RenderParams;
 
 #endif /* RenderParams_h */

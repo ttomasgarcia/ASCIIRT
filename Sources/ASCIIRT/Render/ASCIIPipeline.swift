@@ -95,6 +95,7 @@ struct PipelineConfig: Equatable {
 
     /// Arrastre del campo. Aplica a cualquier fuente, no solo al ojo.
     var trailDecay: Float = 0
+    var trailDisperse: Float = 0
 
     // MARK: Interior del ojo
     var eyeHollow = false
@@ -548,7 +549,7 @@ final class ASCIIPipeline {
                             eyeCoreG: config.eyeCoreColor.y,
                             eyeCoreB: config.eyeCoreColor.z,
                             eyeCoreBlend: config.eyeCoreBlend,
-                            _pad1: 0)
+                            trailDisperse: config.trailDisperse)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

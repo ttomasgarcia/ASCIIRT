@@ -34,7 +34,21 @@ kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCII
     // — que es todo lo que hace falta para que quede un caracter encendido.
     // La resta garantiza que llegue a cero exacto en tiempo acotado.
     const float step = 1.0 / max(float(params.rampLength), 1.0);
-    const float faded = max(previous.read(gid).r * params.trailDecay - step * 0.05, 0.0);
+
+    // Disgregacion: el decaimiento varia celda por celda. Con un factor unico la
+    // cola entera baja al mismo ritmo y se lee como una atenuacion; variandolo,
+    // unas celdas mueren enseguida y otras aguantan, y la cola se desarma en
+    // puntos sueltos — que es como se deshace algo, no como se apaga.
+    //
+    // El patron cambia unas diez veces por segundo. Fijo se veria como una
+    // trama estatica que la cola atraviesa; cambiando, la disgregacion avanza y
+    // parece que la estela se va desarmando sola.
+    const uint cellHash = mixHash(gid.x) ^ (gid.y * 0x9e3779b9u);
+    const uint timeStep = uint(max(params.time, 0.0) * 10.0);
+    const float jitter = hash11(cellHash ^ mixHash(timeStep));
+    const float localDecay = params.trailDecay * (1.0 - params.trailDisperse * jitter);
+
+    const float faded = max(previous.read(gid).r * localDecay - step * 0.05, 0.0);
 
     // Por debajo de medio escalon el glifo ya es el mas ralo de la rampa; dejar
     // decimales invisibles solo posterga el apagado.

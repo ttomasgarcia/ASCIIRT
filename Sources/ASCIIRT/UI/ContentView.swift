@@ -597,6 +597,8 @@ private struct ControlPanel: View {
                          help: "Lo escribe el macro. Está también en Ojo → Físico.")
             ParamReadout(label: "Rozamiento", value: String(format: "%.1f", model.eyeDamping),
                          help: "Lo escribe el macro. Está también en Ojo → Físico.")
+            ParamReadout(label: "Disgregación", value: String(format: "%.2f", model.trailDisperse),
+                         help: "Lo escribe el macro, y entra recién pasado un tercio del recorrido: con colas cortas el desarme no se llega a ver y sólo ensucia el borde. Está también en Temporal.")
 
             Text("Tocar los sliders individuales después está bien; el macro no los vuelve a pisar hasta que lo muevas de nuevo.")
                 .font(.system(size: 9))
@@ -1015,6 +1017,8 @@ private struct ControlPanel: View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             ParamSlider(label: "Arrastre", value: $model.trailDecay, range: 0...0.98,
                         help: "Cuánto sobrevive la imagen del frame anterior. Es el fósforo de un tubo: al moverse, el ASCII deja una estela que se apaga sola. En 0 no hay estela; por encima de 0,9 la cola dura tanto que la pantalla nunca termina de limpiarse.")
+            ParamSlider(label: "Disgregación", value: $model.trailDisperse, range: 0...1,
+                        help: "Cuánto varía el desvanecido celda por celda. En 0 la cola baja pareja y se apaga entera; subiéndolo, unas celdas mueren enseguida y otras aguantan, así que la estela se desarma en puntos sueltos en vez de sólo atenuarse. Es la diferencia entre apagarse y deshacerse.")
             ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
                         help: "Cuánto tiene que cambiar la luminancia de una celda para que cambie su carácter, medido en escalones de rampa. En 0 la salida hierve: la luz oscila unas milésimas y el glifo cambia todo el tiempo. Por encima de 2 los cambios lentos se atrasan y el movimiento se ve pegajoso.")
 
