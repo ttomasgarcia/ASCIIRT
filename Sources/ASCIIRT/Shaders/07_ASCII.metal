@@ -209,18 +209,20 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     // color daria el negativo fotografico, que es otra cosa.
     float coverage = params.invert != 0u ? 1.0 - ink : ink;
 
-    // Matrix ya trae su composicion resuelta contra negro; los modos de color
-    // solo aplican fuera de el.
-    const float3 rgb = matrixOverride ? color * coverage : mix(backdrop, color, coverage);
-
-    // Alpha premultiplicado: es lo que espera una pista ProRes 4444. Sin
-    // premultiplicar, los bordes antialiaseados del glifo salen con halo.
-    // Vaciar el interior: se quita la tinta del glifo, no el color. Asi el
-    // pleno y el anillo siguen dibujandose y lo unico que desaparece adentro es
-    // el codigo.
+    // Vaciar el interior: se quita la tinta del glifo, no el color. Asi el pleno
+    // y el anillo siguen dibujandose y lo unico que desaparece adentro es el
+    // codigo.
+    //
+    // Va ANTES de componer el color: la cobertura es lo que decide cuanto glifo
+    // hay en el pixel, y si se modifica despues de haberla usado para mezclar,
+    // el cambio solo llega al alpha y en pantalla no pasa nada.
     if (params.eyeHollow != 0u && params.generativeEnabled != 0u) {
         coverage *= 1.0 - eyeMask.read(gid).r;
     }
+
+    // Matrix ya trae su composicion resuelta contra negro; los modos de color
+    // solo aplican fuera de el.
+    const float3 rgb = matrixOverride ? color * coverage : mix(backdrop, color, coverage);
 
     // Pleno del ojo por encima del ASCII. Se lee el color a resolucion completa,
     // no el promedio por tile: el disco tiene que tener borde limpio, y el grid
@@ -241,6 +243,8 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
         finalCoverage = max(finalCoverage, mask);
     }
 
+    // Alpha premultiplicado: es lo que espera una pista ProRes 4444. Sin
+    // premultiplicar, los bordes antialiaseados del glifo salen con halo.
     const float alpha = params.transparentBackground != 0u ? finalCoverage : 1.0;
     output.write(float4(params.transparentBackground != 0u ? finalRGB * alpha : finalRGB, alpha), gid);
 }
