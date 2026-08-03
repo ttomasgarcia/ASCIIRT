@@ -389,14 +389,6 @@ private struct ControlPanel: View {
 
             HStack(spacing: 6) {
                 Button("Guardar…") { promptSavePreset() }
-                if let current = model.currentPresetName {
-                    Button(role: .destructive) {
-                        model.deletePreset(named: current)
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .help("Borrar «\(current)»")
-                }
                 Spacer()
                 Button {
                     model.revealPresetsFolder()
@@ -415,7 +407,7 @@ private struct ControlPanel: View {
     }
 
     private func presetPicker(_ label: String, names: [String], current: String?) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Text(label)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -430,6 +422,33 @@ private struct ControlPanel: View {
             .labelsHidden()
             .controlSize(.small)
             .disabled(names.isEmpty)
+
+            // El borrar vive en la fila del cajon, no en un boton global: sin
+            // eso solo se podia borrar lo que estuviera cargado, y los presets
+            // de look y de movimiento no siempre lo estan.
+            Button(role: .destructive) {
+                if let current { confirmDelete(current) }
+            } label: {
+                Image(systemName: "trash")
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderless)
+            .disabled(current == nil)
+            .help(current.map { "Borrar «\($0)»" } ?? "Elegí un preset para borrarlo")
+        }
+    }
+
+    /// Borrar un archivo del usuario merece una confirmacion: es un click de
+    /// distancia del selector y no hay deshacer.
+    private func confirmDelete(_ name: String) {
+        let alert = NSAlert()
+        alert.messageText = "¿Borrar «\(name)»?"
+        alert.informativeText = "El archivo se elimina de la carpeta de presets. No se puede deshacer."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Borrar")
+        alert.addButton(withTitle: "Cancelar")
+        if alert.runModal() == .alertFirstButtonReturn {
+            model.deletePreset(named: name)
         }
     }
 
