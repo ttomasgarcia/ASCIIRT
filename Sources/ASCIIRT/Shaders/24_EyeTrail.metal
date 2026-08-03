@@ -6,9 +6,11 @@
 //  no pasan por ahi: con Pleno alto —que es lo que tienen casi todos los
 //  presets— la mayor parte de lo que se ve no dejaba rastro ninguno.
 //
-//  Este kernel arrastra el color y la mascara de cuerpo del ojo, asi que la cola
-//  hereda tambien el disco y el color del iris en vez de solo glifos sueltos del
-//  color del campo.
+//  Este kernel arrastra el COLOR del ojo para que los caracteres de la cola
+//  salgan del color del iris y no del color del campo. Lo que NO se arrastra es
+//  el pleno: la mascara que dibuja el disco y el aro se toma sin estela, porque
+//  el rastro tiene que estar hecho de glifos y no ser un manchon solido del
+//  disco corriendose por la pantalla.
 //
 //  NO incluir RenderParams.h: ShaderLibrary lo antepone.
 

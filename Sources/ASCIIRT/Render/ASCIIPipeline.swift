@@ -320,12 +320,6 @@ final class ASCIIPipeline {
             eyeMotion.step(deltaTime: deltaTime, time: currentTime)
         }
 
-        // Que textura de color ve el resto del pipeline. La estela del ojo la
-        // reemplaza por su version arrastrada, y hay que arrastrar esa decision
-        // hasta la etapa ASCII: ahi se vuelve a bindear para el pleno, y con la
-        // textura cruda el disco no dejaba rastro por mas que el resto si.
-        var activeColorTexture = colorTexture
-
         var params = makeParams(sourceWidth: source?.width ?? Int(config.outputSize.x),
                                 sourceHeight: source?.height ?? Int(config.outputSize.y))
         let outputThreads = MTLSize(width: Int(config.outputSize.x),
@@ -363,8 +357,13 @@ final class ASCIIPipeline {
                 encoder.setTexture(eyeTrailTextures[eyeTrailIndex],
                                    index: Int(ASCIIRTTextureIndexEyeTrailNext.rawValue))
                 encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: eyeTrailPSO))
-                activeColorTexture = eyeTrailTextures[eyeTrailIndex]
-                encoder.setTexture(activeColorTexture,
+                // Queda bindeada para el downscale, que produce el color medio
+                // por tile: asi los caracteres de la cola conservan el color del
+                // ojo en vez de salir del color del campo. La etapa ASCII vuelve
+                // a bindear la textura SIN arrastrar, porque el pleno y el aro
+                // no tienen que estelar — la estela es de caracteres, no un
+                // manchon del disco.
+                encoder.setTexture(eyeTrailTextures[eyeTrailIndex],
                                    index: Int(ASCIIRTTextureIndexColor.rawValue))
             }
         } else {
@@ -456,7 +455,11 @@ final class ASCIIPipeline {
         encoder.setTexture(atlas.edgeTexture, index: Int(ASCIIRTTextureIndexEdgeAtlas.rawValue))
         encoder.setTexture(glyphTextures[glyphIndex], index: Int(ASCIIRTTextureIndexGlyphNext.rawValue))
         encoder.setTexture(gridColorTexture, index: Int(ASCIIRTTextureIndexGridColor.rawValue))
-        encoder.setTexture(activeColorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
+        // Sin arrastrar a proposito: la mascara de cuerpo que alimenta al pleno
+        // tiene que ser la de ESTE frame. Con la arrastrada, el disco y el aro
+        // dejaban un rastro solido detras, que es justo lo contrario de lo que
+        // se busca — el rastro tiene que estar hecho de glifos.
+        encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
         encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
         encoder.setTexture(outputTexture, index: Int(ASCIIRTTextureIndexOutput.rawValue))
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: asciiThreadgroup())
