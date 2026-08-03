@@ -111,6 +111,7 @@ struct PipelineConfig: Equatable {
     var eyeBlinkSoftness: Float = 0.35
     var eyeBlinkColor: SIMD3<Float> = SIMD3(1, 0.85, 0.2)
     var trailTint: Float = 0
+    var eyePulseShape: Float = 0.6
     var eyeFieldNoise: Float = 0.55
     var eyeFieldChurn: Float = 6
 
@@ -595,7 +596,8 @@ final class ASCIIPipeline {
                             eyeBlinkR: config.eyeBlinkColor.x,
                             eyeBlinkG: config.eyeBlinkColor.y,
                             eyeBlinkB: config.eyeBlinkColor.z,
-                            trailTint: config.trailTint)
+                            trailTint: config.trailTint,
+                            eyePulseShape: config.eyePulseShape)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

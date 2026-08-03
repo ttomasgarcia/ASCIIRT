@@ -114,6 +114,7 @@ struct Preset: Codable, Equatable {
     var eyeBlinkSoftness: Double = 0.35
     var eyeBlinkColor: [Double] = [1, 0.85, 0.2]
     var trailTint: Double = 0
+    var eyePulseShape: Double = 0.6
     var eyeFieldNoise: Double = 0.55
     var eyeFieldChurn: Double = 6
     var matrixImageMix: Double = 0.75
@@ -222,6 +223,7 @@ struct Preset: Codable, Equatable {
         eyeBlinkSoftness = c.value(.eyeBlinkSoftness, d.eyeBlinkSoftness)
         eyeBlinkColor = c.value(.eyeBlinkColor, d.eyeBlinkColor)
         trailTint = c.value(.trailTint, d.trailTint)
+        eyePulseShape = c.value(.eyePulseShape, d.eyePulseShape)
         eyeFieldNoise = c.value(.eyeFieldNoise, d.eyeFieldNoise)
         eyeFieldChurn = c.value(.eyeFieldChurn, d.eyeFieldChurn)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)

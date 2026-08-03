@@ -65,5 +65,6 @@
   "eyeFieldChurn": 4.0,
   "eyeSolidAmount": 0.45,
   "eyeSolidGain": 1.2,
-  "eyeSolidEdge": 0.5
+  "eyeSolidEdge": 0.5,
+  "eyePulseShape": 0.35
 }

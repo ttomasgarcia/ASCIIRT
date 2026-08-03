@@ -176,6 +176,7 @@ final class AppModel: ObservableObject {
     @Published var eyeBlinkSoftness: Double = 0.35 { didSet { sync() } }
     @Published var eyeBlinkColor: Color = Color(red: 1, green: 0.85, blue: 0.2) { didSet { sync() } }
     @Published var trailTint: Double = 0 { didSet { sync() } }
+    @Published var eyePulseShape: Double = 0.6 { didSet { sync() } }
     @Published var eyeFieldNoise: Double = 0.55 { didSet { sync() } }
     @Published var eyeFieldChurn: Double = 6 { didSet { sync() } }
 
@@ -473,6 +474,7 @@ final class AppModel: ObservableObject {
         next.eyeBlinkSoftness = Float(eyeBlinkSoftness)
         next.eyeBlinkColor = AppModel.components(of: eyeBlinkColor)
         next.trailTint = Float(trailTint)
+        next.eyePulseShape = Float(eyePulseShape)
         next.eyeFieldNoise = Float(eyeFieldNoise)
         next.eyeFieldChurn = Float(eyeFieldChurn)
 
@@ -678,6 +680,7 @@ final class AppModel: ObservableObject {
         let blinkRGB = AppModel.components(of: eyeBlinkColor)
         preset.eyeBlinkColor = [Double(blinkRGB.x), Double(blinkRGB.y), Double(blinkRGB.z)]
         preset.trailTint = trailTint
+        preset.eyePulseShape = eyePulseShape
         preset.eyeFieldNoise = eyeFieldNoise
         preset.eyeFieldChurn = eyeFieldChurn
         preset.matrixImageMix = matrixImageMix
@@ -796,6 +799,7 @@ final class AppModel: ObservableObject {
         eyePulseSpeed = preset.eyePulseSpeed
         eyePulseFrequency = preset.eyePulseFrequency
         eyePulseDecay = preset.eyePulseDecay
+        eyePulseShape = preset.eyePulseShape
         eyeSolidAmount = preset.eyeSolidAmount
         eyeSolidGain = preset.eyeSolidGain
         eyeSolidEdge = preset.eyeSolidEdge

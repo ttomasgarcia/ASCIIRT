@@ -355,6 +355,12 @@ typedef struct {
     /// del disco. El decaimiento es exponencial: valores intermedios dejan el
     /// color del ojo cerca del frente y lo van perdiendo a lo largo de la cola.
     float trailTint;
+
+    /// Cuanto se deforma el frente de los pulsos. En 0 son circunferencias
+    /// concentricas —geometricas, se leen como un patron de test— y subiendolo la
+    /// fase se corre segun el angulo y el frente se abolla. No cambia ni el ritmo
+    /// ni el alcance: solo la forma.
+    float eyePulseShape;
 } RenderParams;
 
 #endif /* RenderParams_h */

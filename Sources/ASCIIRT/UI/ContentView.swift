@@ -756,7 +756,9 @@ private struct ControlPanel: View {
             ParamSlider(label: "Frecuencia", value: $model.eyePulseFrequency, range: 0.5...20, decimals: 1,
                         help: "Cuántas ondas conviven en pantalla. Alto da anillos finos y juntos, con aspecto de interferencia; bajo da una sola onda ancha que se lee como una exhalación. Combinado con velocidad baja y frecuencia baja se consigue el pulso más orgánico.")
             ParamSlider(label: "Caída", value: $model.eyePulseDecay, range: 0...8, decimals: 1,
-                        help: "Cuánto se debilita la onda al alejarse. Alto la mantiene pegada al ojo y el borde de la pantalla queda quieto; bajo la deja llegar lejos y toda la imagen late. Si el efecto te resulta invasivo, este es el parámetro a subir.")
+                        help: "Cuánto se debilita la onda al alejarse. Alto la mantiene pegada al ojo y el borde de la pantalla queda quieto; bajo la deja llegar lejos y toda la imagen late. El alcance máximo igual lo pone el radio del halo: los pulsos viven dentro del campo de código y no aparecen anillos en el vacío.")
+            ParamSlider(label: "Forma", value: $model.eyePulseShape, range: 0...1,
+                        help: "Cuánto se abolla el frente de la onda. En 0 son circunferencias concéntricas perfectas, que se leen como un patrón de test más que como energía. Subiéndolo la onda se corre según el ángulo, con tres armónicos lentos que van a velocidades distintas, así que el frente se deforma y la deformación nunca se repite igual. No cambia ni el ritmo ni el alcance: sólo la forma.")
 
             PanelGroupLabel(text: "Campo de código", help: "El grano que convierte el degradado del halo en textura de caracteres.")
             ParamSlider(label: "Grano", value: $model.eyeFieldNoise, range: 0...1.5,

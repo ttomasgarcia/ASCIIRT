@@ -79,11 +79,43 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     const float haloFalloff = haloBase * haloBase * haloBase;
     const float halo = haloFalloff * params.eyeHaloIntensity;
 
-    // Pulsos: ondas radiales que salen del centro. La envolvente las apaga con
-    // la distancia; sin ella el borde de la pantalla late igual que el centro.
-    const float phase = (r - params.time * params.eyePulseSpeed) * params.eyePulseFrequency;
-    const float wave = sin(phase * kTau) * 0.5 + 0.5;
-    const float pulse = wave * exp(-r * params.eyePulseDecay) * params.eyePulseAmount;
+    // Pulsos: ondas que salen del centro.
+    //
+    // La onda es de MEDIA CERO. Antes era `sin*0.5+0.5`, o sea que ademas de
+    // oscilar sumaba una constante de medio amplitud en todo el campo: cualquier
+    // valor del slider aclaraba la pantalla entera antes de que se viera ninguna
+    // onda, y por eso en la parte baja del recorrido ya pegaba fuerte sin poder
+    // dosificarlo. Con media cero el pulso aclara y oscurece alrededor de lo que
+    // ya hay, que ademas es lo que lo hace leerse como una ola atravesando el
+    // codigo y no como un resplandor encendiendose.
+    //
+    // El frente no es una circunferencia. La fase se corre segun el angulo con
+    // tres armonicos lentos y desfasados entre si: los anillos perfectos se leen
+    // como un patron de test, y basta con deformarlos un poco para que pasen a
+    // leerse como algo que emana. Los armonicos van a velocidades distintas, asi
+    // que la deformacion tampoco se repite.
+    const float theta = atan2(p.y, p.x);
+    const float wobble = sin(theta * 2.0 + params.time * 0.23) * 0.55
+                       + sin(theta * 3.0 - params.time * 0.17) * 0.35
+                       + sin(theta * 5.0 + params.time * 0.31) * 0.20;
+    const float shape = saturate(params.eyePulseShape);
+
+    // Dos octavas. La segunda va a 1.7 veces la frecuencia y 0.63 veces la
+    // velocidad: al no ser multiplos enteros, la suma no vuelve a alinearse
+    // nunca y el frente no se ve periodico aunque cada octava por separado lo
+    // sea. Los pesos suman 1 para que la amplitud siga significando lo mismo.
+    const float phase1 = (r - params.time * params.eyePulseSpeed) * params.eyePulseFrequency
+                       + wobble * shape;
+    const float phase2 = (r - params.time * params.eyePulseSpeed * 0.63) * params.eyePulseFrequency * 1.7
+                       + wobble * shape * 1.6;
+    const float wave = sin(phase1 * kTau) * 0.68 + sin(phase2 * kTau) * 0.32;
+
+    // La envolvente arranca de la forma del halo —no de su intensidad— asi que
+    // los pulsos viven donde vive el campo de codigo y no aparecen anillos en el
+    // vacio, pero se pueden subir con el halo bajo. La exponencial encima permite
+    // apretarlos mas cerca del ojo que el propio halo.
+    const float pulseEnvelope = haloFalloff * exp(-r * params.eyePulseDecay);
+    const float pulse = wave * pulseEnvelope * params.eyePulseAmount;
 
     // Grano por celda, no por pixel: el pipeline promedia el tile igual, y a
     // nivel de pixel el ruido se cancelaria en el promedio sin cambiar nada.
