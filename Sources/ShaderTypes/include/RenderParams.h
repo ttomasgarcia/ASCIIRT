@@ -321,18 +321,6 @@ typedef struct {
     /// gradiente y el nucleo solo aporta luminancia.
     float eyeCoreBlend;
 
-    /// Velocidad del ojo en coordenadas normalizadas por segundo. La calcula el
-    /// resorte en CPU; el shader la necesita para saber donde estaba el ojo
-    /// cuando emitio cada onda.
-    float eyeVelocityX;
-    float eyeVelocityY;
-    /// Cuanto quedan atras los pulsos. 0 los deja concentricos y rigidos con el
-    /// ojo; 1 los deja clavados donde fueron emitidos.
-    float eyePulseDrag;
-
-    /// Padding para cerrar en multiplo de 8.
-    uint32_t _pad2;
-
     /// Disgregacion de la estela: cuanto varia el decaimiento celda por celda.
     /// En 0 la cola baja pareja y se apaga entera; subiendolo, unas celdas
     /// mueren enseguida y otras aguantan, asi que la cola se desarma en puntos

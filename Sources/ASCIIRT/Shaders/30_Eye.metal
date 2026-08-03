@@ -81,27 +81,8 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
 
     // Pulsos: ondas radiales que salen del centro. La envolvente las apaga con
     // la distancia; sin ella el borde de la pantalla late igual que el centro.
-    //
-    // Los anillos quedan atras en vez de moverse rigidos con el ojo. Una onda
-    // que ya viajo hasta el radio r salio hace r/velocidad segundos, cuando el
-    // ojo estaba en otro lado; medir su fase desde el centro ACTUAL hace que
-    // todo el frente se teletransporte junto con el ojo, que es lo que se veia
-    // como que los pulsos no se enteran de que la cosa se movio.
-    //
-    // La edad se estima con el radio medido desde el centro actual — una sola
-    // iteracion, porque el radio exacto depende del centro que se busca. A las
-    // velocidades de este efecto la diferencia no se ve, y resolverlo de verdad
-    // pediria guardar el historial de posiciones.
-    const float2 velocity = float2(params.eyeVelocityX, params.eyeVelocityY);
-    const float age = min(r / max(params.eyePulseSpeed, 1e-3), 4.0);
-    const float2 emitted = center - velocity * age * params.eyePulseDrag;
-    const float2 pulseDelta = (uv - emitted) * float2(aspect, 1.0);
-    const float pulseR = length(pulseDelta);
-
-    const float phase = (pulseR - params.time * params.eyePulseSpeed) * params.eyePulseFrequency;
+    const float phase = (r - params.time * params.eyePulseSpeed) * params.eyePulseFrequency;
     const float wave = sin(phase * kTau) * 0.5 + 0.5;
-    // La envolvente sigue usando el radio desde el centro actual: si usara el de
-    // emision, los anillos viejos se reavivarian al alejarse el ojo.
     const float pulse = wave * exp(-r * params.eyePulseDecay) * params.eyePulseAmount;
 
     // Grano por celda, no por pixel: el pipeline promedia el tile igual, y a

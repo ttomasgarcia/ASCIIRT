@@ -84,7 +84,6 @@ struct Preset: Codable, Equatable {
     var eyePulseSpeed: Double = 0.09
     var eyePulseFrequency: Double = 5.0
     var eyePulseDecay: Double = 4.5
-    var eyePulseDrag: Double = 0.6
     var eyeDriftAmount: Double = 0.004
     var eyeDriftSpeed: Double = 0.25
     var eyeStiffness: Double = 18
@@ -187,7 +186,6 @@ struct Preset: Codable, Equatable {
         eyePulseSpeed = c.value(.eyePulseSpeed, d.eyePulseSpeed)
         eyePulseFrequency = c.value(.eyePulseFrequency, d.eyePulseFrequency)
         eyePulseDecay = c.value(.eyePulseDecay, d.eyePulseDecay)
-        eyePulseDrag = c.value(.eyePulseDrag, d.eyePulseDrag)
         eyeDriftAmount = c.value(.eyeDriftAmount, d.eyeDriftAmount)
         eyeDriftSpeed = c.value(.eyeDriftSpeed, d.eyeDriftSpeed)
         eyeStiffness = c.value(.eyeStiffness, d.eyeStiffness)

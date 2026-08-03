@@ -83,8 +83,7 @@ struct EyeMotion {
     var clampEnabled = true
 
     private(set) var position = SIMD2<Float>(0.5, 0.5)
-    /// La lee el pipeline para que los pulsos sepan hacia donde se movio el ojo.
-    private(set) var velocity = SIMD2<Float>(0, 0)
+    private var velocity = SIMD2<Float>(0, 0)
 
     /// Temblor de alta frecuencia y amplitud minima. Se suma SIEMPRE, encima de
     /// cualquier modo de mirada: un ojo real nunca esta perfectamente quieto, y
