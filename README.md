@@ -29,6 +29,11 @@ librerías ASCII de terceros.
   reloj donde cada frame de entrada produce exactamente uno de salida. ProRes
   422 HQ / 4444, H.264 y secuencia PNG numerada. Audio del archivo pasa sin
   recodificar.
+- **Modo ojo**: fuente generativa sin entrada — un núcleo rojo con anillo de
+  lente, halo, respiración y pulsos de energía radiales, que se mueve con
+  inercia siguiendo el mouse. No es un modo aparte: genera luminancia y color
+  donde escribiría la cámara, así que hereda la rampa calibrada, los glifos de
+  borde, la histéresis, la lluvia y el export.
 - **Modos de color**: mono, dos colores, o color original promediado por tile.
   Más invertir y fondo transparente para ProRes 4444 / secuencia PNG.
 - **Presets** en JSON, más restauración automática del estado al abrir.
@@ -79,6 +84,7 @@ Etapas fuera de la numeración base, para el modo Matrix:
   └─> [20] Relief       gaussiana separable sobre el grid + matte de sujeto
   └─> [21] Spawn        reducción por columna: fila de origen de la gota
   └─> [22] Stats        media de luminancia, consumida por [2] del frame siguiente
+  └─> [30] Eye          fuente generativa: escribe donde escribiría la cámara
 ```
 
 Los parámetros viajan a los shaders en un único struct `RenderParams` compartido

@@ -59,6 +59,30 @@ struct PipelineConfig: Equatable {
     /// En `true` la resolucion de salida sigue a la de la fuente.
     var outputFollowsSource = true
 
+    // MARK: Fuente generativa — el ojo
+    var generative = false
+    var eyeCenter: SIMD2<Float> = SIMD2(0.5, 0.5)
+    var eyeRadius: Float = 0.22
+    var eyeCoreRadius: Float = 0.22
+    var eyeFalloff: Float = 2.4
+    var eyeRingWidth: Float = 0.055
+    var eyeRingIntensity: Float = 0.85
+    var eyeHaloRadius: Float = 0.16
+    var eyeHaloIntensity: Float = 0.14
+    var eyeIris: SIMD3<Float> = SIMD3(1.0, 0.10, 0.05)
+    var eyeBreathAmount: Float = 0.03
+    var eyeBreathSpeed: Float = 0.12
+    var eyePulseAmount: Float = 0.07
+    var eyePulseSpeed: Float = 0.09
+    var eyePulseFrequency: Float = 5.0
+    var eyePulseDecay: Float = 4.5
+    var eyeDriftAmount: Float = 0.004
+    var eyeDriftSpeed: Float = 0.25
+    var eyeStiffness: Float = 18
+    var eyeDamping: Float = 5.5
+    var eyeFieldNoise: Float = 0.55
+    var eyeFieldChurn: Float = 6
+
     /// Default de spec §2. Se recalibra siempre; este orden no se asume.
     static let defaultCharset = #" .'`^",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"#
 
@@ -99,6 +123,7 @@ final class ASCIIPipeline {
     private let edgeQuantizePSO: MTLComputePipelineState
     private let glyphIndexPSO: MTLComputePipelineState
     private let statsPSO: MTLComputePipelineState
+    private let eyePSO: MTLComputePipelineState
     private let asciiPSO: MTLComputePipelineState
 
     private var lumaTexture: MTLTexture
@@ -142,6 +167,11 @@ final class ASCIIPipeline {
     /// lluvias distintas y el render dejaria de ser reproducible.
     var timeOverride: Float?
 
+    /// Estado fisico del ojo. Vive en el pipeline y no en el config porque
+    /// cambia todos los frames: meterlo en el config obligaria a comparar la
+    /// estructura entera sesenta veces por segundo para nada.
+    var eyeMotion = EyeMotion()
+
     init(context: MetalContext, config: PipelineConfig) throws {
         self.context = context
         self.config = config
@@ -158,6 +188,7 @@ final class ASCIIPipeline {
         self.edgeQuantizePSO = try ASCIIPipeline.makePSO(context, "edgeQuantizeKernel")
         self.glyphIndexPSO = try ASCIIPipeline.makePSO(context, "glyphIndexKernel")
         self.statsPSO = try ASCIIPipeline.makePSO(context, "lumaStatsKernel")
+        self.eyePSO = try ASCIIPipeline.makePSO(context, "eyeKernel")
         self.asciiPSO = try ASCIIPipeline.makePSO(context, "asciiKernel")
 
         let textures = try ASCIIPipeline.makeTextures(context, config)
@@ -213,13 +244,27 @@ final class ASCIIPipeline {
         config = new
     }
 
-    func encode(commandBuffer: MTLCommandBuffer, source: MTLTexture) throws {
+    /// `source` es opcional porque en modo generativo no hay frame de entrada:
+    /// el ojo lo genera el kernel.
+    func encode(commandBuffer: MTLCommandBuffer, source: MTLTexture?, deltaTime: Float = 1.0 / 60.0) throws {
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
             throw AppError(.metal, "No se pudo crear el compute encoder.")
         }
         encoder.label = "asciirt.ascii"
 
-        var params = makeParams(sourceWidth: source.width, sourceHeight: source.height)
+        // Sin fuente el mapeo "fit" es identidad: el generador ya escribe a
+        // resolucion de salida.
+        if config.generative {
+            eyeMotion.stiffness = config.eyeStiffness
+            eyeMotion.damping = config.eyeDamping
+            eyeMotion.driftAmount = config.eyeDriftAmount
+            eyeMotion.driftSpeed = config.eyeDriftSpeed
+            eyeMotion.target = config.eyeCenter
+            eyeMotion.step(deltaTime: deltaTime, time: currentTime)
+        }
+
+        var params = makeParams(sourceWidth: source?.width ?? Int(config.outputSize.x),
+                                sourceHeight: source?.height ?? Int(config.outputSize.y))
         let outputThreads = MTLSize(width: Int(config.outputSize.x),
                                     height: Int(config.outputSize.y),
                                     depth: 1)
@@ -234,12 +279,19 @@ final class ASCIIPipeline {
         encoder.setBuffer(lumaStatsBuffer, offset: 0,
                           index: Int(ASCIIRTBufferIndexLumaStats.rawValue))
 
-        // [1] Luma cruda
-        encoder.setComputePipelineState(lumaPSO)
-        encoder.setTexture(source, index: Int(ASCIIRTTextureIndexSource.rawValue))
+        // [1] Luma cruda, o el generador cuando la fuente es sintetica. Los dos
+        // escriben lo mismo — lumaRaw y color — asi que todo lo que sigue es
+        // identico y el pipeline no sabe de donde vino la imagen.
         encoder.setTexture(lumaRawTexture, index: Int(ASCIIRTTextureIndexLumaRaw.rawValue))
         encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
-        encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: lumaPSO))
+        if config.generative {
+            encoder.setComputePipelineState(eyePSO)
+            encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: eyePSO))
+        } else {
+            encoder.setComputePipelineState(lumaPSO)
+            encoder.setTexture(source, index: Int(ASCIIRTTextureIndexSource.rawValue))
+            encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: lumaPSO))
+        }
 
         // [2] Normalizacion de exposicion. Consume la media del frame anterior.
         encoder.setComputePipelineState(normalizePSO)
@@ -327,6 +379,11 @@ final class ASCIIPipeline {
 
     // MARK: - Interno
 
+    /// Reloj del efecto. En offline lo fija el indice de frame.
+    private var currentTime: Float {
+        timeOverride ?? Float(CACurrentMediaTime() - startTime)
+    }
+
     private func makeParams(sourceWidth: Int, sourceHeight: Int) -> RenderParams {
         let outW = Float(config.outputSize.x)
         let outH = Float(config.outputSize.y)
@@ -354,7 +411,7 @@ final class ASCIIPipeline {
                             tileSize: config.tileSize,
                             rampLength: UInt32(atlas.rampLength),
                             matrixEnabled: config.matrixEnabled ? 1 : 0,
-                            time: timeOverride ?? Float(CACurrentMediaTime() - startTime),
+                            time: currentTime,
                             matrixSpeed: config.matrixSpeed,
                             matrixTrail: config.matrixTrail,
                             matrixChurn: config.matrixChurn,
@@ -390,6 +447,27 @@ final class ASCIIPipeline {
                             backgroundR: config.background.x,
                             backgroundG: config.background.y,
                             backgroundB: config.background.z,
+                            generativeEnabled: config.generative ? 1 : 0,
+                            eyeCenterX: eyeMotion.position.x,
+                            eyeCenterY: eyeMotion.position.y,
+                            eyeRadius: config.eyeRadius,
+                            eyeCoreRadius: config.eyeCoreRadius,
+                            eyeFalloff: config.eyeFalloff,
+                            eyeRingWidth: config.eyeRingWidth,
+                            eyeRingIntensity: config.eyeRingIntensity,
+                            eyeHaloRadius: config.eyeHaloRadius,
+                            eyeHaloIntensity: config.eyeHaloIntensity,
+                            eyeIrisR: config.eyeIris.x,
+                            eyeIrisG: config.eyeIris.y,
+                            eyeIrisB: config.eyeIris.z,
+                            eyeBreathAmount: config.eyeBreathAmount,
+                            eyeBreathSpeed: config.eyeBreathSpeed,
+                            eyePulseAmount: config.eyePulseAmount,
+                            eyePulseSpeed: config.eyePulseSpeed,
+                            eyePulseFrequency: config.eyePulseFrequency,
+                            eyePulseDecay: config.eyePulseDecay,
+                            eyeFieldNoise: config.eyeFieldNoise,
+                            eyeFieldChurn: config.eyeFieldChurn,
                             _pad0: 0)
     }
 

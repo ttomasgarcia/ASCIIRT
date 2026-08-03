@@ -9,17 +9,7 @@
 #include <metal_stdlib>
 using namespace metal;
 
-/// Hash entero barato. No hace falta calidad estadistica: alcanza con que dos
-/// columnas vecinas no caigan en fase, que es lo unico que se nota a simple vista.
-static inline float hash11(uint n) {
-    n = (n << 13u) ^ n;
-    n = n * (n * n * 15731u + 789221u) + 1376312589u;
-    return float(n & 0x7fffffffu) / float(0x7fffffff);
-}
-
-static inline float hash21(uint2 p) {
-    return hash11(p.x * 73856093u ^ p.y * 19349663u);
-}
+// hash11 / hash21 viven en 000_Common.metal.
 
 /// Intensidad de la lluvia en una celda, 0 fuera del rastro y 1 en la cabeza.
 ///

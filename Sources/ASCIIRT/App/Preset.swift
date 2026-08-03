@@ -54,6 +54,32 @@ struct Preset: Codable, Equatable {
     var transparentBackground: Bool = false
     var foreground: [Double] = [1, 1, 1]
     var background: [Double] = [0, 0, 0]
+
+    // Fuente y ojo generativo
+    /// Se guarda la fuente porque un preset de show tiene que abrir directo en
+    /// el modo ojo, no en camara.
+    var sourceKind: String = "Cámara"
+    var eyeCenter: [Double] = [0.5, 0.5]
+    var eyeRadius: Double = 0.22
+    var eyeCoreRadius: Double = 0.22
+    var eyeFalloff: Double = 2.4
+    var eyeRingWidth: Double = 0.055
+    var eyeRingIntensity: Double = 0.85
+    var eyeHaloRadius: Double = 0.16
+    var eyeHaloIntensity: Double = 0.14
+    var eyeIris: [Double] = [1.0, 0.10, 0.05]
+    var eyeBreathAmount: Double = 0.03
+    var eyeBreathSpeed: Double = 0.12
+    var eyePulseAmount: Double = 0.07
+    var eyePulseSpeed: Double = 0.09
+    var eyePulseFrequency: Double = 5.0
+    var eyePulseDecay: Double = 4.5
+    var eyeDriftAmount: Double = 0.004
+    var eyeDriftSpeed: Double = 0.25
+    var eyeStiffness: Double = 18
+    var eyeDamping: Double = 5.5
+    var eyeFieldNoise: Double = 0.55
+    var eyeFieldChurn: Double = 6
     var matrixImageMix: Double = 0.75
 
     var matrixBaseLevel: Double = 0.30
@@ -112,6 +138,29 @@ struct Preset: Codable, Equatable {
         transparentBackground = c.value(.transparentBackground, d.transparentBackground)
         foreground = c.value(.foreground, d.foreground)
         background = c.value(.background, d.background)
+
+        sourceKind = c.value(.sourceKind, d.sourceKind)
+        eyeCenter = c.value(.eyeCenter, d.eyeCenter)
+        eyeRadius = c.value(.eyeRadius, d.eyeRadius)
+        eyeCoreRadius = c.value(.eyeCoreRadius, d.eyeCoreRadius)
+        eyeFalloff = c.value(.eyeFalloff, d.eyeFalloff)
+        eyeRingWidth = c.value(.eyeRingWidth, d.eyeRingWidth)
+        eyeRingIntensity = c.value(.eyeRingIntensity, d.eyeRingIntensity)
+        eyeHaloRadius = c.value(.eyeHaloRadius, d.eyeHaloRadius)
+        eyeHaloIntensity = c.value(.eyeHaloIntensity, d.eyeHaloIntensity)
+        eyeIris = c.value(.eyeIris, d.eyeIris)
+        eyeBreathAmount = c.value(.eyeBreathAmount, d.eyeBreathAmount)
+        eyeBreathSpeed = c.value(.eyeBreathSpeed, d.eyeBreathSpeed)
+        eyePulseAmount = c.value(.eyePulseAmount, d.eyePulseAmount)
+        eyePulseSpeed = c.value(.eyePulseSpeed, d.eyePulseSpeed)
+        eyePulseFrequency = c.value(.eyePulseFrequency, d.eyePulseFrequency)
+        eyePulseDecay = c.value(.eyePulseDecay, d.eyePulseDecay)
+        eyeDriftAmount = c.value(.eyeDriftAmount, d.eyeDriftAmount)
+        eyeDriftSpeed = c.value(.eyeDriftSpeed, d.eyeDriftSpeed)
+        eyeStiffness = c.value(.eyeStiffness, d.eyeStiffness)
+        eyeDamping = c.value(.eyeDamping, d.eyeDamping)
+        eyeFieldNoise = c.value(.eyeFieldNoise, d.eyeFieldNoise)
+        eyeFieldChurn = c.value(.eyeFieldChurn, d.eyeFieldChurn)
         matrixImageMix = c.value(.matrixImageMix, d.matrixImageMix)
 
         matrixBaseLevel = c.value(.matrixBaseLevel, d.matrixBaseLevel)

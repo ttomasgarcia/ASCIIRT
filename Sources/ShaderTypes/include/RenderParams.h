@@ -218,6 +218,57 @@ typedef struct {
     float backgroundG;
     float backgroundB;
 
+    // MARK: Fuente generativa — el ojo
+    //
+    // No es un modo del pipeline sino una FUENTE: el kernel escribe en lumaRaw y
+    // color donde escribiria la camara, y todo lo de abajo sigue igual.
+
+    uint32_t generativeEnabled;
+
+    /// Centro ya resuelto por la fisica de CPU (ver EyeMotion). El shader no
+    /// integra nada: recibe la posicion del frame y dibuja.
+    float eyeCenterX;
+    float eyeCenterY;
+
+    /// Radio del iris, relativo al lado corto de la salida.
+    float eyeRadius;
+    /// Radio del nucleo, como fraccion del radio del iris.
+    float eyeCoreRadius;
+    /// Exponente de la caida del iris. Alto = borde duro.
+    float eyeFalloff;
+
+    /// Anillo de lente. Existe para que el detector de bordes trace el contorno
+    /// del ojo con glifos direccionales.
+    float eyeRingWidth;
+    float eyeRingIntensity;
+
+    /// Halo: caida ancha que hace que el codigo de alrededor se densifique
+    /// hacia el centro.
+    float eyeHaloRadius;
+    float eyeHaloIntensity;
+
+    float eyeIrisR;
+    float eyeIrisG;
+    float eyeIrisB;
+
+    /// Respiracion: oscilacion lenta del radio, amplitud relativa.
+    float eyeBreathAmount;
+    float eyeBreathSpeed;
+
+    /// Pulsos de energia radiales.
+    float eyePulseAmount;
+    float eyePulseSpeed;
+    float eyePulseFrequency;
+    float eyePulseDecay;
+
+    /// Grano del campo. Un halo liso, cuantizado por la rampa, sale en bandas
+    /// concentricas — se lee como degradado, no como codigo. El grano rompe la
+    /// banda haciendo que celdas vecinas caigan en glifos distintos.
+    float eyeFieldNoise;
+    /// Cambios por segundo del grano. Bajo = campo quieto que respira; alto =
+    /// el codigo se refresca solo.
+    float eyeFieldChurn;
+
     /// Padding explicito para cerrar en multiplo de 8.
     uint32_t _pad0;
 } RenderParams;

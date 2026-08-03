@@ -173,7 +173,10 @@ final class OfflineRenderer {
 
             // Tiempo del efecto derivado del indice: reproducible entre corridas.
             pipeline.timeOverride = Float(Double(frameIndex) / fps)
-            try pipeline.encode(commandBuffer: commandBuffer, source: sourceTexture)
+            // dt fijo del fps nominal: el render tiene que ser reproducible, no
+            // depender de cuanto tardo la GPU en cada cuadro.
+            try pipeline.encode(commandBuffer: commandBuffer, source: sourceTexture,
+                                deltaTime: Float(1.0 / fps))
 
             let descriptor = MTLRenderPassDescriptor()
             descriptor.colorAttachments[0].texture = targetTexture

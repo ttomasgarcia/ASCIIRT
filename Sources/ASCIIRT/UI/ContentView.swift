@@ -79,6 +79,30 @@ struct ContentView: View {
                     .font(.system(.title3, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
+
+            // El arrastre va sobre una capa transparente encima del preview y
+            // no sobre el MTKView: la vista de Metal no participa del layout de
+            // SwiftUI y necesitariamos el tamano en pixeles para convertir.
+            if model.sourceKind == .eye {
+                GeometryReader { geo in
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    // El preview esta centrado con aspect fit, asi
+                                    // que hay que descontar las bandas antes de
+                                    // normalizar o el ojo se corre.
+                                    let fitted = fittedRect(in: geo.size, aspect: model.outputSize)
+                                    guard fitted.width > 0, fitted.height > 0 else { return }
+                                    let x = (value.location.x - fitted.minX) / fitted.width
+                                    let y = (value.location.y - fitted.minY) / fitted.height
+                                    model.eyeCenter = CGPoint(x: min(max(x, -0.5), 1.5),
+                                                              y: min(max(y, -0.5), 1.5))
+                                }
+                        )
+                }
+            }
         }
         .frame(minWidth: 480, minHeight: 270)
         // Los numeros de salud van sobre el preview y no en el panel: se miran
@@ -168,6 +192,16 @@ struct ContentView: View {
         guard seconds.isFinite, seconds >= 0 else { return "00:00" }
         let total = Int(seconds)
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+
+    /// Rectangulo que ocupa el preview dentro del contenedor, con aspect fit.
+    private func fittedRect(in container: CGSize, aspect: CGSize) -> CGRect {
+        guard aspect.width > 0, aspect.height > 0 else { return .zero }
+        let scale = min(container.width / aspect.width, container.height / aspect.height)
+        let size = CGSize(width: aspect.width * scale, height: aspect.height * scale)
+        return CGRect(x: (container.width - size.width) / 2,
+                      y: (container.height - size.height) / 2,
+                      width: size.width, height: size.height)
     }
 
     private var placeholder: String {
@@ -286,6 +320,7 @@ private struct ControlPanel: View {
     @State private var showSource = true
     @State private var showGrid = true
     @State private var showCharset = false
+    @State private var showEye = true
     @State private var showColor = false
     @State private var showExport = false
     @State private var showEdges = true
@@ -302,6 +337,12 @@ private struct ControlPanel: View {
                 Divider()
                 PanelSection(title: "Fuente", systemImage: "video", isExpanded: $showSource) {
                     sourceContent
+                }
+                if model.sourceKind == .eye {
+                    Divider()
+                    PanelSection(title: "Ojo", systemImage: "circle.circle", isExpanded: $showEye) {
+                        eyeContent
+                    }
                 }
                 Divider()
                 PanelSection(title: "Grid", systemImage: "grid", isExpanded: $showGrid) {
@@ -445,10 +486,108 @@ private struct ControlPanel: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+
+            case .eye:
+                Text("Fuente generativa. Arrastrá sobre el preview para mover el ojo.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             ParamReadout(label: "Entrada", value: model.format?.pretty ?? "—")
         }
+    }
+
+    // MARK: Ojo
+
+    private var eyeContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            if model.colorMode != .original {
+                Label("El iris rojo se ve con Color → Original.", systemImage: "info.circle")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            PanelGroupLabel(text: "Forma")
+            ParamSlider(label: "Radio", value: $model.eyeRadius, range: 0.02...0.45,
+                        decimals: 3, help: "Relativo al lado corto de la salida.")
+            ParamSlider(label: "Núcleo", value: $model.eyeCoreRadius, range: 0.02...0.8,
+                        help: "Fracción del radio que quema a blanco. Es lo único que llega a los glifos más densos.")
+            ParamSlider(label: "Dureza", value: $model.eyeFalloff, range: 0.3...8,
+                        help: "Exponente de la caída del iris. Alto = borde duro.")
+
+            PanelGroupLabel(text: "Anillo de lente")
+            ParamSlider(label: "Ancho", value: $model.eyeRingWidth, range: 0.005...0.4, decimals: 3)
+            ParamSlider(label: "Intensidad", value: $model.eyeRingIntensity, range: 0...2,
+                        help: "El anillo existe para que el detector de bordes trace el contorno con - / | \\.")
+
+            PanelGroupLabel(text: "Halo")
+            ParamSlider(label: "Radio", value: $model.eyeHaloRadius, range: 0.02...1.5)
+            ParamSlider(label: "Intensidad", value: $model.eyeHaloIntensity, range: 0...1,
+                        help: "Hace que el código de alrededor se densifique hacia el centro.")
+
+            HStack(spacing: 8) {
+                Text("Iris").font(.system(size: 11)).foregroundStyle(.secondary)
+                    .frame(width: PanelMetrics.labelWidth, alignment: .leading)
+                ColorPicker("", selection: $model.eyeIrisColor, supportsOpacity: false)
+                    .labelsHidden()
+                Spacer()
+            }
+
+            Divider().padding(.vertical, 2)
+            PanelGroupLabel(text: "Respiración")
+            ParamSlider(label: "Amplitud", value: $model.eyeBreathAmount, range: 0...0.3, decimals: 3)
+            ParamSlider(label: "Velocidad", value: $model.eyeBreathSpeed, range: 0.01...2)
+
+            PanelGroupLabel(text: "Pulsos de energía")
+            ParamSlider(label: "Amplitud", value: $model.eyePulseAmount, range: 0...0.6)
+            ParamSlider(label: "Velocidad", value: $model.eyePulseSpeed, range: 0...1)
+            ParamSlider(label: "Frecuencia", value: $model.eyePulseFrequency, range: 0.5...20, decimals: 1)
+            ParamSlider(label: "Caída", value: $model.eyePulseDecay, range: 0...8, decimals: 1,
+                        help: "Cuánto se apaga la onda con la distancia.")
+
+            PanelGroupLabel(text: "Campo de código")
+            ParamSlider(label: "Grano", value: $model.eyeFieldNoise, range: 0...1.5,
+                        help: "Rompe las bandas concéntricas que produce un degradado liso sobre la rampa.")
+            ParamSlider(label: "Refresco", value: $model.eyeFieldChurn, range: 0...30, decimals: 1,
+                        help: "Cambios por segundo del grano. Alto = el código se refresca solo.")
+
+            PanelGroupLabel(text: "Movimiento")
+            ParamSlider(label: "Rigidez", value: $model.eyeStiffness, range: 1...80, decimals: 1,
+                        help: "Cuánto tira el resorte hacia el objetivo. Alto = va derecho y rápido.")
+            ParamSlider(label: "Rozamiento", value: $model.eyeDamping, range: 0.5...30, decimals: 1,
+                        help: "Por debajo de 2·√rigidez el ojo sobrepasa y rebota al llegar. Ahí es donde se siente vivo.")
+            Text(dampingNote)
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+
+            PanelGroupLabel(text: "Deriva")
+            ParamSlider(label: "Amplitud", value: $model.eyeDriftAmount, range: 0...0.08, decimals: 4)
+            ParamSlider(label: "Velocidad", value: $model.eyeDriftSpeed, range: 0.01...2)
+
+            HStack {
+                Button("Centrar") { model.centerEye() }
+                Button("Fijar") { model.snapEyeToCenter() }
+                Spacer()
+                Text(String(format: "%.3f, %.3f", model.eyeCenter.x, model.eyeCenter.y))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+            .controlSize(.small)
+        }
+    }
+
+    /// El punto critico es donde deja de rebotar. Decirlo evita que haya que
+    /// descubrirlo moviendo dos sliders a ciegas.
+    private var dampingNote: String {
+        let critical = 2 * (model.eyeStiffness).squareRoot()
+        if model.eyeDamping < critical * 0.85 {
+            return String(format: "Rebota al llegar. Crítico en %.1f.", critical)
+        } else if model.eyeDamping > critical * 1.25 {
+            return String(format: "Llega lento y sin rebote. Crítico en %.1f.", critical)
+        }
+        return String(format: "Cerca del crítico (%.1f): llega sin pasarse.", critical)
     }
 
     // MARK: Grid

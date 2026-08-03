@@ -32,6 +32,10 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
     /// "antes/despues" y ademas deja M1 disponible para diagnosticar.
     var asciiEnabled = true
 
+    /// Fuente sintetica: no hay frame de entrada que esperar, el pipeline genera
+    /// la imagen. Va siempre con `continuousRedraw`.
+    var generative = false
+
     /// Se consulta en cada draw en vez de empujarse desde Vision: asi el matte
     /// que entra al frame es siempre el ultimo disponible, sin sincronizacion
     /// entre la cola de Vision y el render.
@@ -85,6 +89,7 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
     private var stats = RenderStats()
     private var framesSinceTick = 0
     private var lastStatsTick = CACurrentMediaTime()
+    private var lastDrawTime: CFTimeInterval?
 
     /// Se invoca en main. Throttleado a ~2 Hz para no hacer hervir SwiftUI.
     var onStats: ((RenderStats) -> Void)?
@@ -199,12 +204,18 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
         let frameTime = lastTime
         bufferLock.unlock()
 
-        guard let buffer,
-              let drawable = view.currentDrawable,
+        guard let drawable = view.currentDrawable,
               let passDescriptor = view.currentRenderPassDescriptor else { return }
+        // En modo generativo no hay buffer y no debe haberlo: el guard de abajo
+        // solo aplica cuando la imagen viene de afuera.
+        guard generative || buffer != nil else { return }
 
         do {
-            let (sourceTexture, keepAlive) = try context.makeTexture(from: buffer)
+            var sourceTexture: MTLTexture?
+            var keepAlive: CVMetalTexture?
+            if let buffer {
+                (sourceTexture, keepAlive) = try context.makeTexture(from: buffer)
+            }
 
             guard let commandBuffer = context.commandQueue.makeCommandBuffer() else {
                 throw AppError(.metal, "No se pudo crear el command buffer del preview.")
@@ -214,8 +225,14 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
             // Etapas [1]..[8] en el mismo command buffer que el blit: una sola
             // sumision por frame, sin sincronizaciones intermedias.
             if asciiEnabled {
+                // dt real entre draws: la fisica del ojo tiene que ser
+                // independiente de la tasa de refresco.
+                let now = CACurrentMediaTime()
+                let delta = Float(now - (lastDrawTime ?? now - 1.0 / 60.0))
+                lastDrawTime = now
+
                 ascii.matteTexture = matteProvider?()
-                try ascii.encode(commandBuffer: commandBuffer, source: sourceTexture)
+                try ascii.encode(commandBuffer: commandBuffer, source: sourceTexture, deltaTime: delta)
             }
 
             guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor) else {

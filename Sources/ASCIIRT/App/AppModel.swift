@@ -9,6 +9,8 @@ import simd
 enum SourceKind: String, CaseIterable, Identifiable {
     case camera = "Cámara"
     case file = "Archivo"
+    /// Sin entrada: la imagen la genera el pipeline (el ojo).
+    case eye = "Ojo"
 
     var id: String { rawValue }
 }
@@ -59,7 +61,7 @@ final class AppModel: ObservableObject {
     /// Aspecto manual cuando `aspectFollowsFont` esta apagado. 1.0 = celda
     /// cuadrada (glifo estirado a lo ancho).
     @Published var cellAspect: Double = 2.0 { didSet { sync() } }
-    @Published var asciiEnabled = true { didSet { renderer.asciiEnabled = asciiEnabled; autosave() } }
+    @Published var asciiEnabled = true { didSet { syncRenderFlags(); autosave() } }
 
     // MARK: - Charset
 
@@ -69,6 +71,43 @@ final class AppModel: ObservableObject {
     @Published private(set) var selectedFont: FontSelection = .system(name: "Menlo-Regular")
     private var appliedCharset: [Character] = Array(PipelineConfig.defaultCharset)
     private var appliedExcluded: Set<Character> = []
+
+    // MARK: - Ojo (fuente generativa)
+
+    @Published var eyeCenter = CGPoint(x: 0.5, y: 0.5) { didSet { sync() } }
+    @Published var eyeRadius: Double = 0.22 { didSet { sync() } }
+    @Published var eyeCoreRadius: Double = 0.22 { didSet { sync() } }
+    @Published var eyeFalloff: Double = 2.4 { didSet { sync() } }
+    @Published var eyeRingWidth: Double = 0.055 { didSet { sync() } }
+    @Published var eyeRingIntensity: Double = 0.85 { didSet { sync() } }
+    @Published var eyeHaloRadius: Double = 0.16 { didSet { sync() } }
+    @Published var eyeHaloIntensity: Double = 0.14 { didSet { sync() } }
+    @Published var eyeIrisColor: Color = Color(red: 1.0, green: 0.10, blue: 0.05) { didSet { sync() } }
+    @Published var eyeBreathAmount: Double = 0.03 { didSet { sync() } }
+    @Published var eyeBreathSpeed: Double = 0.12 { didSet { sync() } }
+    @Published var eyePulseAmount: Double = 0.07 { didSet { sync() } }
+    @Published var eyePulseSpeed: Double = 0.09 { didSet { sync() } }
+    @Published var eyePulseFrequency: Double = 5.0 { didSet { sync() } }
+    @Published var eyePulseDecay: Double = 4.5 { didSet { sync() } }
+    @Published var eyeDriftAmount: Double = 0.004 { didSet { sync() } }
+    @Published var eyeDriftSpeed: Double = 0.25 { didSet { sync() } }
+    /// Fuerza del resorte hacia el objetivo.
+    @Published var eyeStiffness: Double = 18 { didSet { sync() } }
+    /// Rozamiento. Por debajo de 2·√rigidez el ojo sobrepasa y rebota al
+    /// asentarse, que es de donde sale la sensacion de que esta vivo.
+    @Published var eyeDamping: Double = 5.5 { didSet { sync() } }
+    @Published var eyeFieldNoise: Double = 0.55 { didSet { sync() } }
+    @Published var eyeFieldChurn: Double = 6 { didSet { sync() } }
+
+    /// Manda el ojo al centro dejando que el resorte lo lleve. Es lo que uno
+    /// quiere en vivo: un salto instantaneo se veria como un corte.
+    func centerEye() { eyeCenter = CGPoint(x: 0.5, y: 0.5) }
+
+    /// Salto duro al centro, sin fisica. Para preparar antes de que entre gente.
+    func snapEyeToCenter() {
+        eyeCenter = CGPoint(x: 0.5, y: 0.5)
+        renderer.ascii.eyeMotion.snap(to: SIMD2(0.5, 0.5))
+    }
 
     // MARK: - Color y salida (M8)
 
@@ -139,7 +178,7 @@ final class AppModel: ObservableObject {
         didSet {
             // La lluvia avanza por reloj: sin repintado continuo se congelaria
             // con el video en pausa o con la camara detenida.
-            renderer.continuousRedraw = matrixEnabled
+            syncRenderFlags()
             sync()
         }
     }
@@ -158,7 +197,7 @@ final class AppModel: ObservableObject {
     @Published var matrixRelief: Double = 10 { didSet { sync() } }
     @Published var reliefRadius: Double = 5 { didSet { sync() } }
     @Published var subjectMatteEnabled = false {
-        didSet { matte.isEnabled = subjectMatteEnabled; sync() }
+        didSet { syncRenderFlags(); sync() }
     }
     @Published var matteWeight: Double = 0.6 { didSet { sync() } }
 
@@ -271,8 +310,7 @@ final class AppModel: ObservableObject {
             self?.isPlaying = playing
         }
 
-        renderer.continuousRedraw = matrixEnabled
-        matte.isEnabled = subjectMatteEnabled
+        syncRenderFlags()
         refreshCameras()
         refreshPresets()
 
@@ -303,6 +341,29 @@ final class AppModel: ObservableObject {
         guard !isApplyingPreset else { return }
 
         var next = PipelineConfig()
+        next.generative = sourceKind == .eye
+        next.eyeCenter = SIMD2(Float(eyeCenter.x), Float(eyeCenter.y))
+        next.eyeRadius = Float(eyeRadius)
+        next.eyeCoreRadius = Float(eyeCoreRadius)
+        next.eyeFalloff = Float(eyeFalloff)
+        next.eyeRingWidth = Float(eyeRingWidth)
+        next.eyeRingIntensity = Float(eyeRingIntensity)
+        next.eyeHaloRadius = Float(eyeHaloRadius)
+        next.eyeHaloIntensity = Float(eyeHaloIntensity)
+        next.eyeIris = AppModel.components(of: eyeIrisColor)
+        next.eyeBreathAmount = Float(eyeBreathAmount)
+        next.eyeBreathSpeed = Float(eyeBreathSpeed)
+        next.eyePulseAmount = Float(eyePulseAmount)
+        next.eyePulseSpeed = Float(eyePulseSpeed)
+        next.eyePulseFrequency = Float(eyePulseFrequency)
+        next.eyePulseDecay = Float(eyePulseDecay)
+        next.eyeDriftAmount = Float(eyeDriftAmount)
+        next.eyeDriftSpeed = Float(eyeDriftSpeed)
+        next.eyeStiffness = Float(eyeStiffness)
+        next.eyeDamping = Float(eyeDamping)
+        next.eyeFieldNoise = Float(eyeFieldNoise)
+        next.eyeFieldChurn = Float(eyeFieldChurn)
+
         next.outputSize = outputPreset.size ?? sourceSize
         next.outputFollowsSource = outputPreset == .source
         next.colorMode = colorMode.rawValue
@@ -450,6 +511,30 @@ final class AppModel: ObservableObject {
         let bg = AppModel.components(of: backgroundColor)
         preset.foreground = [Double(fg.x), Double(fg.y), Double(fg.z)]
         preset.background = [Double(bg.x), Double(bg.y), Double(bg.z)]
+
+        preset.sourceKind = sourceKind.rawValue
+        preset.eyeCenter = [Double(eyeCenter.x), Double(eyeCenter.y)]
+        preset.eyeRadius = eyeRadius
+        preset.eyeCoreRadius = eyeCoreRadius
+        preset.eyeFalloff = eyeFalloff
+        preset.eyeRingWidth = eyeRingWidth
+        preset.eyeRingIntensity = eyeRingIntensity
+        preset.eyeHaloRadius = eyeHaloRadius
+        preset.eyeHaloIntensity = eyeHaloIntensity
+        let iris = AppModel.components(of: eyeIrisColor)
+        preset.eyeIris = [Double(iris.x), Double(iris.y), Double(iris.z)]
+        preset.eyeBreathAmount = eyeBreathAmount
+        preset.eyeBreathSpeed = eyeBreathSpeed
+        preset.eyePulseAmount = eyePulseAmount
+        preset.eyePulseSpeed = eyePulseSpeed
+        preset.eyePulseFrequency = eyePulseFrequency
+        preset.eyePulseDecay = eyePulseDecay
+        preset.eyeDriftAmount = eyeDriftAmount
+        preset.eyeDriftSpeed = eyeDriftSpeed
+        preset.eyeStiffness = eyeStiffness
+        preset.eyeDamping = eyeDamping
+        preset.eyeFieldNoise = eyeFieldNoise
+        preset.eyeFieldChurn = eyeFieldChurn
         preset.matrixImageMix = matrixImageMix
         preset.matrixBaseLevel = matrixBaseLevel
         preset.matrixSpawnBias = matrixSpawnBias
@@ -504,6 +589,38 @@ final class AppModel: ObservableObject {
         if preset.background.count >= 3 {
             backgroundColor = Color(red: preset.background[0], green: preset.background[1], blue: preset.background[2])
         }
+
+        if preset.eyeCenter.count >= 2 {
+            eyeCenter = CGPoint(x: preset.eyeCenter[0], y: preset.eyeCenter[1])
+            // Sin el snap el ojo entraria volando desde donde estuviera, con la
+            // velocidad acumulada de antes.
+            renderer.ascii.eyeMotion.snap(to: SIMD2(Float(preset.eyeCenter[0]), Float(preset.eyeCenter[1])))
+        }
+        eyeRadius = preset.eyeRadius
+        eyeCoreRadius = preset.eyeCoreRadius
+        eyeFalloff = preset.eyeFalloff
+        eyeRingWidth = preset.eyeRingWidth
+        eyeRingIntensity = preset.eyeRingIntensity
+        eyeHaloRadius = preset.eyeHaloRadius
+        eyeHaloIntensity = preset.eyeHaloIntensity
+        if preset.eyeIris.count >= 3 {
+            eyeIrisColor = Color(red: preset.eyeIris[0], green: preset.eyeIris[1], blue: preset.eyeIris[2])
+        }
+        eyeBreathAmount = preset.eyeBreathAmount
+        eyeBreathSpeed = preset.eyeBreathSpeed
+        eyePulseAmount = preset.eyePulseAmount
+        eyePulseSpeed = preset.eyePulseSpeed
+        eyePulseFrequency = preset.eyePulseFrequency
+        eyePulseDecay = preset.eyePulseDecay
+        eyeDriftAmount = preset.eyeDriftAmount
+        eyeDriftSpeed = preset.eyeDriftSpeed
+        eyeStiffness = preset.eyeStiffness
+        eyeDamping = preset.eyeDamping
+        eyeFieldNoise = preset.eyeFieldNoise
+        eyeFieldChurn = preset.eyeFieldChurn
+        // La fuente va al final: cambiarla arranca o detiene captura, y quiero
+        // que lo haga con todos los parametros ya puestos.
+        sourceKind = SourceKind(rawValue: preset.sourceKind) ?? .camera
         matrixImageMix = preset.matrixImageMix
         matrixBaseLevel = preset.matrixBaseLevel
         matrixSpawnBias = preset.matrixSpawnBias
@@ -523,10 +640,8 @@ final class AppModel: ObservableObject {
 
         isApplyingPreset = false
 
-        // Los didSet se saltearon el pipeline; estos tres lo ponen al dia.
-        renderer.asciiEnabled = asciiEnabled
-        renderer.continuousRedraw = matrixEnabled
-        matte.isEnabled = subjectMatteEnabled
+        // Los didSet se saltearon el pipeline; esto lo pone al dia.
+        syncRenderFlags()
         camera.setExposureLocked(exposureLocked)
         sync()
 
@@ -603,6 +718,7 @@ final class AppModel: ObservableObject {
         switch previous {
         case .camera: camera.stop()
         case .file: file.stop()
+        case .eye: break
         }
         isRunning = false
         format = nil
@@ -616,7 +732,33 @@ final class AppModel: ObservableObject {
             Task { await startCapture() }
         case .file:
             break // espera a que abran un archivo
+        case .eye:
+            fileURL = nil
+            duration = 0
+            currentTime = 0
+            isPlaying = false
+            // Sin fuente externa la resolucion la fija el preset; 1080p es el
+            // default razonable para proyectar.
+            sourceSize = SIMD2(1920, 1080)
+            isRunning = true
         }
+        syncRenderFlags()
+        sync()
+    }
+
+    /// Unico lugar que decide los flags del renderer.
+    ///
+    /// Estaban repetidos en tres puntos y el de `apply` pisaba lo que acababa de
+    /// poner el cambio de fuente: al abrir en modo ojo el repintado continuo
+    /// quedaba apagado y la pantalla en negro. Un solo metodo, llamado desde
+    /// todos los didSet que puedan afectarlos.
+    private func syncRenderFlags() {
+        renderer.generative = sourceKind == .eye
+        renderer.asciiEnabled = asciiEnabled
+        // El generador anima por reloj, no por frame de entrada: sin repintado
+        // continuo quedaria congelado en el primer cuadro.
+        renderer.continuousRedraw = matrixEnabled || sourceKind == .eye
+        matte.isEnabled = subjectMatteEnabled
     }
 
     func refreshCameras() {
@@ -810,6 +952,7 @@ extension AppModel: FrameSourceDelegate {
         switch sourceKind {
         case .camera: return source === camera
         case .file: return source === file
+        case .eye: return false   // el generador no entrega frames por delegate
         }
     }
 
