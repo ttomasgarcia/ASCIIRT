@@ -340,11 +340,18 @@ private struct ControlPanel: View {
     @State private var showMatrix = true
     @State private var showEyeLife = true
     @State private var showEyeMotion = true
+    @State private var showProject = true
     @State private var showCoverage = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                PanelSection(title: "Proyecto", systemImage: "rectangle.ratio.16.to.9",
+                             help: "La resolución a la que se genera todo. Está primero porque es la decisión que condiciona al resto: el grid se deriva de ella —nunca al revés— así que cambiarla cambia cuántos caracteres entran en pantalla y, con eso, el aspecto del efecto entero. Conviene fijarla al empezar y no tocarla más.",
+                             isExpanded: $showProject) {
+                    projectContent
+                }
+                Divider()
                 PanelSection(title: "Presets", systemImage: "square.stack.3d.up",
                              help: "Tres cajones independientes. Un preset de «look» define la forma y el color del ojo; uno de «movimiento» define cómo recorre la pantalla; uno de «escena» guarda las dos cosas juntas. Cargar un look no pisa el recorrido y viceversa, así que probar diez looks contra diez recorridos es cuestión de clics y no de rehacer nada. Los archivos son JSON en una carpeta que podés abrir, versionar o mandar por mail.",
                              isExpanded: $showPresets) {
@@ -435,6 +442,33 @@ private struct ControlPanel: View {
             .padding(.vertical, 6)
         }
         .background(.background)
+    }
+
+    // MARK: Proyecto
+
+    private var projectContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            Picker("", selection: $model.outputPreset) {
+                ForEach(AppModel.OutputPreset.allCases) { preset in Text(preset.rawValue).tag(preset) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+
+            ParamReadout(label: "Salida", value: "\(model.config.outputSize.x)×\(model.config.outputSize.y)",
+                         help: "Resolución a la que se genera todo. «Fuente» la toma de la cámara o del archivo; las demás la fijan y la imagen entra encuadrada dentro, con negro en lo que sobra — nunca se recorta en silencio. Para proyectar conviene fijarla a la resolución real del proyector, así lo que ves es exactamente lo que sale.")
+            ParamReadout(label: "Aspecto", value: aspectNote,
+                         help: "Proporción de la salida. 2432×1152 es 2,11:1, bastante más ancha que 16:9: el ojo se mide contra el lado corto, así que al pasar de una a otra no cambia de tamaño, pero le queda mucho más campo a los costados para el código y para que la mirada recorra.")
+            ParamReadout(label: "Grid", value: "\(model.config.gridSize.x) × \(model.config.gridSize.y)",
+                         help: "Cuántos caracteres entran, derivado de la resolución y del tamaño de celda. El tamaño de celda se elige en Grid.")
+        }
+    }
+
+    /// Proporcion de la salida, en la forma en que se habla de ella.
+    private var aspectNote: String {
+        let w = Double(model.config.outputSize.x), h = Double(model.config.outputSize.y)
+        guard h > 0 else { return "—" }
+        return String(format: "%.2f:1", w / h)
     }
 
     // MARK: Presets
@@ -997,18 +1031,6 @@ private struct ControlPanel: View {
 
     private var exportContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            PanelGroupLabel(text: "Resolución de salida", help: "Resolución a la que se genera todo. «Fuente» la toma de la cámara o del archivo; los presets la fijan y la imagen entra encuadrada dentro, con negro en lo que sobra. Para proyectar conviene fijarla a la resolución real del proyector.")
-            HStack(spacing: 6) {
-                Picker("", selection: $model.outputPreset) {
-                    ForEach(AppModel.OutputPreset.allCases) { preset in Text(preset.rawValue).tag(preset) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.small)
-                HelpMark("«Fuente» toma la resolución de la cámara o del archivo. Los presets la fijan y la imagen entra encuadrada, con negro en lo que sobra — nunca se recorta en silencio. Para proyectar conviene fijarla a la resolución real del proyector, así lo que ves es exactamente lo que sale.",
-                         title: "Resolución de salida")
-            }
-
             PanelGroupLabel(text: "Formato", help: "Formato de salida, tanto para REC como para el render offline. ProRes para llevar a post, H.264 para mandar por ahí, secuencia PNG para máxima calidad con alpha. El ASCII es el peor caso posible para un codec de transformada, así que si podés evitá H.264.")
             Picker("", selection: $model.exportCodec) {
                 ForEach(ExportCodec.allCases) { codec in Text(codec.rawValue).tag(codec) }

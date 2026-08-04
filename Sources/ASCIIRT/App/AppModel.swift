@@ -248,6 +248,9 @@ final class AppModel: ObservableObject {
         case hd1080 = "1080p"
         case qhd1440 = "1440p"
         case uhd4K = "4K"
+        /// Panoramica 2.11:1 — no es ninguna proporcion estandar de video, y por
+        /// eso va con las medidas puestas en el nombre en vez de un apodo.
+        case wide2432 = "2432×1152"
 
         var id: String { rawValue }
 
@@ -257,6 +260,7 @@ final class AppModel: ObservableObject {
             case .hd1080: return SIMD2(1920, 1080)
             case .qhd1440: return SIMD2(2560, 1440)
             case .uhd4K: return SIMD2(3840, 2160)
+            case .wide2432: return SIMD2(2432, 1152)
             }
         }
     }
