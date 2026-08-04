@@ -46,9 +46,9 @@ kernel void eyeTrailKernel(texture2d<float, access::read>  current  [[texture(AS
     // agujereando a medida que envejece en vez de acortarse.
     const float step = 1.0 / 255.0;
     const float localDecay = params.trailDecay;
-    const float extraFloor = params.trailDisperse * jitter * step * 0.25;
+    const float extraFloor = params.trailDisperse * jitter * step * 0.25 * params.trailDeltaScale;
 
-    const float faded = max(old.a * localDecay - step - extraFloor, 0.0);
+    const float faded = max(old.a * localDecay - step * params.trailDeltaScale - extraFloor, 0.0);
 
     // El color de lo que queda atras se va hacia el color del codigo. Se aplica
     // por frame, asi que la caida es exponencial: con el tinte en 0 la cola es

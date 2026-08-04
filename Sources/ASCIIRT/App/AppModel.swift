@@ -191,6 +191,27 @@ final class AppModel: ObservableObject {
     }
 
     @Published var trailDecay: Double = 0 { didSet { sync() } }
+
+    /// El slider de arrastre expone SEGUNDOS y no el factor de decaimiento.
+    ///
+    /// El factor es exponencial y el recorrido salia inservible: de 0 a 0,55 hay
+    /// 138 ms de cola —o sea nada visible— y de 0,95 a 0,98 hay dos segundos y
+    /// medio. Mas de la mitad del slider no hacia nada y todo el efecto estaba
+    /// amontonado en el ultimo 3%. En segundos el recorrido es parejo y ademas
+    /// el numero dice algo: cuanto tarda la cola en apagarse.
+    ///
+    /// Se guarda el factor y no los segundos para que los presets ya guardados
+    /// sigan abriendo igual.
+    var trailSeconds: Double {
+        get {
+            guard trailDecay > 0.001 else { return 0 }
+            return log(0.007) / log(trailDecay) / 60
+        }
+        set {
+            let frames = max(newValue, 0) * 60
+            trailDecay = frames < 0.5 ? 0 : pow(0.007, 1.0 / frames)
+        }
+    }
     @Published var trailDisperse: Double = 0 { didSet { sync() } }
 
     /// Interior del ojo.

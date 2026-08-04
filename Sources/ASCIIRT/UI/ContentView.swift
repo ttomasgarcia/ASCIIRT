@@ -620,8 +620,8 @@ private struct ControlPanel: View {
                             : "El control rápido: escribe el arrastre y la disgregación de una vez, y baja la histéresis para acompañar. 0 apaga la estela. Con cámara o archivo la estela es sólo el eco del frame anterior — la parte de inercia del control es del ojo y no hace nada acá.")
 
             PanelGroupLabel(text: "Rastro", help: "Cuánto sobrevive la imagen del frame anterior, y cómo se deshace. La estela es de caracteres: el disco, el aro y el núcleo del ojo no dejan rastro.")
-            ParamSlider(label: "Arrastre", value: $model.trailDecay, range: 0...0.98,
-                        help: "Cuánto sobrevive el campo del frame anterior. Es el mismo mecanismo que el fósforo de un tubo. En 0 no hay estela; 0,90 tarda 0,7 s en apagarse del todo y 0,98 tarda 2,6 s. Sirve para cualquier fuente, no sólo el ojo.")
+            ParamSlider(label: "Arrastre", value: $model.trailSeconds, range: 0...3, decimals: 2,
+                        help: "Cuánto tarda la cola en apagarse del todo, en segundos. Es el mismo mecanismo que el fósforo de un tubo. Antes este slider mostraba el factor de decaimiento, que es exponencial: de 0 a 0,55 había 138 ms de cola —nada visible— y todo el efecto estaba amontonado en el último 3% del recorrido. En segundos el paso es parejo y el número dice algo. Sirve para cualquier fuente, no sólo el ojo. La duración es real: no cambia con los fps ni al renderizar a otra velocidad.")
             ParamSlider(label: "Disgregación", value: $model.trailDisperse, range: 0...1,
                         help: "Cuánto varía el desvanecido celda por celda. En 0 la cola baja pareja y se apaga entera; subiéndolo, unas celdas llegan a cero antes que otras y la cola se agujerea a medida que envejece. No la acorta: el alcance máximo lo fija el Arrastre. Es la diferencia entre apagarse y deshacerse.")
 

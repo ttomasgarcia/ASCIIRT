@@ -361,6 +361,16 @@ typedef struct {
     /// fase se corre segun el angulo y el frente se abolla. No cambia ni el ritmo
     /// ni el alcance: solo la forma.
     float eyePulseShape;
+
+    /// Duracion del frame en unidades de 1/60 s. Existe para que la estela dure
+    /// lo mismo sin importar a cuantos fps se este corriendo: el arrastre se
+    /// aplica una vez por frame, asi que a 120 Hz la cola se apagaba en la mitad
+    /// de tiempo que a 60, y en un render offline a 24 o 30 fps salia mucho mas
+    /// larga que lo que se vio en pantalla al ajustarla.
+    ///
+    /// El factor de decaimiento ya viene corregido desde la CPU; esto escala los
+    /// pisos que se restan por frame, que son la otra mitad del apagado.
+    float trailDeltaScale;
 } RenderParams;
 
 #endif /* RenderParams_h */

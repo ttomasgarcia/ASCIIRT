@@ -56,9 +56,9 @@ kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCII
     // rastro no cambia— y las demas llegan a cero antes, asi que la cola se va
     // agujereando a medida que envejece en vez de acortarse.
     const float localDecay = params.trailDecay;
-    const float extraFloor = params.trailDisperse * jitter * step * 0.25;
+    const float extraFloor = params.trailDisperse * jitter * step * 0.25 * params.trailDeltaScale;
 
-    const float faded = max(previous.read(gid).r * localDecay - step * 0.05 - extraFloor, 0.0);
+    const float faded = max(previous.read(gid).r * localDecay - step * 0.05 * params.trailDeltaScale - extraFloor, 0.0);
 
     // Por debajo de medio escalon el glifo ya es el mas ralo de la rampa; dejar
     // decimales invisibles solo posterga el apagado.

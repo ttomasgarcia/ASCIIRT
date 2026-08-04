@@ -337,7 +337,8 @@ final class ASCIIPipeline {
         }
 
         var params = makeParams(sourceWidth: source?.width ?? Int(config.outputSize.x),
-                                sourceHeight: source?.height ?? Int(config.outputSize.y))
+                                sourceHeight: source?.height ?? Int(config.outputSize.y),
+                                deltaTime: deltaTime)
         let outputThreads = MTLSize(width: Int(config.outputSize.x),
                                     height: Int(config.outputSize.y),
                                     depth: 1)
@@ -497,7 +498,12 @@ final class ASCIIPipeline {
         timeOverride ?? Float(CACurrentMediaTime() - startTime)
     }
 
-    private func makeParams(sourceWidth: Int, sourceHeight: Int) -> RenderParams {
+    private func makeParams(sourceWidth: Int, sourceHeight: Int, deltaTime: Float) -> RenderParams {
+        // `trailDecay` esta definido como supervivencia por 1/60 s — es lo que
+        // guardan los presets viejos— asi que para el frame real se eleva a
+        // cuantos sesentavos duro. A 60 fps queda igual que antes.
+        let frameScale = max(deltaTime, 1e-4) * 60
+        let trailPerFrame = config.trailDecay > 0 ? pow(config.trailDecay, frameScale) : 0
         let outW = Float(config.outputSize.x)
         let outH = Float(config.outputSize.y)
         let srcW = Float(max(sourceWidth, 1))
@@ -585,7 +591,7 @@ final class ASCIIPipeline {
                             eyeSolidGain: config.eyeSolidGain,
                             eyeSolidEdge: config.eyeSolidEdge,
                             _pad0: 0,
-                            trailDecay: config.trailDecay,
+                            trailDecay: trailPerFrame,
                             eyeHollow: config.eyeHollow ? 1 : 0,
                             eyeGradientMode: config.eyeGradientMode,
                             eyeGradientSpeed: config.eyeGradientSpeed,
@@ -606,7 +612,8 @@ final class ASCIIPipeline {
                             eyeBlinkG: config.eyeBlinkColor.y,
                             eyeBlinkB: config.eyeBlinkColor.z,
                             trailTint: config.trailTint,
-                            eyePulseShape: config.eyePulseShape)
+                            eyePulseShape: config.eyePulseShape,
+                            trailDeltaScale: frameScale)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se
