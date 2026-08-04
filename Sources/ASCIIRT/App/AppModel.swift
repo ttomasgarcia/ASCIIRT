@@ -104,12 +104,43 @@ final class AppModel: ObservableObject {
     @Published var gazeStops: Double = 7 { didSet { sync() } }
     /// Arrastre en curso sobre el preview.
     @Published var isDraggingEye = false { didSet { sync() } }
+
     @Published var eyeClampToScreen = true { didSet { sync() } }
 
     /// Pleno: cuanto se sale el ojo del ASCII para ganar intensidad.
     @Published var eyeSolidAmount: Double = 0 { didSet { sync() } }
     @Published var eyeSolidGain: Double = 1.0 { didSet { sync() } }
     @Published var eyeSolidEdge: Double = 0.35 { didSet { sync() } }
+
+    /// Posicion en vivo del arrastre. Sin `@Published` a proposito: la escribe
+    /// cada evento de mouse y publicarla reconstruiria el panel entero cada vez.
+    private var liveEyeCenter = CGPoint(x: 0.5, y: 0.5)
+    private var lastEyePublish = CACurrentMediaTime()
+
+    /// Camino rapido del arrastre. Va derecho al pipeline; el readout de la
+    /// posicion se publica como mucho diez veces por segundo, que es de sobra
+    /// para leerlo y diez veces menos trabajo que seguir al puntero.
+    func dragEye(to point: CGPoint) {
+        liveEyeCenter = point
+        renderer.ascii.dragTarget = SIMD2(Float(point.x), Float(point.y))
+
+        // Publicar `true` en cada evento invalida igual aunque el valor no
+        // cambie: SwiftUI reacciona al envio, no a la diferencia.
+        if !isDraggingEye { isDraggingEye = true }
+
+        let now = CACurrentMediaTime()
+        if now - lastEyePublish >= 0.1 {
+            lastEyePublish = now
+            eyeCenter = point
+        }
+    }
+
+    /// Al soltar, el objetivo vuelve al modelo para que lo guarde un preset.
+    func endEyeDrag() {
+        renderer.ascii.dragTarget = nil
+        eyeCenter = liveEyeCenter
+        isDraggingEye = false
+    }
 
     /// Arrastre del campo. Sirve para cualquier fuente, no solo el ojo.
     // MARK: - Estela (macro)

@@ -215,6 +215,15 @@ final class ASCIIPipeline {
     /// estructura entera sesenta veces por segundo para nada.
     var eyeMotion = EyeMotion()
 
+    /// Objetivo mientras se arrastra con el mouse, fuera del `config`.
+    ///
+    /// Existe para que el arrastre no tenga que pasar por una propiedad
+    /// publicada del modelo. El render corre en el main thread, el mismo donde
+    /// SwiftUI reconstruye el panel: publicar en cada evento de mouse hacia que
+    /// cada movimiento del puntero rearmara las cien filas de controles antes de
+    /// poder dibujar el frame. Escribiendo aca, el arrastre no toca a SwiftUI.
+    var dragTarget: SIMD2<Float>?
+
     init(context: MetalContext, config: PipelineConfig) throws {
         self.context = context
         self.config = config
@@ -323,7 +332,7 @@ final class ASCIIPipeline {
             let aspect = Float(config.outputSize.x) / Float(max(config.outputSize.y, 1))
             let marginY = config.eyeHaloRadius * 0.5
             eyeMotion.clampMargin = SIMD2(marginY / aspect, marginY)
-            eyeMotion.target = config.eyeCenter
+            eyeMotion.target = dragTarget ?? config.eyeCenter
             eyeMotion.step(deltaTime: deltaTime, time: currentTime)
         }
 

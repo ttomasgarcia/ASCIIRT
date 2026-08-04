@@ -90,7 +90,6 @@ struct ContentView: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
-                                    model.isDraggingEye = true
                                     // El preview esta centrado con aspect fit,
                                     // asi que hay que descontar las bandas antes
                                     // de normalizar o el ojo queda corrido
@@ -99,13 +98,14 @@ struct ContentView: View {
                                     guard fitted.width > 0, fitted.height > 0 else { return }
                                     let x = (value.location.x - fitted.minX) / fitted.width
                                     let y = (value.location.y - fitted.minY) / fitted.height
-                                    model.eyeCenter = CGPoint(x: min(max(x, -0.5), 1.5),
-                                                              y: min(max(y, -0.5), 1.5))
+                                    // Camino rapido: no publica en cada evento.
+                                    model.dragEye(to: CGPoint(x: min(max(x, -0.5), 1.5),
+                                                              y: min(max(y, -0.5), 1.5)))
                                 }
                                 .onEnded { _ in
                                     // Al soltar, la mirada retoma su recorrido
                                     // desde donde quedo el ojo.
-                                    model.isDraggingEye = false
+                                    model.endEyeDrag()
                                 }
                         )
                 }
