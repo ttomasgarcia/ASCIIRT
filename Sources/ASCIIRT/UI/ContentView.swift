@@ -67,7 +67,12 @@ struct ContentView: View {
 
     private var preview: some View {
         ZStack {
-            Color.black
+            // Lo que rodea al cuadro es un negro apenas mas claro que el negro
+            // de la imagen. Con los dos en cero no habia forma de saber donde
+            // termina la salida y donde empieza la ventana: un ojo cerca del
+            // borde parecia estar adentro cuando en realidad ya estaba fuera de
+            // cuadro. Es solo del preview — lo que se graba no lo lleva.
+            Color(white: 0.09)
             PreviewView(context: model.metal,
                         renderer: model.renderer,
                         drawableSize: model.outputSize)
