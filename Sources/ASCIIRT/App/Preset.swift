@@ -59,6 +59,7 @@ struct Preset: Codable, Equatable {
 
     // Color y salida
     var outputPreset: String = "Fuente"
+    var sourceFill: Bool = false
     var colorMode: UInt32 = 0
     var invert: Bool = false
     var transparentBackground: Bool = false
@@ -172,6 +173,7 @@ struct Preset: Codable, Equatable {
         exposureLocked = c.value(.exposureLocked, d.exposureLocked)
         exportCodec = c.value(.exportCodec, d.exportCodec)
         outputPreset = c.value(.outputPreset, d.outputPreset)
+        sourceFill = c.value(.sourceFill, d.sourceFill)
         colorMode = c.value(.colorMode, d.colorMode)
         invert = c.value(.invert, d.invert)
         transparentBackground = c.value(.transparentBackground, d.transparentBackground)

@@ -467,6 +467,20 @@ private struct ControlPanel: View {
             .labelsHidden()
             .controlSize(.small)
 
+            if model.sourceKind != .eye {
+                HStack(spacing: 6) {
+                    Picker("", selection: $model.sourceFill) {
+                        Text("Ajustar").tag(false)
+                        Text("Llenar").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    HelpMark("Qué hacer cuando la fuente y la salida no tienen la misma proporción. Ajustar: la imagen entra completa y lo que sobra queda negro. Llenar: la imagen se agranda hasta cubrir la salida y se recorta lo que se pasa. Con una cámara 16:9 y una salida de 2,11:1 la diferencia es entre dos franjas negras arriba y abajo, o perder los costados. Ajustar es el default porque recortar es perder imagen y eso no debería pasar sin que lo pidas.",
+                             title: "Encuadre de la fuente")
+                }
+            }
+
             ParamReadout(label: "Salida", value: "\(model.config.outputSize.x)×\(model.config.outputSize.y)",
                          help: "Resolución a la que se genera todo. «Fuente» la toma de la cámara o del archivo; las demás la fijan y la imagen entra encuadrada dentro, con negro en lo que sobra — nunca se recorta en silencio. Para proyectar conviene fijarla a la resolución real del proyector, así lo que ves es exactamente lo que sale.")
             ParamReadout(label: "Aspecto", value: aspectNote,
@@ -916,6 +930,20 @@ private struct ControlPanel: View {
 
             ParamReadout(label: "Celda", value: "\(model.config.tileSize.x)×\(model.config.tileSize.y) px",
                          help: "Tamaño en píxeles de cada carácter. Cuanto más chico, más caracteres entran y más detalle tiene la imagen, pero menos se distingue cada glifo. Es el compromiso central de todo el efecto: legibilidad del carácter contra resolución de la imagen.")
+            if model.sourceKind != .eye {
+                HStack(spacing: 6) {
+                    Picker("", selection: $model.sourceFill) {
+                        Text("Ajustar").tag(false)
+                        Text("Llenar").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    HelpMark("Qué hacer cuando la fuente y la salida no tienen la misma proporción. Ajustar: la imagen entra completa y lo que sobra queda negro. Llenar: la imagen se agranda hasta cubrir la salida y se recorta lo que se pasa. Con una cámara 16:9 y una salida de 2,11:1 la diferencia es entre dos franjas negras arriba y abajo, o perder los costados. Ajustar es el default porque recortar es perder imagen y eso no debería pasar sin que lo pidas.",
+                             title: "Encuadre de la fuente")
+                }
+            }
+
             ParamReadout(label: "Salida", value: "\(model.config.outputSize.x)×\(model.config.outputSize.y)",
                          help: "Resolución a la que se genera todo. Se fija en Export; el grid se deriva de ella, nunca al revés. Si no divide entero por el tamaño de celda aparece una advertencia con el valor válido más cercano.")
             ParamReadout(label: "Grid", value: "\(model.config.gridSize.x) × \(model.config.gridSize.y)",

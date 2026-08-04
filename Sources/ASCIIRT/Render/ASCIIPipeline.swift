@@ -112,6 +112,8 @@ struct PipelineConfig: Equatable {
     var eyeBlinkColor: SIMD3<Float> = SIMD3(1, 0.85, 0.2)
     var trailTint: Float = 0
     var trailDensity: Float = 1
+    /// `true` = la fuente llena la salida y se recorta lo que sobra.
+    var sourceFill = false
     var eyePulseShape: Float = 0.6
     var eyeFieldNoise: Float = 0.55
     var eyeFieldChurn: Float = 6
@@ -516,10 +518,17 @@ final class ASCIIPipeline {
         let srcW = Float(max(sourceWidth, 1))
         let srcH = Float(max(sourceHeight, 1))
 
-        // Encuadre "fit": la fuente entra completa, lo que sobra queda negro.
-        // Recortar seria perder imagen sin avisar, y esta app trata de no hacer
-        // eso en silencio en ningun lado.
-        let fit = min(outW / srcW, outH / srcH)
+        // Dos encuadres, y la unica diferencia entre ellos es min o max.
+        //
+        // Ajustar: la fuente entra completa y lo que sobra queda negro. Llenar:
+        // la fuente se agranda hasta cubrir la salida y se recorta lo que se
+        // pasa. Con una camara 16:9 y una salida 2.11:1 la diferencia es entre
+        // dos franjas negras arriba y abajo, o perder los costados.
+        //
+        // Ajustar sigue siendo el default: recortar es perder imagen, y eso no
+        // tiene que pasar sin que alguien lo haya pedido.
+        let fit = config.sourceFill ? max(outW / srcW, outH / srcH)
+                                    : min(outW / srcW, outH / srcH)
         let shownW = srcW * fit
         let shownH = srcH * fit
         let originX = (outW - shownW) * 0.5

@@ -267,6 +267,9 @@ final class AppModel: ObservableObject {
 
     @Published var outputPreset: OutputPreset = .source { didSet { sync() } }
 
+    /// Encuadre de la fuente contra la salida. `true` = llenar y recortar.
+    @Published var sourceFill = false { didSet { sync() } }
+
     enum ColorMode: UInt32, CaseIterable, Identifiable {
         case mono = 0
         case duotone = 1
@@ -535,6 +538,7 @@ final class AppModel: ObservableObject {
 
         next.outputSize = outputPreset.size ?? sourceSize
         next.outputFollowsSource = outputPreset == .source
+        next.sourceFill = sourceFill
         next.colorMode = colorMode.rawValue
         next.invert = invert
         next.transparentBackground = transparentBackground
@@ -677,6 +681,7 @@ final class AppModel: ObservableObject {
         preset.exposureLocked = exposureLocked
         preset.exportCodec = exportCodec
         preset.outputPreset = outputPreset.rawValue
+        preset.sourceFill = sourceFill
         preset.colorMode = colorMode.rawValue
         preset.invert = invert
         preset.transparentBackground = transparentBackground
@@ -821,6 +826,7 @@ final class AppModel: ObservableObject {
         exposureLocked = preset.exposureLocked
         exportCodec = preset.exportCodec
         outputPreset = OutputPreset(rawValue: preset.outputPreset) ?? .source
+        sourceFill = preset.sourceFill
         colorMode = ColorMode(rawValue: preset.colorMode) ?? .mono
         invert = preset.invert
         transparentBackground = preset.transparentBackground
@@ -1007,6 +1013,21 @@ final class AppModel: ObservableObject {
             duration = 0
             currentTime = 0
             isPlaying = false
+
+            // La camara arranca en blanco y negro. Los looks del ojo dejan el
+            // color en «Original» porque es la unica forma de que se vea el iris
+            // rojo, y al pasar a camara eso se llevaba puesta la imagen: cada
+            // caracter con el color promedio de su celda, o sea una foto hecha de
+            // letras en vez de codigo. Mono sobre negro es el punto de partida
+            // que uno espera de una camara.
+            //
+            // Se aplica al CAMBIAR a camara, no en cada arranque: si lo hiciera
+            // siempre, un ajuste de color hecho a mano no sobreviviria a cerrar
+            // la app.
+            colorMode = .mono
+            foregroundColor = .white
+            backgroundColor = .black
+
             Task { await startCapture() }
         case .file:
             break // espera a que abran un archivo
