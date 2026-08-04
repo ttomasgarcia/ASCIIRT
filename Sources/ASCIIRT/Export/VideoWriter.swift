@@ -217,6 +217,12 @@ final class VideoWriter {
         guard isRecording, let pool = adaptor?.pixelBufferPool else { return nil }
         var buffer: CVPixelBuffer?
         guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer) == kCVReturnSuccess else {
+            // El pool vacio significa que el codificador todavia tiene todos los
+            // buffers. El frame no se graba, y antes eso no se contaba en ningun
+            // lado: el archivo salia con un frenado y los contadores decian que
+            // no se habia perdido nada. Ahora suma a perdidos.
+            queue.async { self.stats.framesDropped += 1 }
+            publish()
             return nil
         }
         return buffer
@@ -318,6 +324,7 @@ final class VideoWriter {
     }
 
     func finish() async -> Result<URL, AppError> {
+        publish(force: true)
         guard isRecording, let writer, let input else {
             return .failure(AppError(.capture, "No hay grabación en curso."))
         }
@@ -354,7 +361,26 @@ final class VideoWriter {
         DispatchQueue.main.async { [weak self] in self?.onError?(error) }
     }
 
-    private func publish() {
+    /// Ultima vez que se publicaron los contadores a la UI.
+    private var lastPublish: CFTimeInterval = 0
+
+    /// Publica los contadores, como mucho cuatro veces por segundo.
+    ///
+    /// Antes se publicaba en CADA frame escrito. `recordStats` esta publicado en
+    /// el modelo, asi que eso reconstruia el panel entero —cien filas de
+    /// controles con sus ayudas— treinta veces por segundo, en el main thread,
+    /// que es el mismo hilo donde corre el render. De ahi el tironeo al grabar y
+    /// que el archivo saliera con frenadas: los frames se dibujaban tarde.
+    ///
+    /// El renderer ya throttleaba sus propios contadores a 2 Hz por esta misma
+    /// razon; al escritor le habia faltado.
+    ///
+    /// `force` es para el arranque y el cierre, donde el numero final importa
+    /// mas que el ritmo.
+    private func publish(force: Bool = false) {
+        let now = CACurrentMediaTime()
+        guard force || now - lastPublish >= 0.25 else { return }
+        lastPublish = now
         let snapshot = stats
         DispatchQueue.main.async { [weak self] in self?.onStats?(snapshot) }
     }
