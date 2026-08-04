@@ -622,6 +622,8 @@ private struct ControlPanel: View {
             PanelGroupLabel(text: "Rastro", help: "Cuánto sobrevive la imagen del frame anterior, y cómo se deshace. La estela es de caracteres: el disco, el aro y el núcleo del ojo no dejan rastro.")
             ParamSlider(label: "Arrastre", value: $model.trailSeconds, range: 0...3, decimals: 2,
                         help: "Cuánto tarda la cola en apagarse del todo, en segundos. Es el mismo mecanismo que el fósforo de un tubo. Antes este slider mostraba el factor de decaimiento, que es exponencial: de 0 a 0,55 había 138 ms de cola —nada visible— y todo el efecto estaba amontonado en el último 3% del recorrido. En segundos el paso es parejo y el número dice algo. Sirve para cualquier fuente, no sólo el ojo. La duración es real: no cambia con los fps ni al renderizar a otra velocidad.")
+            ParamSlider(label: "Densidad", value: $model.trailDensity, range: 0...1,
+                        help: "Con cuánta fuerza entra cada celda a la cola, respecto de lo que vale en la imagen. En 1 la cola arranca igual de densa que la fuente — que es lo que hacía siempre, y por eso el rastro se veía con el mismo peso pasara lo que pasara. Bajándolo, la celda cae de golpe a un glifo más ralo apenas el frente la deja atrás. Medido con Arrastre en 1 s, pasar de 1 a 0,35 baja las celdas encendidas cerca del ojo de 4,1% a 2,1%. Ojo: el ritmo de apagado no cambia, pero al arrancar más abajo la cola toca el piso antes, así que también llega algo menos lejos — con esos valores, unos 0,3 s menos. No lo toca el macro Cantidad.")
             ParamSlider(label: "Disgregación", value: $model.trailDisperse, range: 0...1,
                         help: "Cuánto varía el desvanecido celda por celda. En 0 la cola baja pareja y se apaga entera; subiéndolo, unas celdas llegan a cero antes que otras y la cola se agujerea a medida que envejece. No la acorta: el alcance máximo lo fija el Arrastre. Es la diferencia entre apagarse y deshacerse.")
 
@@ -630,8 +632,8 @@ private struct ControlPanel: View {
                             help: "De qué color queda la cola. En 0 lo que queda atrás toma el color del código: la estela se lee como caracteres. En 1 conserva el color del ojo, y como el cuerpo del ojo es una masa roja llena, la cola se lee como esa masa corriéndose por la pantalla — que es un efecto muy distinto y bastante más pesado. El valor se aplica por frame, así que en los intermedios el color del ojo sobrevive cerca del frente y se va perdiendo a lo largo del rastro.")
             }
 
-            ParamReadout(label: "Histéresis", value: String(format: "%.2f", model.hysteresisThreshold),
-                         help: "«Cantidad» también la baja al subir la estela: con la cola larga, retener glifos confunde el residuo de la histéresis con el rastro de verdad. El slider está en Temporal, que es donde vive junto al resto de lo temporal.")
+            ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3, decimals: 2,
+                        help: "Cuánto tiene que cambiar la luminancia de una celda para que cambie su carácter, medido en escalones de rampa. Con la cola larga conviene tenerla baja: retener glifos confunde el residuo de la histéresis con el rastro de verdad, y se ve como suciedad que no termina de apagarse. En 0 la salida hierve; por encima de 2 los cambios lentos se atrasan y el movimiento se ve pegajoso. «Cantidad» también la escribe.")
 
 
         }
@@ -1083,8 +1085,8 @@ private struct ControlPanel: View {
             // Arrastre y disgregación se mudaron a la sección Estela, junto con
             // la inercia del ojo: tener el rastro partido en dos secciones
             // obligaba a saltar de una a otra para ajustar una sola cosa.
-            ParamSlider(label: "Histéresis", value: $model.hysteresisThreshold, range: 0...3,
-                        help: "Cuánto tiene que cambiar la luminancia de una celda para que cambie su carácter, medido en escalones de rampa. En 0 la salida hierve: la luz oscila unas milésimas y el glifo cambia todo el tiempo. Por encima de 2 los cambios lentos se atrasan y el movimiento se ve pegajoso.")
+            ParamReadout(label: "Histéresis", value: String(format: "%.2f", model.hysteresisThreshold),
+                         help: "Cuánto tiene que cambiar la luminancia de una celda para que cambie su carácter, medido en escalones de rampa. El slider vive en Estela, porque es ahí donde se lo toca: con la cola larga, retener glifos confunde el residuo con el rastro de verdad.")
 
             // Todo este grupo existe para pelear contra una exposicion que se
             // mueve sola. La fuente generativa produce la misma luminancia todos

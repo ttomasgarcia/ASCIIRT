@@ -65,6 +65,7 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexEyeMask = 21,  ///< R8 mascara del interior del ojo, a resolucion completa
     ASCIIRTTextureIndexEyeTrailPrev = 22, ///< RGBA8 color+cuerpo del ojo arrastrado, frame anterior
     ASCIIRTTextureIndexEyeTrailNext = 23, ///< RGBA8 color+cuerpo del ojo arrastrado, este frame
+    ASCIIRTTextureIndexTrailOut = 24, ///< R16F lo que ven las etapas de abajo: fuente + rastro
 };
 
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
@@ -376,6 +377,18 @@ typedef struct {
     /// saber si la mascara del interior del ojo tiene contenido valido: con
     /// camara o archivo esa textura no se escribe.
     uint32_t generative;
+
+    /// Con cuanta fuerza entra cada celda al rastro, respecto de su valor en la
+    /// imagen. En 1 la cola arranca igual de densa que la fuente —que es lo que
+    /// hacia siempre— y por eso el rastro se veia con el mismo peso pase lo que
+    /// pase. Bajandolo, la celda cae de golpe a un glifo mas ralo apenas el
+    /// frente la deja atras, y de ahi se apaga normalmente. El ritmo de apagado
+    /// no cambia, pero al arrancar mas abajo la cola toca el piso antes, asi que
+    /// bajar la densidad tambien acorta un poco el alcance.
+    ///
+    /// Escala lo que ENTRA al rastro y no lo que sale. Escalar la salida se
+    /// compondria frame a frame y terminaria siendo otro control de duracion.
+    float trailDensity;
 } RenderParams;
 
 #endif /* RenderParams_h */

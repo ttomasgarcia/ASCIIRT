@@ -111,6 +111,7 @@ struct PipelineConfig: Equatable {
     var eyeBlinkSoftness: Float = 0.35
     var eyeBlinkColor: SIMD3<Float> = SIMD3(1, 0.85, 0.2)
     var trailTint: Float = 0
+    var trailDensity: Float = 1
     var eyePulseShape: Float = 0.6
     var eyeFieldNoise: Float = 0.55
     var eyeFieldChurn: Float = 6
@@ -409,8 +410,13 @@ final class ASCIIPipeline {
             encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
             encoder.setTexture(trailTextures[1 - trailIndex], index: Int(ASCIIRTTextureIndexTrailPrev.rawValue))
             encoder.setTexture(trailTextures[trailIndex], index: Int(ASCIIRTTextureIndexTrailNext.rawValue))
+            // El estado del rastro y lo que ven las etapas de abajo son cosas
+            // distintas: el estado guarda la cola atenuada por la densidad y la
+            // salida combina esa cola con la fuente a fuerza plena. Con una sola
+            // textura, la densidad le pegaria tambien al ojo del frame actual.
+            encoder.setTexture(trailTextures[2], index: Int(ASCIIRTTextureIndexTrailOut.rawValue))
             encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: trailPSO))
-            encoder.setTexture(trailTextures[trailIndex], index: Int(ASCIIRTTextureIndexGrid.rawValue))
+            encoder.setTexture(trailTextures[2], index: Int(ASCIIRTTextureIndexGrid.rawValue))
         }
 
         // [4][5][6] Bordes. Solo si estan activos: son las tres etapas mas caras
@@ -615,7 +621,8 @@ final class ASCIIPipeline {
                             trailTint: config.trailTint,
                             eyePulseShape: config.eyePulseShape,
                             trailDeltaScale: frameScale,
-                            generative: config.generative ? 1 : 0)
+                            generative: config.generative ? 1 : 0,
+                            trailDensity: config.trailDensity)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se
@@ -713,7 +720,7 @@ final class ASCIIPipeline {
         let color = try make(.rgba8Unorm, width, height, "color")
         let gridColor = try make(.rgba8Unorm, Int(grid.x), Int(grid.y), "gridColor")
         let eyeMask = try make(.r8Unorm, width, height, "eyeMask")
-        let trail = try (0..<2).map { try make(.r16Float, Int(grid.x), Int(grid.y), "trail\($0)") }
+        let trail = try (0..<3).map { try make(.r16Float, Int(grid.x), Int(grid.y), "trail\($0)") }
         let eyeTrail = try (0..<2).map { try make(.rgba8Unorm, width, height, "eyeTrail\($0)") }
         let dogTemp = try make(.rg16Float, width, height, "dogTemp")
         let dog = try make(.r16Float, width, height, "dog")

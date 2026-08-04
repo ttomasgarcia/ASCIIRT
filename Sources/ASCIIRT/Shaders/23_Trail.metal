@@ -23,6 +23,7 @@ kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCII
                         texture2d<float, access::read>  eyeMask  [[texture(ASCIIRTTextureIndexEyeMask)]],
                         texture2d<float, access::read>  previous [[texture(ASCIIRTTextureIndexTrailPrev)]],
                         texture2d<float, access::write> next     [[texture(ASCIIRTTextureIndexTrailNext)]],
+                        texture2d<float, access::write> out      [[texture(ASCIIRTTextureIndexTrailOut)]],
                         constant RenderParams &params [[buffer(ASCIIRTBufferIndexRenderParams)]],
                         uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= params.gridSize.x || gid.y >= params.gridSize.y) { return; }
@@ -76,8 +77,19 @@ kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCII
         inside = eyeMask.read(centre).r;
     }
 
+    // La densidad atenua lo que ENTRA al rastro. La celda cae a un glifo mas
+    // ralo apenas el frente la deja atras, y de ahi se apaga al ritmo de
+    // siempre. Como arranca mas abajo, tambien toca el piso antes: bajar la
+    // densidad acorta un poco el alcance ademas de aligerar la cola.
+    const float entering = current * params.trailDensity;
+    float state = mix(max(entering, faded), entering, inside);
+
     // Por debajo de medio escalon el glifo ya es el mas ralo de la rampa; dejar
     // decimales invisibles solo posterga el apagado.
-    const float value = mix(max(current, faded), current, inside);
-    next.write(float4(value > step * 0.5 ? value : 0.0), gid);
+    state = state > step * 0.5 ? state : 0.0;
+    next.write(float4(state), gid);
+
+    // Lo que ven las etapas de abajo lleva la fuente a fuerza plena: la densidad
+    // es de la cola, no del frame actual.
+    out.write(float4(max(current, state)), gid);
 }
