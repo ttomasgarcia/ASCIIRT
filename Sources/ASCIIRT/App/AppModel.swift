@@ -1039,13 +1039,36 @@ final class AppModel: ObservableObject {
         matte.isEnabled = subjectMatteEnabled
     }
 
+    /// Enumera camaras FUERA del main thread.
+    ///
+    /// `AVCaptureDevice.DiscoverySession` incluye la Continuity Camera, y la
+    /// primera enumeracion con un iPhone cerca puede tardar lo suficiente como
+    /// para que la ventana deje de responder. Corriendo en main, eso se ve como
+    /// que la app se colgo justo al pasar a modo camara.
     func refreshCameras() {
-        cameras = CameraSource.availableCameras()
+        Task.detached(priority: .userInitiated) {
+            let found = CameraSource.availableCameras()
+            await MainActor.run { self.applyCameras(found) }
+        }
+    }
+
+    @MainActor
+    private func applyCameras(_ found: [CameraInfo]) {
+        cameras = found
         if selectedCameraID == nil || !cameras.contains(where: { $0.id == selectedCameraID }) {
             selectedCameraID = cameras.first?.id
         }
     }
 
+    /// En main a proposito.
+    ///
+    /// `AppModel` no es un actor, asi que un `Task { await startCapture() }`
+    /// lanzado desde el cambio de fuente corria en la pool concurrente y este
+    /// metodo escribia `permissionDenied`, `isRunning`, `cameras` y
+    /// `selectedCameraID` —todas publicadas— desde un hilo de fondo. Publicar
+    /// fuera de main es comportamiento indefinido en SwiftUI y se manifiesta
+    /// como cuelgues.
+    @MainActor
     func startCapture() async {
         guard sourceKind == .camera else { return }
         guard await CameraSource.requestAccess() else {
