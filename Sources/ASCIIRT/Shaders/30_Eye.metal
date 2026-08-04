@@ -107,7 +107,8 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // significa lo mismo con la frecuencia en 1 que en 20. Media longitud de onda
     // ya alcanza para que dos partes del mismo frente esten en oposicion.
     const float wavelength = 1.0 / max(params.eyePulseFrequency, 1e-3);
-    const float warp = fbm3(float3(p * 2.6, params.time * 0.13));
+
+    const float warp = quasiField(p * 2.6, params.time);
     const float rw = r + warp * shape * wavelength * 0.60;
 
     // Dos octavas radiales. La segunda va a 1.7 veces la frecuencia y 0.63 veces
@@ -122,7 +123,9 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // lento, hace que el pulso sea fuerte en unas zonas y casi nulo en otras. Sin
     // esto el frente ya sale irregular pero late todo a la vez, que sigue
     // delatando que atras hay una sola funcion.
-    const float breakup = fbm3(float3(p * 1.1 + 31.7, params.time * 0.07));
+    // El mismo campo a otra escala y otra velocidad, corrido para que no quede
+    // correlacionado con el que deforma el frente.
+    const float breakup = quasiField(p * 1.1 + 31.7, params.time * 0.54);
     const float wave = waveRaw * mix(1.0, saturate(0.55 + breakup), shape);
 
     // La envolvente arranca de la forma del halo —no de su intensidad— asi que

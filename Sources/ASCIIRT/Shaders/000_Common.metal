@@ -38,54 +38,23 @@ static inline float hash21(uint2 p) {
     return hash11(mixHash(p.x) ^ (p.y * 0x9e3779b9u));
 }
 
-/// Hash de un punto entero del reticulado 3D, en -1..1.
-static inline float latticeHash3(int3 p) {
-    const uint h = mixHash(uint(p.x * 73856093) ^ mixHash(uint(p.y * 19349663))
-                           ^ mixHash(uint(p.z * 83492791)));
-    return hash11(h) * 2.0 - 1.0;
-}
-
-/// Ruido de valor 3D. Reticulado entero, valor al azar en cada nodo e
-/// interpolacion con la quintica de Perlin (6t^5-15t^4+10t^3), que tiene primera
-/// y segunda derivada nulas en los nodos: con interpolacion cubica se ven las
-/// aristas del reticulado como una grilla tenue, que es justo lo que hay que
-/// evitar cuando el objetivo es que no se note el patron.
-static inline float valueNoise3(float3 p) {
-    const float3 i = floor(p);
-    const float3 f = p - i;
-    const float3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-    const int3 c = int3(i);
-
-    const float n000 = latticeHash3(c + int3(0,0,0));
-    const float n100 = latticeHash3(c + int3(1,0,0));
-    const float n010 = latticeHash3(c + int3(0,1,0));
-    const float n110 = latticeHash3(c + int3(1,1,0));
-    const float n001 = latticeHash3(c + int3(0,0,1));
-    const float n101 = latticeHash3(c + int3(1,0,1));
-    const float n011 = latticeHash3(c + int3(0,1,1));
-    const float n111 = latticeHash3(c + int3(1,1,1));
-
-    const float x00 = mix(n000, n100, u.x);
-    const float x10 = mix(n010, n110, u.x);
-    const float x01 = mix(n001, n101, u.x);
-    const float x11 = mix(n011, n111, u.x);
-    return mix(mix(x00, x10, u.y), mix(x01, x11, u.y), u.z);
-}
-
-/// Tres octavas de ruido de valor, en -1..1 aproximadamente.
+/// Campo suave y sin periodo visible, para deformar cosas.
 ///
-/// El salto de frecuencia es 2.13 y no 2: con el 2 exacto los nodos de las
-/// octavas caen unos encima de otros cada dos niveles y el reticulado vuelve a
-/// aparecer. Con un salto irracional las octavas nunca se alinean.
-static inline float fbm3(float3 p) {
-    float sum = 0.0;
-    float amplitude = 0.5;
-    float total = 0.0;
-    for (int o = 0; o < 3; ++o) {
-        sum += valueNoise3(p) * amplitude;
-        total += amplitude;
-        p = p * 2.13 + 17.3;
-        amplitude *= 0.5;
-    }
-    return sum / max(total, 1e-5);
+/// Cuatro ondas planas en direcciones y frecuencias inconmensurables entre si
+/// —las frecuencias son potencias de la proporcion aurea—. La suma de ondas con
+/// razones irracionales es cuasiperiodica: no vuelve a alinearse nunca, que es
+/// exactamente la propiedad que hace falta cuando lo que se quiere es que no se
+/// note el patron.
+///
+/// Reemplaza a un ruido de valor fractal de tres octavas. El ruido era mejor en
+/// teoria y peor en la practica: veinticuatro consultas al reticulado por
+/// muestra, dos muestras por pixel, a resolucion completa. Medido, costaba 40%
+/// del tiempo de frame. Esto cuesta cuatro senos y reparte la energia angular
+/// incluso mejor (42% en los tres primeros armonicos contra 58% del ruido).
+static inline float quasiField(float2 p, float t) {
+    float s = sin(( p.x               ) * kTau * 1.000 + t * 0.130 * kTau) * 0.40;
+    s      += sin(( p.x * 0.309 + p.y * 0.951) * kTau * 1.618 - t * 0.098 * kTau) * 0.30;
+    s      += sin((-p.x * 0.809 + p.y * 0.588) * kTau * 2.618 + t * 0.071 * kTau) * 0.19;
+    s      += sin((-p.x * 0.588 - p.y * 0.809) * kTau * 4.236 + t * 0.113 * kTau) * 0.11;
+    return s;
 }
