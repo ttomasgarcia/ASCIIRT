@@ -37,6 +37,19 @@ final class MetalContext {
         self.library = try ShaderLibrary.makeLibrary(device: device)
     }
 
+    /// Suelta las texturas del cache que ya nadie usa.
+    ///
+    /// `CVMetalTextureCache` no libera nada por su cuenta: acumula las texturas
+    /// que fue creando hasta que se le pide que las revise. Sin esta llamada la
+    /// memoria sube sostenido mientras corre un video —medido, unos 15 MB por
+    /// minuto con material 1080p— y con un archivo en loop eso no para nunca.
+    ///
+    /// Va DESPUES de que el command buffer termino: el cache solo suelta lo que
+    /// no tiene referencias vivas, asi que llamarlo antes no libera nada.
+    func flushTextureCache() {
+        CVMetalTextureCacheFlush(textureCache, 0)
+    }
+
     /// Envuelve un CVPixelBuffer BGRA como MTLTexture sin copiar.
     ///
     /// El CVMetalTexture devuelto tiene que seguir vivo mientras el command

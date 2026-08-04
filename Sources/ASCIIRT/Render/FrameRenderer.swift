@@ -293,6 +293,10 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
                 // Los tiempos de GPU los llena Metal recien al completarse. El
                 // handler corre en una cola interna, asi que se acumula y el
                 // promedio se calcula en el tick, que ya esta en main.
+                // El cache de texturas no suelta nada solo. Se lo revisa aca,
+                // con el frame ya terminado y las referencias liberadas.
+                self?.context.flushTextureCache()
+
                 let elapsed = buffer.gpuEndTime - buffer.gpuStartTime
                 if elapsed > 0 {
                     DispatchQueue.main.async {
