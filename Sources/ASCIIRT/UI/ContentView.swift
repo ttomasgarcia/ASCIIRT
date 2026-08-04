@@ -128,6 +128,13 @@ struct ContentView: View {
     private var hud: some View {
         HStack(spacing: 10) {
             Label(String(format: "%.0f fps", model.stats.displayedFPS), systemImage: "speedometer")
+            // El tiempo de GPU al lado de los fps. Con archivo, los fps son los
+            // del video —el preview dibuja cuando llega un cuadro— asi que solos
+            // no dicen si la app llega o no. Los milisegundos si.
+            if model.stats.gpuMilliseconds > 0 {
+                Text(String(format: "%.1f ms", model.stats.gpuMilliseconds))
+                    .foregroundStyle(model.stats.gpuMilliseconds > 12 ? .orange : .secondary)
+            }
             Text("\(model.config.gridSize.x)×\(model.config.gridSize.y)")
             if model.stats.droppedFrames > 0 {
                 Label("\(model.stats.droppedFrames)", systemImage: "arrow.down.right.circle")

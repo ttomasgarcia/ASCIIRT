@@ -14,6 +14,15 @@ struct RenderStats: Equatable {
     /// antes de llegar a dibujarse. En Live esto es aceptable (spec §6); el
     /// numero esta para que sea visible, no para alarmar.
     var droppedFrames: Int = 0
+
+    /// Cuanto tarda la GPU en un frame, promediado.
+    ///
+    /// Existe porque los fps solos mienten segun la fuente: con un archivo el
+    /// preview dibuja cuando llega un cuadro nuevo, asi que el contador muestra
+    /// la tasa DEL VIDEO y no lo que la app da de si. Un video de 8 fps se ve
+    /// como «8 fps» y parece que la app va lenta cuando en realidad esta
+    /// esperando. Con el tiempo de GPU al lado se distingue de un vistazo.
+    var gpuMilliseconds: Double = 0
 }
 
 /// Renderer del preview: corre el pipeline ASCII y hace la etapa [9] hacia el
@@ -87,6 +96,8 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
     private weak var view: MTKView?
 
     private var stats = RenderStats()
+    private var gpuTimeSum: Double = 0
+    private var gpuTimeCount = 0
     private var framesSinceTick = 0
     private var lastStatsTick = CACurrentMediaTime()
     private var lastDrawTime: CFTimeInterval?
@@ -273,11 +284,21 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
 
             // El CVMetalTexture tiene que sobrevivir a la ejecucion en GPU; la
             // captura en el completion handler es lo que lo mantiene vivo.
-            commandBuffer.addCompletedHandler { [weak self] _ in
+            commandBuffer.addCompletedHandler { [weak self] buffer in
                 _ = keepAlive
                 _ = recordedKeepAlive
                 if let recordedBuffer {
                     self?.writer?.append(recordedBuffer, at: frameTime)
+                }
+                // Los tiempos de GPU los llena Metal recien al completarse. El
+                // handler corre en una cola interna, asi que se acumula y el
+                // promedio se calcula en el tick, que ya esta en main.
+                let elapsed = buffer.gpuEndTime - buffer.gpuStartTime
+                if elapsed > 0 {
+                    DispatchQueue.main.async {
+                        self?.gpuTimeSum += elapsed * 1000
+                        self?.gpuTimeCount += 1
+                    }
                 }
             }
             commandBuffer.present(drawable)
@@ -298,6 +319,11 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
         guard elapsed >= 0.5 else { return }
 
         stats.displayedFPS = Double(framesSinceTick) / elapsed
+        if gpuTimeCount > 0 {
+            stats.gpuMilliseconds = gpuTimeSum / Double(gpuTimeCount)
+            gpuTimeSum = 0
+            gpuTimeCount = 0
+        }
         framesSinceTick = 0
         lastStatsTick = now
         onStats?(stats)
