@@ -616,8 +616,8 @@ private struct ControlPanel: View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
             ParamSlider(label: "Cantidad", value: $model.trailMacro, range: 0...1,
                         help: model.sourceKind == .eye
-                            ? "El control rápido: mueve a la vez el arrastre, la disgregación y la inercia del ojo. 0 apaga la estela y devuelve todo a su valor neutro. Subiéndolo, la imagen del frame anterior dura más y el ojo se vuelve más pesado, así que el rastro se estira. Después podés retocar cualquiera a mano; no los vuelve a pisar hasta que lo muevas de nuevo."
-                            : "El control rápido: escribe el arrastre y la disgregación de una vez, y baja la histéresis para acompañar. 0 apaga la estela. Con cámara o archivo la estela es sólo el eco del frame anterior — la parte de inercia del control es del ojo y no hace nada acá.")
+                            ? "El control rápido: escribe de una vez el arrastre, la disgregación y la histéresis. 0 apaga la estela. Después podés retocar cualquiera a mano; no los vuelve a pisar hasta que lo muevas de nuevo. No toca la inercia del ojo: eso es del recorrido y vive en los presets de movimiento."
+                            : "El control rápido: escribe el arrastre y la disgregación de una vez, y baja la histéresis para acompañar. 0 apaga la estela.")
 
             PanelGroupLabel(text: "Rastro", help: "Cuánto sobrevive la imagen del frame anterior, y cómo se deshace. La estela es de caracteres: el disco, el aro y el núcleo del ojo no dejan rastro.")
             ParamSlider(label: "Arrastre", value: $model.trailSeconds, range: 0...3, decimals: 2,
@@ -633,12 +633,7 @@ private struct ControlPanel: View {
             ParamReadout(label: "Histéresis", value: String(format: "%.2f", model.hysteresisThreshold),
                          help: "«Cantidad» también la baja al subir la estela: con la cola larga, retener glifos confunde el residuo de la histéresis con el rastro de verdad. El slider está en Temporal, que es donde vive junto al resto de lo temporal.")
 
-            if model.sourceKind == .eye {
-                Text("«Cantidad» también escribe la rigidez y el rozamiento, que están en Ojo · movimiento.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+
         }
     }
 

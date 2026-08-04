@@ -1,0 +1,82 @@
+{
+  "name": "01 Fósforo",
+  "scope": "look",
+  "sourceKind": "Ojo",
+  "colorMode": 2,
+  "eyeRadius": 0.16,
+  "eyeCoreRadius": 0.24,
+  "eyeFalloff": 3.0,
+  "eyeRingWidth": 0.055,
+  "eyeRingIntensity": 0.9,
+  "eyeHaloRadius": 0.46,
+  "eyeHaloIntensity": 0.16,
+  "eyeIris": [
+    0.95,
+    0.1,
+    0.05
+  ],
+  "eyeIrisOuter": [
+    0.28,
+    0.02,
+    0.06
+  ],
+  "eyeGradientMode": 0,
+  "eyeGradientCycles": 1.0,
+  "eyeGradientSpeed": 0.1,
+  "eyeCoreColor": [
+    1,
+    1,
+    1
+  ],
+  "eyeCoreBlend": 0.9,
+  "eyeHollow": false,
+  "eyeBlinkEnabled": false,
+  "eyeBlinkRate": 1.0,
+  "eyeBlinkDuty": 0.18,
+  "eyeBlinkSoftness": 0.35,
+  "eyeBlinkColor": [
+    1,
+    0.85,
+    0.2
+  ],
+  "eyeBreathAmount": 0.03,
+  "eyeBreathSpeed": 0.1,
+  "eyePulseAmount": 0.1,
+  "eyePulseSpeed": 0.12,
+  "eyePulseFrequency": 3.5,
+  "eyePulseDecay": 3.0,
+  "eyePulseShape": 0.6,
+  "eyeSolidAmount": 0.35,
+  "eyeSolidGain": 1.15,
+  "eyeSolidEdge": 0.25,
+  "tileWidth": 8,
+  "aspectFollowsFont": true,
+  "asciiEnabled": true,
+  "charset": " .'`^\",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+  "excluded": "",
+  "fontSystemName": "Menlo-Regular",
+  "edgesEnabled": true,
+  "edgeThreshold": 0.12,
+  "dogSigma1": 0.8,
+  "dogSigma2": 2.4,
+  "dogTau": 0.9,
+  "hysteresisThreshold": 0.35,
+  "eyeFieldNoise": 0.45,
+  "eyeFieldChurn": 2.0,
+  "trailMacro": 0.0,
+  "trailDecay": 0.9334,
+  "trailDisperse": 0.0,
+  "trailTint": 0.0,
+  "matrixEnabled": false,
+  "invert": false,
+  "foreground": [
+    1,
+    1,
+    1
+  ],
+  "background": [
+    0,
+    0,
+    0
+  ]
+}

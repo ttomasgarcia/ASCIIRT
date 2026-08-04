@@ -20,6 +20,7 @@
 using namespace metal;
 
 kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCIIRTTextureIndexGrid)]],
+                        texture2d<float, access::read>  eyeMask  [[texture(ASCIIRTTextureIndexEyeMask)]],
                         texture2d<float, access::read>  previous [[texture(ASCIIRTTextureIndexTrailPrev)]],
                         texture2d<float, access::write> next     [[texture(ASCIIRTTextureIndexTrailNext)]],
                         constant RenderParams &params [[buffer(ASCIIRTBufferIndexRenderParams)]],
@@ -60,8 +61,23 @@ kernel void trailKernel(texture2d<float, access::read>  grid     [[texture(ASCII
 
     const float faded = max(previous.read(gid).r * localDecay - step * 0.05 * params.trailDeltaScale - extraFloor, 0.0);
 
+    // Adentro del ojo la estela no se ve: un objeto tapa su propio pasado.
+    //
+    // El rastro se queda con el MAXIMO entre lo que hay ahora y lo que quedaba.
+    // El interior del iris es oscuro, asi que cuando el aro brillante pasa por
+    // encima y sigue de largo, el maximo conserva ese brillo dentro del circulo
+    // y se ve como si las generaciones viejas de la estela flotaran arriba del
+    // centro. Anulando el rastro donde la mascara dice que estamos adentro del
+    // aro, el ojo se tapa a si mismo y la cola queda solo por fuera.
+    float inside = 0.0;
+    if (params.generative != 0u) {
+        const uint2 centre = min(gid * params.tileSize + params.tileSize / 2u,
+                                 params.outputSize - uint2(1u));
+        inside = eyeMask.read(centre).r;
+    }
+
     // Por debajo de medio escalon el glifo ya es el mas ralo de la rampa; dejar
     // decimales invisibles solo posterga el apagado.
-    const float value = max(current, faded);
+    const float value = mix(max(current, faded), current, inside);
     next.write(float4(value > step * 0.5 ? value : 0.0), gid);
 }

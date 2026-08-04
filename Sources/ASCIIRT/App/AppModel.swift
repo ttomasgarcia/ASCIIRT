@@ -153,7 +153,7 @@ final class AppModel: ObservableObject {
     @Published var trailMacro: Double = 0 { didSet { applyTrailMacro() } }
 
     /// Valores neutros a los que vuelve el macro en 0.
-    private static let neutralTrail = (decay: 0.0, stiffness: 18.0, damping: 5.5, hysteresis: 0.75)
+    private static let neutralTrail = (decay: 0.0, hysteresis: 0.75)
 
     private func applyTrailMacro() {
         // Al cargar un preset los cuatro parametros ya vienen guardados; dejar
@@ -174,12 +174,9 @@ final class AppModel: ObservableObject {
         // frames. Con frames < 1 da practicamente 0, o sea sin estela.
         trailDecay = frames < 0.5 ? 0 : pow(0.007, 1.0 / frames)
 
-        // Menos resorte y menos rozamiento: el ojo va mas atras del objetivo y
-        // se pasa al llegar, con lo que el campo se estira mientras viaja. Es la
-        // otra mitad de la sensacion de estela, y sin esto el arrastre solo se
-        // ve como un eco y no como movimiento.
-        eyeStiffness = n.stiffness + (6.0 - n.stiffness) * t
-        eyeDamping = n.damping + (2.6 - n.damping) * t
+        // Ya NO toca la inercia del ojo. La inercia es del recorrido y vive en
+        // los presets de movimiento; que un control del look la reescribiera
+        // hacia que cambiar de aspecto te moviera el ojo de otra manera.
 
         // La disgregacion entra despues del primer tercio: con colas cortas
         // desarmar no se llega a ver, solo ensucia el borde de la estela.
@@ -770,20 +767,12 @@ final class AppModel: ObservableObject {
             gazeStops = preset.gazeStops
             eyeClampToScreen = preset.eyeClampToScreen
 
-            // Fisica, temblor y estela van con el movimiento y no con el look.
-            // La estela solo existe cuando algo se mueve, y los cuatro valores
-            // que escribe el macro «Cantidad» —arrastre, disgregacion, rigidez y
-            // rozamiento— tienen que viajar juntos: repartidos entre los dos
-            // alcances, cargar un look con cola larga contra un movimiento rigido
-            // daba eco sin estiramiento, que no es ninguno de los dos efectos.
+            // La fisica y el temblor son el RECORRIDO: por donde va el ojo y
+            // como viaja. Van con el movimiento.
             eyeStiffness = preset.eyeStiffness
             eyeDamping = preset.eyeDamping
             eyeDriftAmount = preset.eyeDriftAmount
             eyeDriftSpeed = preset.eyeDriftSpeed
-            trailDecay = preset.trailDecay
-            trailMacro = preset.trailMacro
-            trailDisperse = preset.trailDisperse
-            trailTint = preset.trailTint
                     if preset.eyeCenter.count >= 2 {
                 eyeCenter = CGPoint(x: preset.eyeCenter[0], y: preset.eyeCenter[1])
                 renderer.ascii.eyeMotion.snap(to: SIMD2(Float(preset.eyeCenter[0]),
@@ -855,6 +844,13 @@ final class AppModel: ObservableObject {
         eyeSolidAmount = preset.eyeSolidAmount
         eyeSolidGain = preset.eyeSolidGain
         eyeSolidEdge = preset.eyeSolidEdge
+        // La estela es como se ve el codigo a lo largo del tiempo, no por donde
+        // pasa el ojo: dos looks distintos sobre el mismo recorrido tienen que
+        // poder dejar rastros distintos.
+        trailDecay = preset.trailDecay
+        trailMacro = preset.trailMacro
+        trailDisperse = preset.trailDisperse
+        trailTint = preset.trailTint
         eyeHollow = preset.eyeHollow
         eyeGradientMode = preset.eyeGradientMode
         eyeGradientSpeed = preset.eyeGradientSpeed

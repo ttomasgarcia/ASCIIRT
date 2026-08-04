@@ -18,6 +18,7 @@
 using namespace metal;
 
 kernel void eyeTrailKernel(texture2d<float, access::read>  current  [[texture(ASCIIRTTextureIndexColor)]],
+                           texture2d<float, access::read>  eyeMask  [[texture(ASCIIRTTextureIndexEyeMask)]],
                            texture2d<float, access::read>  previous [[texture(ASCIIRTTextureIndexEyeTrailPrev)]],
                            texture2d<float, access::write> next     [[texture(ASCIIRTTextureIndexEyeTrailNext)]],
                            constant RenderParams &params [[buffer(ASCIIRTBufferIndexRenderParams)]],
@@ -48,7 +49,11 @@ kernel void eyeTrailKernel(texture2d<float, access::read>  current  [[texture(AS
     const float localDecay = params.trailDecay;
     const float extraFloor = params.trailDisperse * jitter * step * 0.25 * params.trailDeltaScale;
 
-    const float faded = max(old.a * localDecay - step * params.trailDeltaScale - extraFloor, 0.0);
+    // Igual que en el rastro del grid: adentro del aro el ojo tapa su propia
+    // cola, si no el color de las generaciones viejas se cuela por el interior.
+    const float inside = eyeMask.read(gid).r;
+    const float faded = max(old.a * localDecay - step * params.trailDeltaScale - extraFloor, 0.0)
+                      * (1.0 - inside);
 
     // El color de lo que queda atras se va hacia el color del codigo. Se aplica
     // por frame, asi que la caida es exponencial: con el tinte en 0 la cola es

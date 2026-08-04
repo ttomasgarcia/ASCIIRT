@@ -406,6 +406,7 @@ final class ASCIIPipeline {
         if config.trailDecay > 0 {
             trailIndex = 1 - trailIndex
             encoder.setComputePipelineState(trailPSO)
+            encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
             encoder.setTexture(trailTextures[1 - trailIndex], index: Int(ASCIIRTTextureIndexTrailPrev.rawValue))
             encoder.setTexture(trailTextures[trailIndex], index: Int(ASCIIRTTextureIndexTrailNext.rawValue))
             encoder.dispatchThreads(gridThreads, threadsPerThreadgroup: threadgroup(for: trailPSO))
@@ -613,7 +614,8 @@ final class ASCIIPipeline {
                             eyeBlinkB: config.eyeBlinkColor.z,
                             trailTint: config.trailTint,
                             eyePulseShape: config.eyePulseShape,
-                            trailDeltaScale: frameScale)
+                            trailDeltaScale: frameScale,
+                            generative: config.generative ? 1 : 0)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

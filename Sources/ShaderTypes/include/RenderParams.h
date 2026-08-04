@@ -371,6 +371,11 @@ typedef struct {
     /// El factor de decaimiento ya viene corregido desde la CPU; esto escala los
     /// pisos que se restan por frame, que son la otra mitad del apagado.
     float trailDeltaScale;
+
+    /// 1 cuando la imagen la genera el ojo. Lo miran las etapas de estela para
+    /// saber si la mascara del interior del ojo tiene contenido valido: con
+    /// camara o archivo esa textura no se escribe.
+    uint32_t generative;
 } RenderParams;
 
 #endif /* RenderParams_h */
