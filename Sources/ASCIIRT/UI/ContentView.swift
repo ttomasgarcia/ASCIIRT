@@ -1234,6 +1234,10 @@ private struct ControlPanel: View {
                         help: model.chatMode == .single
                             ? "Cuánto dura cada mensaje de punta a punta: entrada, permanencia y salida. Se mide así y no como tiempo entre mensajes porque si no, subir la duración de la animación acortaría el tiempo de lectura sin avisar. La animación tiene un techo de un tercio del ciclo, para que el mensaje siempre llegue a quedarse quieto."
                             : "Segundos entre la llegada de un mensaje y la del siguiente. Es el ritmo de la conversación: valores altos dan pausas de lectura, valores bajos hacen que se amontonen como cuando alguien escribe rápido.")
+            if model.chatMode == .single {
+                ParamSlider(label: "Pausa", value: $model.chatPause, range: 0...10, decimals: 2,
+                            help: "Cuánto queda la pantalla vacía entre un mensaje y el siguiente. En 0 el próximo entra apenas se fue el anterior, sin respiro. Es aparte del Ciclo: el Ciclo es cuánto dura el mensaje en pantalla —entrada, permanencia y salida— y la Pausa es el hueco después. Sumados dan el tiempo de mensaje a mensaje. En modo Pila no aparece porque ahí nada se va: el Intervalo ya es el tiempo entre una llegada y la siguiente.")
+            }
             ParamSlider(label: "Duración", value: $model.chatDuration, range: 0.05...3, decimals: 2,
                         help: "Cuánto tarda el MOVIMIENTO de entrada. Con Rebote es el tiempo de respuesta del resorte —cuánto tarda en llegar— y el resorte se sigue asentando un poco después, como corresponde. No toca la opacidad: eso es Fundido. Con «Se escribe» es cuánto tarda en terminar de tipearse el mensaje entero.")
             ParamSlider(label: "Fundido entrada", value: $model.chatFadeIn, range: 0.0...2, decimals: 2,
@@ -1266,6 +1270,18 @@ private struct ControlPanel: View {
                         help: "Al terminar el último mensaje vuelve a empezar la conversación. Para un loop de sala conviene encendido; para un pase único, apagado.")
 
             PanelGroupLabel(text: "Forma", help: "Tamaño del texto y del globo, todo medido en celdas.")
+            HStack(spacing: 6) {
+                Picker("", selection: $model.chatShape) {
+                    ForEach(ChatBubbleShape.allCases) { s in Text(s.label).tag(s) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Recto es un rectángulo lleno. Redondeado saca la casilla de cada esquina: en una grilla de caracteres no hay curva posible, así que el redondeo es un recorte en escalera — y a escala 2 o más ya se lee como globo. El recorte es de una casilla, o sea que crece con la Escala.",
+                         title: "Forma del globo")
+            }
+            ParamToggle(label: "Piquito", isOn: $model.chatTail,
+                        help: "Agrega la puntita del globo de diálogo, abajo a la izquierda — del mismo lado por el que se alinean los globos. También en escalera: dos casillas y después una, que es lo que en una grilla se lee como la punta que apunta a quien habla.")
             ParamSlider(label: "Escala", value: $model.chatScale, range: 1...6, decimals: 0,
                         help: "Cuántas celdas ocupa cada letra por lado. En 1 el texto es del tamaño de un carácter del ASCII y se mezcla con el fondo; subiéndolo el mensaje se despega y se lee de lejos, que es lo que hace falta proyectando. Todo el maquetado vive en una grilla de este tamaño, así que los globos siempre caen alineados entre sí.")
             ParamSlider(label: "Ancho", value: $model.chatColumns, range: 8...80, decimals: 0,
@@ -1273,7 +1289,7 @@ private struct ControlPanel: View {
             ParamSlider(label: "Margen interno", value: $model.chatPadX, range: 0...6, decimals: 0,
                         help: "Cuántos caracteres de aire quedan entre el texto y el borde del globo, a cada lado.")
             ParamSlider(label: "Separación", value: $model.chatGap, range: 0...6, decimals: 0,
-                        help: "Cuánto espacio queda entre un globo y el siguiente.")
+                        help: "Cuánto espacio queda entre un globo y el siguiente, en casillas. Con el piquito encendido el mínimo pasa a 3, porque la punta baja dos casillas por debajo del globo y si no se le monta al mensaje de abajo.")
             ParamSlider(label: "Margen izq.", value: $model.chatMarginLeft, range: 0...30, decimals: 0,
                         help: "Distancia de los globos al borde izquierdo, en caracteres.")
             ParamSlider(label: "Margen abajo", value: $model.chatMarginBottom, range: 0...20, decimals: 0,

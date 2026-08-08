@@ -72,6 +72,22 @@ enum ChatMode: UInt32, CaseIterable, Identifiable {
     }
 }
 
+/// Forma del globo. Todo se dibuja con celdas enteras, asi que "redondeado"
+/// quiere decir esquinas recortadas en escalera, no una curva: en una grilla de
+/// caracteres es lo unico que existe, y a escala 2 o mas ya se lee como redondeo.
+enum ChatBubbleShape: UInt32, CaseIterable, Identifiable {
+    case rect = 0
+    case rounded = 1
+
+    var id: UInt32 { rawValue }
+    var label: String {
+        switch self {
+        case .rect: return "Recto"
+        case .rounded: return "Redondeado"
+        }
+    }
+}
+
 final class ChatLayer {
 
     // MARK: Contenido
@@ -82,6 +98,11 @@ final class ChatLayer {
 
     /// Segundos entre la entrada de un mensaje y la del siguiente.
     var interval: Float = 2.5
+    /// Pantalla vacia entre un mensaje y el proximo, en segundos.
+    ///
+    /// Solo tiene sentido en «uno por vez»: en pila nada se va, asi que el hueco
+    /// no existe y el tiempo entre mensajes ya es el intervalo.
+    var pause: Float = 0
     /// Cuánto dura la animación de entrada.
     var entranceDuration: Float = 0.45
     var entrance: ChatEntrance = .riseFade
@@ -126,6 +147,9 @@ final class ChatLayer {
     /// Distancia al borde de abajo y al de la izquierda, en caracteres.
     var marginBottom: Int = 2
     var marginLeft: Int = 2
+    /// Forma del globo y si lleva piquito.
+    var shape: ChatBubbleShape = .rect
+    var tail = false
 
     // MARK: Salida
 
@@ -223,7 +247,11 @@ final class ChatLayer {
         let texts = messages.map(\.text).filter { !$0.isEmpty }
         guard !texts.isEmpty else { return [] }
 
-        let period = max(interval, 0.05)
+        // En «uno por vez» el ciclo de un mensaje es lo que dura en pantalla MAS
+        // la pausa con la pantalla vacia. En pila no hay pausa: el intervalo ya
+        // es el tiempo entre una llegada y la siguiente.
+        let visibleFor = max(interval, 0.05)
+        let period = mode == .single ? visibleFor + max(pause, 0) : visibleFor
         let total = Float(texts.count) * period
         var clock = max(time - startDelay, 0)
         // En pila se agrega un periodo de mas para que el ultimo mensaje se
@@ -241,8 +269,8 @@ final class ChatLayer {
         let innerWidth = max(min(maxColumns, usable) - padX * 2, 1)
 
         if mode == .single {
-            return layoutSingle(texts: texts, innerWidth: innerWidth,
-                                boxRows: boxRows, clock: clock, period: period)
+            return layoutSingle(texts: texts, innerWidth: innerWidth, boxRows: boxRows,
+                                clock: clock, period: period, visibleFor: visibleFor)
         }
         // En pila hay varios globos, cada uno en su momento de la animacion, y el
         // corrimiento del shader es uno solo para toda la capa. Ahi se sigue
@@ -294,7 +322,9 @@ final class ChatLayer {
             stack.append(Balloon(lines: lines, width: width, height: height,
                                  originX: marginLeft, originY: cursorY + offset,
                                  alpha: alpha, revealed: revealed))
-            cursorY -= gap
+            // El piquito baja dos casillas por debajo del globo, asi que con
+            // separacion 1 se le montaba encima del mensaje de abajo.
+            cursorY -= tail ? max(gap, 3) : gap
             if cursorY < 0 { break }
         }
         return stack
@@ -312,24 +342,30 @@ final class ChatLayer {
     /// La salida no es la entrada al reves: sigue subiendo. Un globo que entra
     /// desde abajo y despues vuelve a bajar se lee como que alguien lo borro; uno
     /// que sigue de largo se lee como que paso.
-    private func layoutSingle(texts: [String], innerWidth: Int,
-                              boxRows: Int, clock: Float, period: Float) -> [Balloon] {
+    private func layoutSingle(texts: [String], innerWidth: Int, boxRows: Int,
+                              clock: Float, period: Float, visibleFor: Float) -> [Balloon] {
         let index = min(Int(clock / period), texts.count - 1)
         let age = clock - Float(index) * period
+
+        // Pausa: el mensaje ya se fue y el proximo todavia no llega.
+        guard age <= visibleFor else {
+            pixelOffset = 0
+            return []
+        }
 
         // Ni la entrada ni la salida pueden comerse el ciclo: entre las dos se
         // les deja como mucho el 90%, si no el mensaje nunca llega a estar quieto.
         let wanted = max(entranceDuration, 0.01) + max(exitDuration, 0)
-        let squeeze = wanted > period * 0.9 ? period * 0.9 / wanted : 1
+        let squeeze = wanted > visibleFor * 0.9 ? visibleFor * 0.9 / wanted : 1
         let animIn = max(entranceDuration, 0.01) * squeeze
         let animOut = max(exitDuration, 0) * squeeze
 
         let tIn = min(max(age / animIn, 0), 1)
         let tOut: Float
         if exit == .cut || animOut <= 0 {
-            tOut = age >= period - 1e-4 ? 1 : 0
+            tOut = age >= visibleFor - 1e-4 ? 1 : 0
         } else {
-            tOut = min(max((age - (period - animOut)) / animOut, 0), 1)
+            tOut = min(max((age - (visibleFor - animOut)) / animOut, 0), 1)
         }
         // El movimiento del rebote se evalua en segundos y puede seguir despues
         // de `animIn`: un resorte se sigue asentando aunque ya haya llegado.
@@ -339,8 +375,8 @@ final class ChatLayer {
 
         // La opacidad tiene sus propios tiempos, mas cortos que el movimiento.
         let fadeInT = min(max(age / max(fadeIn, 0.01), 0), 1)
-        let fadeOutStart = period - max(fadeOut, 0)
-        let fadeOutT = max(fadeOut, 0) <= 0 ? (age >= period - 1e-4 ? 1 : 0)
+        let fadeOutStart = visibleFor - max(fadeOut, 0)
+        let fadeOutT = max(fadeOut, 0) <= 0 ? (age >= visibleFor - 1e-4 ? 1 : 0)
                                             : min(max((age - fadeOutStart) / max(fadeOut, 0.01), 0), 1)
         let appear = fadeInT * fadeInT * (3 - 2 * fadeInT)
         let vanish = fadeOutT * fadeOutT * (3 - 2 * fadeOutT)
@@ -451,12 +487,40 @@ final class ChatLayer {
 
         // Fondo del globo. Se pinta despues de las letras y solo donde no hay
         // ninguna, para no tener que ordenar dos pasadas.
-        for by in balloon.originY..<(balloon.originY + balloon.height) {
+        let lastX = balloon.width - 1
+        let lastY = balloon.height - 1
+        for row in 0..<balloon.height {
+            let by = balloon.originY + row
             guard by >= 0, by < boxRows else { continue }
-            for bx in balloon.originX..<(balloon.originX + balloon.width) {
+            for column in 0..<balloon.width {
+                // Redondeado: se saca la casilla de cada esquina. En una grilla de
+                // caracteres no hay curva posible, y el recorte en escalera es lo
+                // que la sugiere — a escala 2 o mas se lee como redondeo.
+                if shape == .rounded, balloon.height > 1, balloon.width > 2,
+                   (column == 0 || column == lastX), (row == 0 || row == lastY) {
+                    continue
+                }
+                let bx = balloon.originX + column
                 guard bx >= 0, bx < boxCols else { continue }
                 stamp(box: SIMD2(bx, by), char: 0, alpha: alpha,
                       step: step, cols: cols, rows: rows, backgroundOnly: true)
+            }
+        }
+
+        // Piquito. Va abajo a la izquierda, del mismo lado por el que se alinean
+        // los globos, y en escalera: dos casillas y despues una. Es lo que en una
+        // grilla se lee como la puntita de un globo de dialogo.
+        if tail {
+            let base = balloon.originY + balloon.height
+            for (row, run) in [(0, 2), (1, 1)] {
+                let by = base + row
+                guard by >= 0, by < boxRows else { continue }
+                for column in 0..<run {
+                    let bx = balloon.originX + 1 + column
+                    guard bx >= 0, bx < boxCols else { continue }
+                    stamp(box: SIMD2(bx, by), char: 0, alpha: alpha,
+                          step: step, cols: cols, rows: rows, backgroundOnly: true)
+                }
             }
         }
     }

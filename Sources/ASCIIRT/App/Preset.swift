@@ -72,6 +72,9 @@ struct Preset: Codable, Equatable {
     var chatBounce: Double = 0.5
     var chatFadeIn: Double = 0.15
     var chatFadeOut: Double = 0.20
+    var chatPause: Double = 0
+    var chatShape: UInt32 = 0
+    var chatTail: Bool = false
     var chatInterval: Double = 2.5
     var chatDuration: Double = 0.45
     var chatRise: Double = 4
@@ -224,6 +227,9 @@ struct Preset: Codable, Equatable {
         chatBounce = c.value(.chatBounce, d.chatBounce)
         chatFadeIn = c.value(.chatFadeIn, d.chatFadeIn)
         chatFadeOut = c.value(.chatFadeOut, d.chatFadeOut)
+        chatPause = c.value(.chatPause, d.chatPause)
+        chatShape = ChatBubbleShape(rawValue: c.value(.chatShape, d.chatShape))?.rawValue ?? d.chatShape
+        chatTail = c.value(.chatTail, d.chatTail)
         chatInterval = c.value(.chatInterval, d.chatInterval)
         chatDuration = c.value(.chatDuration, d.chatDuration)
         chatRise = c.value(.chatRise, d.chatRise)
