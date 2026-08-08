@@ -237,8 +237,8 @@ final class AppModel: ObservableObject {
     @Published var glitchBandShift: Double = 8 { didSet { sync() } }
     @Published var glitchBandAmount: Double = 0.35 { didSet { sync() } }
     @Published var glitchBlockCount: Double = 5 { didSet { sync() } }
-    @Published var glitchBlockMin: Double = 2 { didSet { sync() } }
-    @Published var glitchBlockMax: Double = 10 { didSet { sync() } }
+    @Published var glitchModule: Double = 2 { didSet { sync() } }
+    @Published var glitchBlockScale: Double = 3 { didSet { sync() } }
     @Published var glitchBlockFill: UInt32 = 0 { didSet { sync() } }
     @Published var glitchFreeze: Double = 0.25 { didSet { sync() } }
     @Published var glitchScramble: Double = 0.2 { didSet { sync() } }
@@ -557,8 +557,8 @@ final class AppModel: ObservableObject {
         next.glitchBandShift = Float(glitchBandShift)
         next.glitchBandAmount = Float(glitchBandAmount)
         next.glitchBlockCount = Float(glitchBlockCount)
-        next.glitchBlockMin = Float(glitchBlockMin)
-        next.glitchBlockMax = Float(glitchBlockMax)
+        next.glitchModule = Float(glitchModule)
+        next.glitchBlockScale = Float(glitchBlockScale)
         next.glitchBlockFill = glitchBlockFill
         next.glitchFreeze = Float(glitchFreeze)
         next.glitchScramble = Float(glitchScramble)
@@ -780,8 +780,8 @@ final class AppModel: ObservableObject {
         preset.glitchBandShift = glitchBandShift
         preset.glitchBandAmount = glitchBandAmount
         preset.glitchBlockCount = glitchBlockCount
-        preset.glitchBlockMin = glitchBlockMin
-        preset.glitchBlockMax = glitchBlockMax
+        preset.glitchModule = glitchModule
+        preset.glitchBlockScale = glitchBlockScale
         preset.glitchBlockFill = glitchBlockFill
         preset.glitchFreeze = glitchFreeze
         preset.glitchScramble = glitchScramble
@@ -918,8 +918,8 @@ final class AppModel: ObservableObject {
         glitchBandShift = preset.glitchBandShift
         glitchBandAmount = preset.glitchBandAmount
         glitchBlockCount = preset.glitchBlockCount
-        glitchBlockMin = preset.glitchBlockMin
-        glitchBlockMax = preset.glitchBlockMax
+        glitchModule = preset.glitchModule
+        glitchBlockScale = preset.glitchBlockScale
         glitchBlockFill = preset.glitchBlockFill
         glitchFreeze = preset.glitchFreeze
         glitchScramble = preset.glitchScramble

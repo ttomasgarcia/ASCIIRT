@@ -125,8 +125,8 @@ struct PipelineConfig: Equatable {
     var glitchBandShift: Float = 8
     var glitchBandAmount: Float = 0.35
     var glitchBlockCount: Float = 5
-    var glitchBlockMin: Float = 2
-    var glitchBlockMax: Float = 10
+    var glitchModule: Float = 2
+    var glitchBlockScale: Float = 3
     var glitchBlockFill: UInt32 = 0
     var glitchFreeze: Float = 0.25
     var glitchScramble: Float = 0.2
@@ -657,8 +657,8 @@ final class ASCIIPipeline {
                             glitchBandShift: config.glitchBandShift,
                             glitchBandAmount: config.glitchBandAmount,
                             glitchBlockCount: config.glitchBlockCount,
-                            glitchBlockMin: config.glitchBlockMin,
-                            glitchBlockMax: config.glitchBlockMax,
+                            glitchModule: config.glitchModule,
+                            glitchBlockScale: config.glitchBlockScale,
                             glitchBlockFill: config.glitchBlockFill,
                             glitchFreeze: config.glitchFreeze,
                             glitchScramble: config.glitchScramble)

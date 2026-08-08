@@ -420,10 +420,25 @@ typedef struct {
     /// Que fraccion de las bandas se corre en cada racha.
     float glitchBandAmount;
 
-    /// Bloques rectangulares corrompidos: cuantos, y su tamano en celdas.
+    /// Bloques rectangulares corrompidos.
     float glitchBlockCount;
-    float glitchBlockMin;
-    float glitchBlockMax;
+
+    /// Lado del modulo base, en FILAS de celda. Todos los bloques miden un
+    /// multiplo entero de esto y arrancan pegados a la grilla de modulos, asi que
+    /// se alinean entre si en vez de caer donde toque.
+    ///
+    /// El ancho del modulo se deriva del aspecto de la celda para que el modulo
+    /// salga CUADRADO EN PANTALLA. Una celda tipografica es mas alta que ancha
+    /// —16x31 px con los defaults— asi que un modulo de n x n celdas saldria un
+    /// rectangulo parado y la grilla entera se veria estirada.
+    float glitchModule;
+
+    /// Cuantos modulos de lado puede llegar a medir un bloque. Las proporciones
+    /// salen de una tabla corta (1:1, 2:1, 1:2, 3:1, 1:3, 2:2, 4:1, 1:4) en vez
+    /// de un sorteo continuo: con medidas libres cada rectangulo es distinto y el
+    /// conjunto se lee como accidente; con pocas proporciones repetidas se lee
+    /// como sistema.
+    float glitchBlockScale;
     /// 0 solido, 1 trama, 2 invertido, 3 vacio.
     uint32_t glitchBlockFill;
 

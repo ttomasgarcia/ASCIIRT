@@ -131,15 +131,37 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
             // Bloques: se prueban contra el tile de ORIGEN, no contra el corrido.
             // Si se probaran contra el corrido, los bloques viajarian con las
             // bandas y dejarian de leerse como algo pegado a la pantalla.
+            // El modulo se quiere CUADRADO EN PANTALLA. La celda es mas alta que
+            // ancha, asi que el modulo lleva mas columnas que filas; sin esta
+            // correccion la grilla entera sale estirada en vertical.
+            const float cellRatio = float(params.tileSize.y) / float(max(params.tileSize.x, 1u));
+            const uint modH = max(uint(params.glitchModule + 0.5), 1u);
+            const uint modW = max(uint(params.glitchModule * cellRatio + 0.5), 1u);
+            const uint colsM = max(params.gridSize.x / modW, 1u);
+            const uint rowsM = max(params.gridSize.y / modH, 1u);
+
+            // Proporciones de una tabla corta. Un sorteo continuo da un
+            // rectangulo distinto cada vez y el conjunto se lee como accidente;
+            // repitiendo pocas proporciones se lee como sistema.
+            const uint2 ratios[8] = { uint2(1u,1u), uint2(2u,1u), uint2(1u,2u), uint2(3u,1u),
+                                      uint2(1u,3u), uint2(2u,2u), uint2(4u,1u), uint2(1u,4u) };
+
             const uint count = uint(clamp(params.glitchBlockCount, 0.0, 16.0));
             for (uint b = 0u; b < count; ++b) {
                 const uint h = mixHash(b * 0x165667b1u ^ burst);
-                const float w = mix(params.glitchBlockMin, params.glitchBlockMax, hash11(h ^ 0x2545f491u));
-                const float ht = mix(params.glitchBlockMin, params.glitchBlockMax, hash11(h ^ 0x9e3779b9u));
-                const int x0 = int(hash11(h) * float(params.gridSize.x));
-                const int y0 = int(hash11(h ^ 0x85ebca6bu) * float(params.gridSize.y));
-                if (int(homeTile.x) >= x0 && int(homeTile.x) < x0 + int(w) &&
-                    int(homeTile.y) >= y0 && int(homeTile.y) < y0 + int(ht)) {
+                const uint2 ratio = ratios[mixHash(h) & 7u];
+                const uint scale = 1u + uint(hash11(h ^ 0x2545f491u) * max(params.glitchBlockScale, 1.0));
+
+                // Origen pegado a la grilla de modulos: los bloques se alinean
+                // entre si aunque no se toquen, que es de donde sale la lectura
+                // de grilla.
+                const int x0 = int((uint(hash11(h) * float(colsM))) * modW);
+                const int y0 = int((uint(hash11(h ^ 0x85ebca6bu) * float(rowsM))) * modH);
+                const int bw = int(ratio.x * scale * modW);
+                const int bh = int(ratio.y * scale * modH);
+
+                if (int(homeTile.x) >= x0 && int(homeTile.x) < x0 + bw &&
+                    int(homeTile.y) >= y0 && int(homeTile.y) < y0 + bh) {
                     inBlock = true;
                     break;
                 }

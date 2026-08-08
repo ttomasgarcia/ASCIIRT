@@ -127,8 +127,8 @@ struct Preset: Codable, Equatable {
     var glitchBandShift: Double = 8
     var glitchBandAmount: Double = 0.35
     var glitchBlockCount: Double = 5
-    var glitchBlockMin: Double = 2
-    var glitchBlockMax: Double = 10
+    var glitchModule: Double = 2
+    var glitchBlockScale: Double = 3
     var glitchBlockFill: UInt32 = 0
     var glitchFreeze: Double = 0.25
     var glitchScramble: Double = 0.2
@@ -252,8 +252,8 @@ struct Preset: Codable, Equatable {
         glitchBandShift = c.value(.glitchBandShift, d.glitchBandShift)
         glitchBandAmount = c.value(.glitchBandAmount, d.glitchBandAmount)
         glitchBlockCount = c.value(.glitchBlockCount, d.glitchBlockCount)
-        glitchBlockMin = c.value(.glitchBlockMin, d.glitchBlockMin)
-        glitchBlockMax = c.value(.glitchBlockMax, d.glitchBlockMax)
+        glitchModule = c.value(.glitchModule, d.glitchModule)
+        glitchBlockScale = c.value(.glitchBlockScale, d.glitchBlockScale)
         glitchBlockFill = c.value(.glitchBlockFill, d.glitchBlockFill)
         glitchFreeze = c.value(.glitchFreeze, d.glitchFreeze)
         glitchScramble = c.value(.glitchScramble, d.glitchScramble)

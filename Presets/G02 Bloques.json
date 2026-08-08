@@ -67,9 +67,9 @@
   "glitchBandShift": 8,
   "glitchBandAmount": 0.0,
   "glitchBlockCount": 12,
-  "glitchBlockMin": 2,
-  "glitchBlockMax": 8,
   "glitchBlockFill": 0,
   "glitchFreeze": 0.0,
-  "glitchScramble": 0.0
+  "glitchScramble": 0.0,
+  "glitchModule": 2,
+  "glitchBlockScale": 2
 }
