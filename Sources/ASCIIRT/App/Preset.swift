@@ -67,6 +67,9 @@ struct Preset: Codable, Equatable {
     var chatScale: Double = 2
     var chatEntrance: UInt32 = 2
     var chatMode: UInt32 = 0
+    var chatExit: UInt32 = 0
+    var chatExitDuration: Double = 0.35
+    var chatBounce: Double = 0.5
     var chatInterval: Double = 2.5
     var chatDuration: Double = 0.45
     var chatRise: Double = 4
@@ -214,6 +217,9 @@ struct Preset: Codable, Equatable {
         chatScale = c.value(.chatScale, d.chatScale)
         chatEntrance = c.value(.chatEntrance, d.chatEntrance)
         chatMode = c.value(.chatMode, d.chatMode)
+        chatExit = c.value(.chatExit, d.chatExit)
+        chatExitDuration = c.value(.chatExitDuration, d.chatExitDuration)
+        chatBounce = c.value(.chatBounce, d.chatBounce)
         chatInterval = c.value(.chatInterval, d.chatInterval)
         chatDuration = c.value(.chatDuration, d.chatDuration)
         chatRise = c.value(.chatRise, d.chatRise)

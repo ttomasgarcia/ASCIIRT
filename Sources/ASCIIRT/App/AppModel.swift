@@ -253,6 +253,9 @@ final class AppModel: ObservableObject {
     @Published var chatBubbleAlpha: Double = 0.85 { didSet { sync() } }
     @Published var chatEntrance: ChatEntrance = .riseFade { didSet { syncChat() } }
     @Published var chatMode: ChatMode = .stack { didSet { syncChat() } }
+    @Published var chatExit: ChatExit = .fade { didSet { syncChat() } }
+    @Published var chatExitDuration: Double = 0.35 { didSet { syncChat() } }
+    @Published var chatBounce: Double = 0.5 { didSet { syncChat() } }
     @Published var chatInterval: Double = 2.5 { didSet { syncChat() } }
     @Published var chatDuration: Double = 0.45 { didSet { syncChat() } }
     @Published var chatRise: Double = 4 { didSet { syncChat() } }
@@ -273,6 +276,9 @@ final class AppModel: ObservableObject {
             .filter { !$0.text.isEmpty }
         layer.entrance = chatEntrance
         layer.mode = chatMode
+        layer.exit = chatExit
+        layer.exitDuration = Float(chatExitDuration)
+        layer.bounce = Float(chatBounce)
         layer.interval = Float(chatInterval)
         layer.entranceDuration = Float(chatDuration)
         layer.riseCells = Float(chatRise)
@@ -786,6 +792,9 @@ final class AppModel: ObservableObject {
         preset.chatScale = chatScale
         preset.chatEntrance = chatEntrance.rawValue
         preset.chatMode = chatMode.rawValue
+        preset.chatExit = chatExit.rawValue
+        preset.chatExitDuration = chatExitDuration
+        preset.chatBounce = chatBounce
         preset.chatInterval = chatInterval
         preset.chatDuration = chatDuration
         preset.chatRise = chatRise
@@ -966,6 +975,9 @@ final class AppModel: ObservableObject {
         chatScale = preset.chatScale
         chatEntrance = ChatEntrance(rawValue: preset.chatEntrance) ?? .riseFade
         chatMode = ChatMode(rawValue: preset.chatMode) ?? .stack
+        chatExit = ChatExit(rawValue: preset.chatExit) ?? .fade
+        chatExitDuration = preset.chatExitDuration
+        chatBounce = preset.chatBounce
         chatInterval = preset.chatInterval
         chatDuration = preset.chatDuration
         chatRise = preset.chatRise

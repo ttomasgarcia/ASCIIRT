@@ -1236,8 +1236,28 @@ private struct ControlPanel: View {
                             : "Segundos entre la llegada de un mensaje y la del siguiente. Es el ritmo de la conversación: valores altos dan pausas de lectura, valores bajos hacen que se amontonen como cuando alguien escribe rápido.")
             ParamSlider(label: "Duración", value: $model.chatDuration, range: 0.05...3, decimals: 2,
                         help: "Cuánto dura la animación de entrada. Corta se lee como que el mensaje aparece; larga, como que sube flotando. Con «Se escribe» esto es cuánto tarda en terminar de tipearse el mensaje entero.")
+            if model.chatEntrance == .bounce {
+                ParamSlider(label: "Rebote", value: $model.chatBounce, range: 0...1,
+                            help: "Cuánto se pasa el globo antes de asentarse. Es un resorte subamortiguado: en 0 queda sobreamortiguado y la curva es prácticamente la suave de siempre; en 1 se pasa varias veces. Ojo con la Subida: el sobrepaso se ve en escalones enteros de celda, no en fracciones, así que con una subida corta el rebote no llega a cruzar el redondeo y no se nota. Con 5 o más celdas empieza a leerse.")
+            }
             ParamSlider(label: "Subida", value: $model.chatRise, range: 0...20, decimals: 0,
                         help: "Cuántas celdas sube el globo mientras entra. Se mueve de a celdas enteras y no en píxeles sueltos: media celda dejaría el texto partido entre dos filas y se vería borroso. El escalonado se lee como movimiento de terminal, que es coherente con el resto.")
+            if model.chatMode == .single {
+                PanelGroupLabel(text: "Salida", help: "Cómo se va cada mensaje. Sólo aplica en «uno por vez»: en pila nada se va.")
+                HStack(spacing: 6) {
+                    Picker("", selection: $model.chatExit) {
+                        ForEach(ChatExit.allCases) { e in Text(e.label).tag(e) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    HelpMark("Fundido se apaga en el lugar. Se va arriba sigue subiendo mientras se apaga — es lo que más se lee como «el mensaje pasó» en vez de «alguien lo borró». Se va abajo cae, que se lee como descartado. Corte lo saca de un cuadro al otro, sin transición, y ahí la duración no hace nada.",
+                             title: "Salida")
+                }
+                ParamSlider(label: "Duración salida", value: $model.chatExitDuration, range: 0...3, decimals: 2,
+                            help: "Cuánto tarda en irse. Va aparte de la duración de entrada porque casi nunca se quieren iguales: entrar tiene que llamar la atención, irse no. En 0 desaparece de golpe. Entre la entrada y la salida no pueden pasarse del 90% del ciclo; si las dos suman más, se achican en proporción para que el mensaje siempre llegue a quedarse quieto.")
+            }
+
             ParamToggle(label: "Repetir", isOn: $model.chatLoops,
                         help: "Al terminar el último mensaje vuelve a empezar la conversación. Para un loop de sala conviene encendido; para un pase único, apagado.")
 

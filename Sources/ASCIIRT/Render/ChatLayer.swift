@@ -24,6 +24,7 @@ enum ChatEntrance: UInt32, CaseIterable, Identifiable {
     case rise = 1       // sube desde abajo
     case riseFade = 2   // sube y aparece
     case type = 3       // se escribe letra por letra
+    case bounce = 4     // sube, se pasa y vuelve
 
     var id: UInt32 { rawValue }
     var label: String {
@@ -32,6 +33,25 @@ enum ChatEntrance: UInt32, CaseIterable, Identifiable {
         case .rise: return "Sube"
         case .riseFade: return "Sube y funde"
         case .type: return "Se escribe"
+        case .bounce: return "Rebote"
+        }
+    }
+}
+
+/// Como se va cada globo. Solo aplica en «uno por vez»: en pila nada se va.
+enum ChatExit: UInt32, CaseIterable, Identifiable {
+    case fade = 0       // se apaga en el lugar
+    case riseAway = 1   // sigue subiendo y se apaga
+    case fallAway = 2   // cae y se apaga
+    case cut = 3        // desaparece de un frame al otro
+
+    var id: UInt32 { rawValue }
+    var label: String {
+        switch self {
+        case .fade: return "Fundido"
+        case .riseAway: return "Se va arriba"
+        case .fallAway: return "Se va abajo"
+        case .cut: return "Corte"
         }
     }
 }
@@ -66,6 +86,12 @@ final class ChatLayer {
     var entranceDuration: Float = 0.45
     var entrance: ChatEntrance = .riseFade
     var mode: ChatMode = .stack
+    var exit: ChatExit = .fade
+    /// Cuanto dura la salida. Separada de la entrada porque casi nunca se
+    /// quieren iguales: entrar llama la atencion, irse no deberia.
+    var exitDuration: Float = 0.35
+    /// Cuanto se pasa el rebote, de 0 (sin rebote) a 1 (elastico).
+    var bounce: Float = 0.5
     /// Cuántas celdas sube el globo mientras entra.
     var riseCells: Float = 4
     /// Si repite la conversación desde el principio al terminar.
@@ -219,7 +245,7 @@ final class ChatLayer {
         for i in stride(from: entered - 1, through: 0, by: -1) {
             let age = clock - Float(i) * period
             let t = min(max(age / max(entranceDuration, 0.01), 0), 1)
-            let eased = t * t * (3 - 2 * t)
+            let eased = entrance == .bounce ? springEase(t) : t * t * (3 - 2 * t)
 
             let lines = wrap(texts[i], width: innerWidth)
             let bodyWidth = lines.map(\.count).max() ?? 0
@@ -235,6 +261,9 @@ final class ChatLayer {
                 alpha = eased
                 offset = Int((1 - eased) * riseCells)
             case .type: break
+            case .bounce:
+                offset = Int(((1 - eased) * riseCells).rounded())
+                alpha = min(t * 3, 1)
             }
 
             let revealed: Int
@@ -272,13 +301,21 @@ final class ChatLayer {
         let index = min(Int(clock / period), texts.count - 1)
         let age = clock - Float(index) * period
 
-        // La animacion no puede comerse todo el ciclo: se le deja al menos un
-        // tercio de permanencia, si no el mensaje nunca llega a estar quieto.
-        let animation = min(max(entranceDuration, 0.01), period / 3)
+        // Ni la entrada ni la salida pueden comerse el ciclo: entre las dos se
+        // les deja como mucho el 90%, si no el mensaje nunca llega a estar quieto.
+        let wanted = max(entranceDuration, 0.01) + max(exitDuration, 0)
+        let squeeze = wanted > period * 0.9 ? period * 0.9 / wanted : 1
+        let animIn = max(entranceDuration, 0.01) * squeeze
+        let animOut = max(exitDuration, 0) * squeeze
 
-        let tIn = min(max(age / animation, 0), 1)
-        let tOut = min(max((age - (period - animation)) / animation, 0), 1)
-        let easeIn = tIn * tIn * (3 - 2 * tIn)
+        let tIn = min(max(age / animIn, 0), 1)
+        let tOut: Float
+        if exit == .cut || animOut <= 0 {
+            tOut = age >= period - 1e-4 ? 1 : 0
+        } else {
+            tOut = min(max((age - (period - animOut)) / animOut, 0), 1)
+        }
+        let easeIn = entrance == .bounce ? springEase(tIn) : tIn * tIn * (3 - 2 * tIn)
         let easeOut = tOut * tOut * (3 - 2 * tOut)
 
         let lines = wrap(texts[index], width: innerWidth)
@@ -286,14 +323,31 @@ final class ChatLayer {
         let height = lines.count + padY * 2
 
         var alpha: Float = 1
-        var offset = 0
+        var offset: Float = 0
         switch entrance {
-        case .fade: alpha = easeIn * (1 - easeOut)
-        case .rise: offset = Int((1 - easeIn) * riseCells - easeOut * riseCells)
+        case .fade: alpha = easeIn
+        case .rise: offset = (1 - easeIn) * riseCells
         case .riseFade:
-            alpha = easeIn * (1 - easeOut)
-            offset = Int((1 - easeIn) * riseCells - easeOut * riseCells)
-        case .type: alpha = 1 - easeOut
+            alpha = easeIn
+            offset = (1 - easeIn) * riseCells
+        case .type: break
+        case .bounce:
+            // El rebote se pasa de largo: `easeIn` cruza 1 y vuelve, asi que el
+            // desplazamiento se hace negativo un momento y el globo aparece un
+            // poco mas arriba de su lugar antes de asentarse.
+            offset = (1 - easeIn) * riseCells
+            alpha = min(tIn * 3, 1)   // la opacidad no rebota: solo la posicion
+        }
+
+        switch exit {
+        case .fade: alpha *= 1 - easeOut
+        case .riseAway:
+            alpha *= 1 - easeOut
+            offset -= easeOut * riseCells
+        case .fallAway:
+            alpha *= 1 - easeOut
+            offset += easeOut * riseCells
+        case .cut: alpha *= tOut >= 1 ? 0 : 1
         }
 
         let revealed: Int
@@ -309,8 +363,27 @@ final class ChatLayer {
         let originY = boxRows - marginBottom - height
 
         return [Balloon(lines: lines, width: bodyWidth + padX * 2, height: height,
-                        originX: marginLeft, originY: originY + offset,
+                        originX: marginLeft, originY: originY + Int(offset.rounded()),
                         alpha: alpha, revealed: revealed)]
+    }
+
+    /// Curva de entrada con sobrepaso: resorte subamortiguado normalizado.
+    ///
+    /// Llega a 1 pasandose y volviendo, que es lo que hace un globo de mensaje en
+    /// una UI. El sobrepaso se ve en escalones enteros de celda, no en fracciones
+    /// —el maquetado vive en la grilla— asi que con la subida corta el rebote no
+    /// llega a notarse: hacen falta unas cuantas celdas para que el sobrepaso
+    /// cruce el redondeo.
+    private func springEase(_ t: Float) -> Float {
+        guard t < 1 else { return 1 }
+        let amount = min(max(bounce, 0), 1)
+        // Menos amortiguacion = mas rebote. En 0 queda sobreamortiguado y la
+        // curva es practicamente la suave de siempre.
+        let zeta = 0.9 - 0.75 * amount
+        let omega: Float = 9
+        let wd = omega * (1 - zeta * zeta).squareRoot()
+        let decay = exp(-zeta * omega * t)
+        return 1 - decay * (cos(wd * t) + (zeta * omega / wd) * sin(wd * t))
     }
 
     // MARK: - Pintado
