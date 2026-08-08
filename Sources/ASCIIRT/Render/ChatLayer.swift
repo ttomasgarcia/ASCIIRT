@@ -36,6 +36,22 @@ enum ChatEntrance: UInt32, CaseIterable, Identifiable {
     }
 }
 
+/// Como se suceden los mensajes.
+enum ChatMode: UInt32, CaseIterable, Identifiable {
+    /// Se acumulan: el que llega entra al pie y empuja a los viejos hacia arriba.
+    case stack = 0
+    /// Uno por vez: entra, se queda, se va, y el siguiente ocupa su lugar.
+    case single = 1
+
+    var id: UInt32 { rawValue }
+    var label: String {
+        switch self {
+        case .stack: return "Pila"
+        case .single: return "Uno por vez"
+        }
+    }
+}
+
 final class ChatLayer {
 
     // MARK: Contenido
@@ -49,6 +65,7 @@ final class ChatLayer {
     /// Cuánto dura la animación de entrada.
     var entranceDuration: Float = 0.45
     var entrance: ChatEntrance = .riseFade
+    var mode: ChatMode = .stack
     /// Cuántas celdas sube el globo mientras entra.
     var riseCells: Float = 4
     /// Si repite la conversación desde el principio al terminar.
@@ -172,13 +189,24 @@ final class ChatLayer {
         let period = max(interval, 0.05)
         let total = Float(texts.count) * period
         var clock = max(time - startDelay, 0)
-        if loops && total > 0 { clock = clock.truncatingRemainder(dividingBy: total + period) }
+        // En pila se agrega un periodo de mas para que el ultimo mensaje se
+        // quede a la vista antes de que la conversacion vuelva a empezar. En uno
+        // por vez no hace falta: cada mensaje ya tiene su propia salida.
+        if loops && total > 0 {
+            let cycle = mode == .single ? total : total + period
+            clock = clock.truncatingRemainder(dividingBy: cycle)
+        }
 
         // El ancho pedido se acota a lo que entra de verdad. Con escala alta la
         // grilla de casillas es chica —a escala 6 sobre 160 columnas quedan 26— y
         // un globo de 28 caracteres se saldria de cuadro por la derecha.
         let usable = max(boxCols - marginLeft - 1, 4)
         let innerWidth = max(min(maxColumns, usable) - padX * 2, 1)
+
+        if mode == .single {
+            return layoutSingle(texts: texts, innerWidth: innerWidth,
+                                boxRows: boxRows, clock: clock, period: period)
+        }
 
         // Cuántos entraron ya, y hace cuánto entró el último.
         let entered = min(Int(clock / period) + 1, texts.count)
@@ -225,6 +253,64 @@ final class ChatLayer {
             if cursorY < 0 { break }
         }
         return stack
+    }
+
+    /// Uno por vez: entra, se queda, se va, y el siguiente ocupa exactamente el
+    /// mismo lugar.
+    ///
+    /// El intervalo pasa a ser el ciclo COMPLETO — entrada, permanencia y
+    /// salida— y no el tiempo entre mensajes. Con la pila los dos numeros
+    /// coinciden porque nada se va; aca no, y medirlo de otra forma haria que
+    /// subir la duracion de la animacion acortara el tiempo de lectura sin
+    /// avisar.
+    ///
+    /// La salida no es la entrada al reves: sigue subiendo. Un globo que entra
+    /// desde abajo y despues vuelve a bajar se lee como que alguien lo borro; uno
+    /// que sigue de largo se lee como que paso.
+    private func layoutSingle(texts: [String], innerWidth: Int,
+                              boxRows: Int, clock: Float, period: Float) -> [Balloon] {
+        let index = min(Int(clock / period), texts.count - 1)
+        let age = clock - Float(index) * period
+
+        // La animacion no puede comerse todo el ciclo: se le deja al menos un
+        // tercio de permanencia, si no el mensaje nunca llega a estar quieto.
+        let animation = min(max(entranceDuration, 0.01), period / 3)
+
+        let tIn = min(max(age / animation, 0), 1)
+        let tOut = min(max((age - (period - animation)) / animation, 0), 1)
+        let easeIn = tIn * tIn * (3 - 2 * tIn)
+        let easeOut = tOut * tOut * (3 - 2 * tOut)
+
+        let lines = wrap(texts[index], width: innerWidth)
+        let bodyWidth = lines.map(\.count).max() ?? 0
+        let height = lines.count + padY * 2
+
+        var alpha: Float = 1
+        var offset = 0
+        switch entrance {
+        case .fade: alpha = easeIn * (1 - easeOut)
+        case .rise: offset = Int((1 - easeIn) * riseCells - easeOut * riseCells)
+        case .riseFade:
+            alpha = easeIn * (1 - easeOut)
+            offset = Int((1 - easeIn) * riseCells - easeOut * riseCells)
+        case .type: alpha = 1 - easeOut
+        }
+
+        let revealed: Int
+        if entrance == .type {
+            let totalChars = lines.reduce(0) { $0 + $1.count }
+            revealed = Int(easeIn * Float(totalChars) + 0.5)
+        } else {
+            revealed = Int.max
+        }
+
+        // Anclado abajo, igual que el mensaje mas nuevo de la pila: el lugar es
+        // el mismo aunque el mensaje siguiente tenga otra cantidad de renglones.
+        let originY = boxRows - marginBottom - height
+
+        return [Balloon(lines: lines, width: bodyWidth + padX * 2, height: height,
+                        originX: marginLeft, originY: originY + offset,
+                        alpha: alpha, revealed: revealed)]
     }
 
     // MARK: - Pintado

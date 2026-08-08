@@ -252,6 +252,7 @@ final class AppModel: ObservableObject {
     @Published var chatBubbleColor: Color = Color(red: 0.05, green: 0.07, blue: 0.10) { didSet { sync() } }
     @Published var chatBubbleAlpha: Double = 0.85 { didSet { sync() } }
     @Published var chatEntrance: ChatEntrance = .riseFade { didSet { syncChat() } }
+    @Published var chatMode: ChatMode = .stack { didSet { syncChat() } }
     @Published var chatInterval: Double = 2.5 { didSet { syncChat() } }
     @Published var chatDuration: Double = 0.45 { didSet { syncChat() } }
     @Published var chatRise: Double = 4 { didSet { syncChat() } }
@@ -271,6 +272,7 @@ final class AppModel: ObservableObject {
             .map { ChatMessage(text: $0.trimmingCharacters(in: .whitespaces)) }
             .filter { !$0.text.isEmpty }
         layer.entrance = chatEntrance
+        layer.mode = chatMode
         layer.interval = Float(chatInterval)
         layer.entranceDuration = Float(chatDuration)
         layer.riseCells = Float(chatRise)
@@ -783,6 +785,7 @@ final class AppModel: ObservableObject {
         preset.chatEnabled = chatEnabled
         preset.chatScale = chatScale
         preset.chatEntrance = chatEntrance.rawValue
+        preset.chatMode = chatMode.rawValue
         preset.chatInterval = chatInterval
         preset.chatDuration = chatDuration
         preset.chatRise = chatRise
@@ -962,6 +965,7 @@ final class AppModel: ObservableObject {
         chatEnabled = preset.chatEnabled
         chatScale = preset.chatScale
         chatEntrance = ChatEntrance(rawValue: preset.chatEntrance) ?? .riseFade
+        chatMode = ChatMode(rawValue: preset.chatMode) ?? .stack
         chatInterval = preset.chatInterval
         chatDuration = preset.chatDuration
         chatRise = preset.chatRise

@@ -1211,6 +1211,16 @@ private struct ControlPanel: View {
 
             PanelGroupLabel(text: "Entrada", help: "Cómo llega cada mensaje y cada cuánto.")
             HStack(spacing: 6) {
+                Picker("", selection: $model.chatMode) {
+                    ForEach(ChatMode.allCases) { m in Text(m.label).tag(m) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Pila: los mensajes se acumulan, el que llega entra al pie y empuja a los viejos hacia arriba, como en cualquier chat. Uno por vez: entra, se queda, se va, y el siguiente ocupa exactamente el mismo lugar — anclado abajo, así que el lugar es el mismo aunque el mensaje siguiente tenga otra cantidad de renglones. En «uno por vez» la salida no es la entrada al revés: el globo sigue subiendo. Uno que entra desde abajo y después vuelve a bajar se lee como que alguien lo borró; uno que sigue de largo se lee como que pasó.",
+                         title: "Modo")
+            }
+            HStack(spacing: 6) {
                 Picker("", selection: $model.chatEntrance) {
                     ForEach(ChatEntrance.allCases) { e in Text(e.label).tag(e) }
                 }
@@ -1219,8 +1229,11 @@ private struct ControlPanel: View {
                 HelpMark("Fundido aparece en el lugar. Sube entra desde abajo hasta su posición final. Sube y funde hace las dos, que es lo que más se parece a un mensaje que llega. Se escribe revela el texto letra por letra, como si lo estuvieran tipeando del otro lado — para eso conviene subir la duración, porque ahí la duración es cuánto tarda en terminar de escribirse.",
                          title: "Animación de entrada")
             }
-            ParamSlider(label: "Intervalo", value: $model.chatInterval, range: 0.3...12, decimals: 2,
-                        help: "Segundos entre la llegada de un mensaje y la del siguiente. Es el ritmo de la conversación: valores altos dan pausas de lectura, valores bajos hacen que se amontonen como cuando alguien escribe rápido.")
+            ParamSlider(label: model.chatMode == .single ? "Ciclo" : "Intervalo",
+                        value: $model.chatInterval, range: 0.3...12, decimals: 2,
+                        help: model.chatMode == .single
+                            ? "Cuánto dura cada mensaje de punta a punta: entrada, permanencia y salida. Se mide así y no como tiempo entre mensajes porque si no, subir la duración de la animación acortaría el tiempo de lectura sin avisar. La animación tiene un techo de un tercio del ciclo, para que el mensaje siempre llegue a quedarse quieto."
+                            : "Segundos entre la llegada de un mensaje y la del siguiente. Es el ritmo de la conversación: valores altos dan pausas de lectura, valores bajos hacen que se amontonen como cuando alguien escribe rápido.")
             ParamSlider(label: "Duración", value: $model.chatDuration, range: 0.05...3, decimals: 2,
                         help: "Cuánto dura la animación de entrada. Corta se lee como que el mensaje aparece; larga, como que sube flotando. Con «Se escribe» esto es cuánto tarda en terminar de tipearse el mensaje entero.")
             ParamSlider(label: "Subida", value: $model.chatRise, range: 0...20, decimals: 0,
