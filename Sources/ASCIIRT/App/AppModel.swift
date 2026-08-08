@@ -242,7 +242,12 @@ final class AppModel: ObservableObject {
         """ { didSet { syncChat() } }
 
     @Published var chatEnabled = false { didSet { sync() } }
-    @Published var chatScale: Double = 2 { didSet { sync() } }
+    /// La escala es el unico parametro del chat que viaja por los DOS caminos:
+    /// el shader la necesita para saber que pedazo del glifo le toca a cada
+    /// celda, y el maquetado en CPU para armar todo en casillas de ese tamano.
+    /// Avisandole a uno solo, cada lado dibuja a una escala distinta y no queda
+    /// nada en pie.
+    @Published var chatScale: Double = 2 { didSet { sync(); syncChat() } }
     @Published var chatTextColor: Color = .white { didSet { sync() } }
     @Published var chatBubbleColor: Color = Color(red: 0.05, green: 0.07, blue: 0.10) { didSet { sync() } }
     @Published var chatBubbleAlpha: Double = 0.85 { didSet { sync() } }

@@ -174,7 +174,11 @@ final class ChatLayer {
         var clock = max(time - startDelay, 0)
         if loops && total > 0 { clock = clock.truncatingRemainder(dividingBy: total + period) }
 
-        let innerWidth = max(maxColumns - padX * 2, 1)
+        // El ancho pedido se acota a lo que entra de verdad. Con escala alta la
+        // grilla de casillas es chica —a escala 6 sobre 160 columnas quedan 26— y
+        // un globo de 28 caracteres se saldria de cuadro por la derecha.
+        let usable = max(boxCols - marginLeft - 1, 4)
+        let innerWidth = max(min(maxColumns, usable) - padX * 2, 1)
 
         // Cuántos entraron ya, y hace cuánto entró el último.
         let entered = min(Int(clock / period) + 1, texts.count)
