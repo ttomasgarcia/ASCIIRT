@@ -22,6 +22,16 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
                       uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= params.outputSize.x || gid.y >= params.outputSize.y) { return; }
 
+    // Fuente Chat: no hay ojo, solo fondo. Se sale por aca en vez de no
+    // despachar el kernel para que las texturas queden igual limpias todos los
+    // frames; si no, el ultimo ojo dibujado se quedaria congelado abajo.
+    if (params.chatOnly != 0u) {
+        luma.write(float4(0.0), gid);
+        color.write(float4(0.0), gid);
+        mask.write(float4(0.0), gid);
+        return;
+    }
+
     const float2 size = float2(params.outputSize);
     const float2 uv = (float2(gid) + 0.5) / size;
 

@@ -352,6 +352,7 @@ private struct ControlPanel: View {
     @State private var showMatrix = true
     @State private var showEyeLife = true
     @State private var showEyeMotion = true
+    @State private var showChat = true
     @State private var showGlitch = true
     @State private var showProject = true
     @State private var showCoverage = false
@@ -376,6 +377,15 @@ private struct ControlPanel: View {
                              isExpanded: $showSource) {
                     sourceContent
                 }
+                if model.sourceKind == .chat {
+                    Divider()
+                    PanelSection(title: "Chat", systemImage: "bubble.left.and.bubble.right",
+                                 help: "Globos de diálogo escritos DIRECTO en la grilla, una letra por celda. La alternativa era dibujarlos en una imagen y dejar que el pipeline los convirtiera a ASCII como a cualquier fuente, pero a los tamaños de celda que se usan un texto pasado por la rampa queda ilegible — se lee como una mancha de densidad con forma de renglón. Escribiéndolos en la grilla el texto queda nítido y además la app dibuja lo que es: caracteres en una grilla.",
+                                 isExpanded: $showChat) {
+                        chatContent
+                    }
+                }
+
                 // Las tres secciones del ojo estan separadas por lo que HACEN, y
                 // el corte coincide con el alcance de los presets: forma y vida
                 // son «look», movimiento y estela son «movimiento». Antes era una
@@ -669,9 +679,15 @@ private struct ControlPanel: View {
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
+
+            case .chat:
+                Text("Sin entrada: los mensajes se escriben directo en la grilla. El texto y los tiempos están en la sección Chat.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            if model.sourceKind != .eye {
+            if model.sourceKind == .camera || model.sourceKind == .file {
                 ParamReadout(label: "Entrada", value: model.format?.pretty ?? "—")
             }
         }
@@ -1178,6 +1194,66 @@ private struct ControlPanel: View {
                         help: "A qué luminancia se lleva el promedio de la imagen. 0,5 lo centra en la rampa y usa todo el rango de glifos; más alto aclara y empuja la imagen hacia los caracteres densos; más bajo la oscurece.")
                 .disabled(model.autoLevelStrength <= 0)
             }
+        }
+    }
+
+    // MARK: Chat
+
+    private var chatContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            PanelGroupLabel(text: "Mensajes", help: "Un mensaje por renglón, en orden. Se edita como texto porque escribir una conversación es escribir, no llenar un formulario.")
+            TextEditor(text: $model.chatScript)
+                .font(.system(size: 11, design: .monospaced))
+                .frame(minHeight: 110)
+                .scrollContentBackground(.hidden)
+                .padding(4)
+                .background(RoundedRectangle(cornerRadius: 4).fill(.quaternary.opacity(0.4)))
+
+            PanelGroupLabel(text: "Entrada", help: "Cómo llega cada mensaje y cada cuánto.")
+            HStack(spacing: 6) {
+                Picker("", selection: $model.chatEntrance) {
+                    ForEach(ChatEntrance.allCases) { e in Text(e.label).tag(e) }
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Fundido aparece en el lugar. Sube entra desde abajo hasta su posición final. Sube y funde hace las dos, que es lo que más se parece a un mensaje que llega. Se escribe revela el texto letra por letra, como si lo estuvieran tipeando del otro lado — para eso conviene subir la duración, porque ahí la duración es cuánto tarda en terminar de escribirse.",
+                         title: "Animación de entrada")
+            }
+            ParamSlider(label: "Intervalo", value: $model.chatInterval, range: 0.3...12, decimals: 2,
+                        help: "Segundos entre la llegada de un mensaje y la del siguiente. Es el ritmo de la conversación: valores altos dan pausas de lectura, valores bajos hacen que se amontonen como cuando alguien escribe rápido.")
+            ParamSlider(label: "Duración", value: $model.chatDuration, range: 0.05...3, decimals: 2,
+                        help: "Cuánto dura la animación de entrada. Corta se lee como que el mensaje aparece; larga, como que sube flotando. Con «Se escribe» esto es cuánto tarda en terminar de tipearse el mensaje entero.")
+            ParamSlider(label: "Subida", value: $model.chatRise, range: 0...20, decimals: 0,
+                        help: "Cuántas celdas sube el globo mientras entra. Se mueve de a celdas enteras y no en píxeles sueltos: media celda dejaría el texto partido entre dos filas y se vería borroso. El escalonado se lee como movimiento de terminal, que es coherente con el resto.")
+            ParamToggle(label: "Repetir", isOn: $model.chatLoops,
+                        help: "Al terminar el último mensaje vuelve a empezar la conversación. Para un loop de sala conviene encendido; para un pase único, apagado.")
+
+            PanelGroupLabel(text: "Forma", help: "Tamaño del texto y del globo, todo medido en celdas.")
+            ParamSlider(label: "Escala", value: $model.chatScale, range: 1...6, decimals: 0,
+                        help: "Cuántas celdas ocupa cada letra por lado. En 1 el texto es del tamaño de un carácter del ASCII y se mezcla con el fondo; subiéndolo el mensaje se despega y se lee de lejos, que es lo que hace falta proyectando. Todo el maquetado vive en una grilla de este tamaño, así que los globos siempre caen alineados entre sí.")
+            ParamSlider(label: "Ancho", value: $model.chatColumns, range: 8...80, decimals: 0,
+                        help: "Ancho máximo del globo en caracteres, antes de cortar el renglón. El corte respeta las palabras salvo que una sola palabra no entre.")
+            ParamSlider(label: "Margen interno", value: $model.chatPadX, range: 0...6, decimals: 0,
+                        help: "Cuántos caracteres de aire quedan entre el texto y el borde del globo, a cada lado.")
+            ParamSlider(label: "Separación", value: $model.chatGap, range: 0...6, decimals: 0,
+                        help: "Cuánto espacio queda entre un globo y el siguiente.")
+            ParamSlider(label: "Margen izq.", value: $model.chatMarginLeft, range: 0...30, decimals: 0,
+                        help: "Distancia de los globos al borde izquierdo, en caracteres.")
+            ParamSlider(label: "Margen abajo", value: $model.chatMarginBottom, range: 0...20, decimals: 0,
+                        help: "Distancia del globo más nuevo al borde inferior. La pila se ancla abajo: el mensaje que llega entra al pie y empuja a los viejos hacia arriba, como cualquier chat.")
+
+            PanelGroupLabel(text: "Color", help: "Del texto y del fondo del globo.")
+            HStack(spacing: 8) {
+                ParamLabel(text: "Texto", help: "Color de las letras. Se dibuja por encima de todo lo demás, incluido el glitch y el pleno del ojo: un mensaje que algo puede tapar deja de cumplir su única función.")
+                ColorPicker("", selection: $model.chatTextColor, supportsOpacity: false)
+                    .labelsHidden()
+                Spacer()
+                ParamLabel(text: "Globo", help: "Color del fondo del globo.")
+                ColorPicker("", selection: $model.chatBubbleColor, supportsOpacity: false)
+                    .labelsHidden()
+            }
+            ParamSlider(label: "Opacidad", value: $model.chatBubbleAlpha, range: 0...1,
+                        help: "Cuánto tapa el fondo del globo. En 0 el texto flota sin caja, que sobre negro se lee perfecto y es más limpio; subiéndolo aparece la caja, que hace falta cuando abajo hay imagen o código y el texto se pierde.")
         }
     }
 

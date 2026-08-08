@@ -60,6 +60,24 @@ struct Preset: Codable, Equatable {
     // Color y salida
     var outputPreset: String = "Fuente"
     var sourceFill: Bool = false
+
+    // Chat
+    var chatScript: String = ""
+    var chatEnabled: Bool = false
+    var chatScale: Double = 2
+    var chatEntrance: UInt32 = 2
+    var chatInterval: Double = 2.5
+    var chatDuration: Double = 0.45
+    var chatRise: Double = 4
+    var chatColumns: Double = 28
+    var chatGap: Double = 1
+    var chatPadX: Double = 1
+    var chatMarginLeft: Double = 2
+    var chatMarginBottom: Double = 2
+    var chatLoops: Bool = true
+    var chatBubbleAlpha: Double = 0.85
+    var chatTextColor: [Double] = [1, 1, 1]
+    var chatBubbleColor: [Double] = [0.05, 0.07, 0.10]
     var colorMode: UInt32 = 0
     var invert: Bool = false
     var transparentBackground: Bool = false
@@ -190,6 +208,22 @@ struct Preset: Codable, Equatable {
         exportCodec = c.value(.exportCodec, d.exportCodec)
         outputPreset = c.value(.outputPreset, d.outputPreset)
         sourceFill = c.value(.sourceFill, d.sourceFill)
+        chatScript = c.value(.chatScript, d.chatScript)
+        chatEnabled = c.value(.chatEnabled, d.chatEnabled)
+        chatScale = c.value(.chatScale, d.chatScale)
+        chatEntrance = c.value(.chatEntrance, d.chatEntrance)
+        chatInterval = c.value(.chatInterval, d.chatInterval)
+        chatDuration = c.value(.chatDuration, d.chatDuration)
+        chatRise = c.value(.chatRise, d.chatRise)
+        chatColumns = c.value(.chatColumns, d.chatColumns)
+        chatGap = c.value(.chatGap, d.chatGap)
+        chatPadX = c.value(.chatPadX, d.chatPadX)
+        chatMarginLeft = c.value(.chatMarginLeft, d.chatMarginLeft)
+        chatMarginBottom = c.value(.chatMarginBottom, d.chatMarginBottom)
+        chatLoops = c.value(.chatLoops, d.chatLoops)
+        chatBubbleAlpha = c.value(.chatBubbleAlpha, d.chatBubbleAlpha)
+        chatTextColor = c.value(.chatTextColor, d.chatTextColor)
+        chatBubbleColor = c.value(.chatBubbleColor, d.chatBubbleColor)
         colorMode = c.value(.colorMode, d.colorMode)
         invert = c.value(.invert, d.invert)
         transparentBackground = c.value(.transparentBackground, d.transparentBackground)

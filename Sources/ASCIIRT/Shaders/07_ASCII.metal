@@ -89,6 +89,8 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                         texture2d<float, access::read>  eyeMask [[texture(ASCIIRTTextureIndexEyeMask)]],
                         texture2d<float, access::read>  height [[texture(ASCIIRTTextureIndexHeight)]],
                         texture2d<float, access::read>  spawn  [[texture(ASCIIRTTextureIndexSpawn)]],
+                        texture2d<uint,  access::read>  chat [[texture(ASCIIRTTextureIndexChat)]],
+                        texture2d<float, access::read>  textAtlas [[texture(ASCIIRTTextureIndexTextAtlas)]],
                         texture2d<float, access::write> output [[texture(ASCIIRTTextureIndexOutput)]],
                         constant RenderParams &params [[buffer(ASCIIRTBufferIndexRenderParams)]],
                         uint2 gid [[thread_position_in_grid]]) {
@@ -350,6 +352,45 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
         // Con fondo transparente el pleno tiene que ser opaco: si heredara la
         // cobertura del glifo saldria calado por dentro.
         finalCoverage = max(finalCoverage, mask);
+    }
+
+    // Globos de chat, por encima de todo. Van al final a proposito: son un
+    // mensaje, y un mensaje que el glitch o el pleno pueden tapar deja de
+    // cumplir su unica funcion.
+    if (params.chatEnabled != 0u) {
+        const uint2 slot = chat.read(homeTile).rg;
+        const float bubble = float(slot.y) / 255.0;
+        if (bubble > 0.0) {
+            const float3 bubbleColor = float3(params.chatBubbleR, params.chatBubbleG, params.chatBubbleB);
+            const float bubbleMix = bubble * params.chatBubbleAlpha;
+            finalRGB = mix(finalRGB, bubbleColor, bubbleMix);
+            finalCoverage = max(finalCoverage, bubbleMix);
+
+            if (slot.x > 0u) {
+                // Un caracter ocupa `chatScale` celdas de lado, asi que hay que
+                // averiguar que pedazo del glifo cae en esta celda. La CPU
+                // garantiza que todo arranca en multiplos de la escala, y por eso
+                // el resto de la division alcanza para ubicarse.
+                const uint escala = max(params.chatScale, 1u);
+                const uint2 sub = homeTile % escala;
+                const uint2 inCell = gid % params.tileSize;
+                const uint2 within = (sub * params.tileSize + inCell) / escala;
+
+                // SIN dar vuelta la Y, al reves que el muestreo de la rampa.
+                //
+                // La rampa la invierte y ahi esta bien: sus glifos se eligen por
+                // cuanta tinta tienen, y la tinta no cambia si el caracter esta
+                // dado vuelta, asi que nadie lo nota. Aca si: un texto invertido
+                // se lee al instante como un error.
+                const uint2 texel = uint2((slot.x - 1u) * params.tileSize.x + within.x,
+                                          within.y);
+                const float glyph = textAtlas.read(texel).r * bubble;
+
+                const float3 textColor = float3(params.chatTextR, params.chatTextG, params.chatTextB);
+                finalRGB = mix(finalRGB, textColor, glyph);
+                finalCoverage = max(finalCoverage, glyph);
+            }
+        }
     }
 
     // Alpha premultiplicado: es lo que espera una pista ProRes 4444. Sin

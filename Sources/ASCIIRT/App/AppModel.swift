@@ -11,6 +11,8 @@ enum SourceKind: String, CaseIterable, Identifiable {
     case file = "Archivo"
     /// Sin entrada: la imagen la genera el pipeline (el ojo).
     case eye = "Ojo"
+    /// Sin entrada tampoco: globos de dialogo escritos en la grilla.
+    case chat = "Chat"
 
     var id: String { rawValue }
 }
@@ -226,6 +228,56 @@ final class AppModel: ObservableObject {
     @Published var eyeBlinkColor: Color = Color(red: 1, green: 0.85, blue: 0.2) { didSet { sync() } }
     @Published var trailTint: Double = 0 { didSet { sync() } }
     @Published var trailDensity: Double = 1 { didSet { sync() } }
+
+    // MARK: - Chat
+
+    /// Un mensaje por renglon. Se edita como texto y no como lista porque
+    /// escribir una conversacion es escribir, no llenar un formulario.
+    @Published var chatScript: String = """
+        Bienvenidos!
+        Como andan amigos y amigas que alegria "verlos" acá jeje
+        Buenassss crack! como andas! Puedo tutearte o preferis que te hable formalmente?
+        sientense genios! scaneen el QR para que empiece el experimento!
+        Sacá la camara para el QR y segui las instrucciones se viene el juego
+        """ { didSet { syncChat() } }
+
+    @Published var chatEnabled = false { didSet { sync() } }
+    @Published var chatScale: Double = 2 { didSet { sync() } }
+    @Published var chatTextColor: Color = .white { didSet { sync() } }
+    @Published var chatBubbleColor: Color = Color(red: 0.05, green: 0.07, blue: 0.10) { didSet { sync() } }
+    @Published var chatBubbleAlpha: Double = 0.85 { didSet { sync() } }
+    @Published var chatEntrance: ChatEntrance = .riseFade { didSet { syncChat() } }
+    @Published var chatInterval: Double = 2.5 { didSet { syncChat() } }
+    @Published var chatDuration: Double = 0.45 { didSet { syncChat() } }
+    @Published var chatRise: Double = 4 { didSet { syncChat() } }
+    @Published var chatColumns: Double = 28 { didSet { syncChat() } }
+    @Published var chatGap: Double = 1 { didSet { syncChat() } }
+    @Published var chatPadX: Double = 1 { didSet { syncChat() } }
+    @Published var chatMarginLeft: Double = 2 { didSet { syncChat() } }
+    @Published var chatMarginBottom: Double = 2 { didSet { syncChat() } }
+    @Published var chatLoops = true { didSet { syncChat() } }
+
+    /// Lo que no viaja en `RenderParams` va directo a la capa: son mensajes y
+    /// tiempos, que resuelve la CPU.
+    private func syncChat() {
+        let layer = renderer.ascii.chat
+        layer.messages = chatScript
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { ChatMessage(text: $0.trimmingCharacters(in: .whitespaces)) }
+            .filter { !$0.text.isEmpty }
+        layer.entrance = chatEntrance
+        layer.interval = Float(chatInterval)
+        layer.entranceDuration = Float(chatDuration)
+        layer.riseCells = Float(chatRise)
+        layer.maxColumns = Int(chatColumns)
+        layer.gap = Int(chatGap)
+        layer.padX = Int(chatPadX)
+        layer.marginLeft = Int(chatMarginLeft)
+        layer.marginBottom = Int(chatMarginBottom)
+        layer.loops = chatLoops
+        layer.scale = max(Int(chatScale), 1)
+        autosave()
+    }
 
     // MARK: - Glitch
     @Published var glitchEnabled: Bool = false { didSet { sync() } }
@@ -482,6 +534,10 @@ final class AppModel: ObservableObject {
         } else {
             sync()
         }
+        // El guion del chat vive fuera de `RenderParams` y solo se proyecta desde
+        // su didSet, que al arrancar no dispara. Sin esta llamada la capa arranca
+        // sin mensajes y la pantalla queda negra con el chat encendido.
+        syncChat()
 
         openFileObserver = NotificationCenter.default.addObserver(
             forName: .asciirtOpenFile, object: nil, queue: .main
@@ -502,7 +558,8 @@ final class AppModel: ObservableObject {
         guard !isApplyingPreset else { return }
 
         var next = PipelineConfig()
-        next.generative = sourceKind == .eye
+        next.generative = sourceKind == .eye || sourceKind == .chat
+        next.chatOnly = sourceKind == .chat
         next.eyeCenter = SIMD2(Float(eyeCenter.x), Float(eyeCenter.y))
         next.eyeRadius = Float(eyeRadius)
         next.eyeCoreRadius = Float(eyeCoreRadius)
@@ -569,6 +626,11 @@ final class AppModel: ObservableObject {
         next.outputSize = outputPreset.size ?? sourceSize
         next.outputFollowsSource = outputPreset == .source
         next.sourceFill = sourceFill
+        next.chatEnabled = chatEnabled
+        next.chatScale = UInt32(max(chatScale, 1))
+        next.chatTextColor = AppModel.components(of: chatTextColor)
+        next.chatBubbleColor = AppModel.components(of: chatBubbleColor)
+        next.chatBubbleAlpha = Float(chatBubbleAlpha)
         next.colorMode = colorMode.rawValue
         next.invert = invert
         next.transparentBackground = transparentBackground
@@ -712,6 +774,24 @@ final class AppModel: ObservableObject {
         preset.exportCodec = exportCodec
         preset.outputPreset = outputPreset.rawValue
         preset.sourceFill = sourceFill
+        preset.chatScript = chatScript
+        preset.chatEnabled = chatEnabled
+        preset.chatScale = chatScale
+        preset.chatEntrance = chatEntrance.rawValue
+        preset.chatInterval = chatInterval
+        preset.chatDuration = chatDuration
+        preset.chatRise = chatRise
+        preset.chatColumns = chatColumns
+        preset.chatGap = chatGap
+        preset.chatPadX = chatPadX
+        preset.chatMarginLeft = chatMarginLeft
+        preset.chatMarginBottom = chatMarginBottom
+        preset.chatLoops = chatLoops
+        preset.chatBubbleAlpha = chatBubbleAlpha
+        let chatText = AppModel.components(of: chatTextColor)
+        preset.chatTextColor = [Double(chatText.x), Double(chatText.y), Double(chatText.z)]
+        let chatBubble = AppModel.components(of: chatBubbleColor)
+        preset.chatBubbleColor = [Double(chatBubble.x), Double(chatBubble.y), Double(chatBubble.z)]
         preset.colorMode = colorMode.rawValue
         preset.invert = invert
         preset.transparentBackground = transparentBackground
@@ -871,6 +951,29 @@ final class AppModel: ObservableObject {
         exportCodec = preset.exportCodec
         outputPreset = OutputPreset(rawValue: preset.outputPreset) ?? .source
         sourceFill = preset.sourceFill
+        // Un preset viejo no tiene guion; dejarlo vacio borraria la conversacion
+        // que trae la app y la pantalla quedaria negra sin explicacion.
+        if !preset.chatScript.isEmpty { chatScript = preset.chatScript }
+        chatEnabled = preset.chatEnabled
+        chatScale = preset.chatScale
+        chatEntrance = ChatEntrance(rawValue: preset.chatEntrance) ?? .riseFade
+        chatInterval = preset.chatInterval
+        chatDuration = preset.chatDuration
+        chatRise = preset.chatRise
+        chatColumns = preset.chatColumns
+        chatGap = preset.chatGap
+        chatPadX = preset.chatPadX
+        chatMarginLeft = preset.chatMarginLeft
+        chatMarginBottom = preset.chatMarginBottom
+        chatLoops = preset.chatLoops
+        chatBubbleAlpha = preset.chatBubbleAlpha
+        if preset.chatTextColor.count >= 3 {
+            chatTextColor = Color(red: preset.chatTextColor[0], green: preset.chatTextColor[1], blue: preset.chatTextColor[2])
+        }
+        if preset.chatBubbleColor.count >= 3 {
+            chatBubbleColor = Color(red: preset.chatBubbleColor[0], green: preset.chatBubbleColor[1], blue: preset.chatBubbleColor[2])
+        }
+        syncChat()
         colorMode = ColorMode(rawValue: preset.colorMode) ?? .mono
         invert = preset.invert
         transparentBackground = preset.transparentBackground
@@ -1060,7 +1163,7 @@ final class AppModel: ObservableObject {
         switch previous {
         case .camera: camera.stop()
         case .file: file.stop()
-        case .eye: break
+        case .eye, .chat: break
         }
         isRunning = false
         format = nil
@@ -1098,6 +1201,17 @@ final class AppModel: ObservableObject {
             // default razonable para proyectar.
             sourceSize = SIMD2(1920, 1080)
             isRunning = true
+
+        case .chat:
+            fileURL = nil
+            duration = 0
+            currentTime = 0
+            isPlaying = false
+            sourceSize = SIMD2(1920, 1080)
+            isRunning = true
+            // El chat se enciende al elegirlo: es la unica razon para estar aca.
+            chatEnabled = true
+            syncChat()
         }
         syncRenderFlags()
         sync()
@@ -1110,11 +1224,11 @@ final class AppModel: ObservableObject {
     /// quedaba apagado y la pantalla en negro. Un solo metodo, llamado desde
     /// todos los didSet que puedan afectarlos.
     private func syncRenderFlags() {
-        renderer.generative = sourceKind == .eye
+        renderer.generative = sourceKind == .eye || sourceKind == .chat
         renderer.asciiEnabled = asciiEnabled
         // El generador anima por reloj, no por frame de entrada: sin repintado
         // continuo quedaria congelado en el primer cuadro.
-        renderer.continuousRedraw = matrixEnabled || sourceKind == .eye
+        renderer.continuousRedraw = matrixEnabled || sourceKind == .eye || sourceKind == .chat
         matte.isEnabled = subjectMatteEnabled
     }
 
@@ -1332,7 +1446,7 @@ extension AppModel: FrameSourceDelegate {
         switch sourceKind {
         case .camera: return source === camera
         case .file: return source === file
-        case .eye: return false   // el generador no entrega frames por delegate
+        case .eye, .chat: return false   // los generadores no entregan frames por delegate
         }
     }
 

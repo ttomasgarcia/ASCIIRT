@@ -115,6 +115,14 @@ struct PipelineConfig: Equatable {
     /// `true` = la fuente llena la salida y se recorta lo que sobra.
     var sourceFill = false
 
+    // MARK: Chat
+    var chatEnabled = false
+    var chatOnly = false
+    var chatScale: UInt32 = 2
+    var chatTextColor: SIMD3<Float> = SIMD3(1, 1, 1)
+    var chatBubbleColor: SIMD3<Float> = SIMD3(0.05, 0.07, 0.10)
+    var chatBubbleAlpha: Float = 0.85
+
     // MARK: Glitch
     var glitchEnabled: Bool = false
     var glitchRate: Float = 1.2
@@ -243,6 +251,10 @@ final class ASCIIPipeline {
     /// poder dibujar el frame. Escribiendo aca, el arrastre no toca a SwiftUI.
     var dragTarget: SIMD2<Float>?
 
+    /// Globos de chat. El maquetado corre en CPU y deja una textura de grid.
+    let chat = ChatLayer()
+    private var textAtlas: TextAtlas?
+
     init(context: MetalContext, config: PipelineConfig) throws {
         self.context = context
         self.config = config
@@ -289,6 +301,14 @@ final class ASCIIPipeline {
                                                 excluded: config.excluded,
                                                 cellWidth: Int(config.tileSize.x),
                                                 cellHeight: Int(config.tileSize.y))
+        // Si la fuente elegida no sirve para texto, el chat no dibuja y el resto
+        // de la app sigue funcionando. No es un error que valga la pena
+        // interrumpir a nadie: la rampa, que es lo que define el look, ya se
+        // construyo con la misma fuente unas lineas mas arriba.
+        self.textAtlas = try? FontAtlasBuilder.buildText(device: context.device,
+                                                         font: config.font,
+                                                         cellWidth: Int(config.tileSize.x),
+                                                         cellHeight: Int(config.tileSize.y))
     }
 
     /// Reconfigura solo lo que haga falta: cambiar el tile regenera el atlas,
@@ -313,6 +333,10 @@ final class ASCIIPipeline {
             self.eyeTrailTextures = textures.eyeTrail
         }
         if atlasChanged {
+            textAtlas = try? FontAtlasBuilder.buildText(device: context.device,
+                                                        font: new.font,
+                                                        cellWidth: Int(new.tileSize.x),
+                                                        cellHeight: Int(new.tileSize.y))
             atlas = try FontAtlasBuilder.build(device: context.device,
                                                font: new.font,
                                                charset: new.charset,
@@ -504,6 +528,23 @@ final class ASCIIPipeline {
         encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
         encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
         encoder.setTexture(outputTexture, index: Int(ASCIIRTTextureIndexOutput.rawValue))
+
+        // Chat. El maquetado corre en CPU y deja una textura de grid con
+        // (caracter, opacidad) por celda; la composicion pasa dentro de la etapa
+        // ASCII, al final, para que ni el glitch ni el pleno tapen un mensaje.
+        //
+        // La textura se crea aunque el chat este apagado: el shader la lee por
+        // una condicion de runtime, asi que el binding tiene que existir igual.
+        chat.ensure(device: context.device, gridSize: config.gridSize)
+        if config.chatEnabled, let textAtlas {
+            chat.update(device: context.device, gridSize: config.gridSize,
+                        atlas: textAtlas, time: currentTime)
+        }
+        if let layer = chat.texture, let textAtlas {
+            encoder.setTexture(layer, index: Int(ASCIIRTTextureIndexChat.rawValue))
+            encoder.setTexture(textAtlas.texture, index: Int(ASCIIRTTextureIndexTextAtlas.rawValue))
+        }
+
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: asciiThreadgroup())
 
         // Media de luminancia para el frame siguiente. Va al final: el encoder es
@@ -661,7 +702,17 @@ final class ASCIIPipeline {
                             glitchBlockScale: config.glitchBlockScale,
                             glitchBlockFill: config.glitchBlockFill,
                             glitchFreeze: config.glitchFreeze,
-                            glitchScramble: config.glitchScramble)
+                            glitchScramble: config.glitchScramble,
+                            chatEnabled: config.chatEnabled ? 1 : 0,
+                            chatOnly: config.chatOnly ? 1 : 0,
+                            chatScale: max(config.chatScale, 1),
+                            chatTextR: config.chatTextColor.x,
+                            chatTextG: config.chatTextColor.y,
+                            chatTextB: config.chatTextColor.z,
+                            chatBubbleR: config.chatBubbleColor.x,
+                            chatBubbleG: config.chatBubbleColor.y,
+                            chatBubbleB: config.chatBubbleColor.z,
+                            chatBubbleAlpha: config.chatBubbleAlpha)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

@@ -331,3 +331,78 @@ enum FontAtlasBuilder {
         return glyphs
     }
 }
+
+/// Atlas de TEXTO: los caracteres que puede dibujar la capa de chat.
+///
+/// Separado del atlas de la rampa por la misma razon que el de los glifos
+/// direccionales: la rampa esta ordenada por cobertura de tinta y su indice
+/// significa "que tan denso", no "que letra". Para escribir hace falta lo
+/// contrario — un indice estable por caracter — y meterlos en la rampa la
+/// reordenaria entera.
+struct TextAtlas {
+    let texture: MTLTexture
+    let characters: [Character]
+    private let lookup: [Character: UInt8]
+
+    let cellWidth: Int
+    let cellHeight: Int
+
+    init(texture: MTLTexture, characters: [Character], cellWidth: Int, cellHeight: Int) {
+        self.texture = texture
+        self.characters = characters
+        self.cellWidth = cellWidth
+        self.cellHeight = cellHeight
+        var table: [Character: UInt8] = [:]
+        for (i, c) in characters.enumerated() where i < 254 { table[c] = UInt8(i + 1) }
+        self.lookup = table
+    }
+
+    /// 0 = sin caracter. Los indices arrancan en 1 para que el cero pueda
+    /// significar "celda vacia" en la textura de la capa.
+    func index(of character: Character) -> UInt8 { lookup[character] ?? 0 }
+
+    /// Juego fijo y no derivado del texto del usuario: asi el atlas se rearma
+    /// solo cuando cambia la fuente o el tamano de celda, y no cada vez que se
+    /// tipea una letra en el panel.
+    static let defaultCharacters: [Character] = Array(
+        " !\"#$%&'()*+,-./0123456789:;<=>?@" +
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`" +
+        "abcdefghijklmnopqrstuvwxyz{|}~" +
+        "áéíóúüñÁÉÍÓÚÜÑ¡¿ºª€·…" +
+        "─│┌┐└┘├┤┬┴┼█▓▒░")
+}
+
+extension FontAtlasBuilder {
+
+    /// Mismo rasterizador que la rampa, sin medir cobertura ni ordenar: el orden
+    /// aca es el del juego de caracteres y tiene que quedarse quieto.
+    static func buildText(device: MTLDevice,
+                          font selection: FontSelection,
+                          cellWidth: Int,
+                          cellHeight: Int) throws -> TextAtlas {
+        let font = try selection.makeFont(size: CGFloat(cellHeight))
+
+        // Se descartan los caracteres que la fuente no tenga en vez de fallar.
+        // En la rampa fallar es correcto —el usuario eligio ese charset y tiene
+        // que enterarse— pero aca el juego lo pone la app, y una fuente sin, por
+        // ejemplo, los caracteres de caja dejaria el chat entero sin dibujar.
+        let characters = TextAtlas.defaultCharacters.filter { character in
+            let utf16 = Array(String(character).utf16)
+            var resolved = [CGGlyph](repeating: 0, count: utf16.count)
+            let ok = CTFontGetGlyphsForCharacters(font, utf16, &resolved, utf16.count)
+            return ok && (resolved.first ?? 0) != 0
+        }
+        guard !characters.isEmpty else {
+            throw AppError(.shaders, "«\(selection.displayName)» no tiene ningun caracter para el chat.")
+        }
+        let strip = try rasterize(characters: characters, font: font, selection: selection,
+                                  cellWidth: cellWidth, cellHeight: cellHeight)
+        // Orden identidad: aca el indice significa "que letra" y no puede moverse.
+        let texture = try makeTexture(device: device, strip: strip,
+                                      order: Array(0..<characters.count),
+                                      cellWidth: cellWidth, cellHeight: cellHeight,
+                                      sourceStride: cellWidth * characters.count)
+        return TextAtlas(texture: texture, characters: characters,
+                         cellWidth: cellWidth, cellHeight: cellHeight)
+    }
+}

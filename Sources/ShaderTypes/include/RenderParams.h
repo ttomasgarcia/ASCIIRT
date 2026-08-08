@@ -66,6 +66,8 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexEyeTrailPrev = 22, ///< RGBA8 color+cuerpo del ojo arrastrado, frame anterior
     ASCIIRTTextureIndexEyeTrailNext = 23, ///< RGBA8 color+cuerpo del ojo arrastrado, este frame
     ASCIIRTTextureIndexTrailOut = 24, ///< R16F lo que ven las etapas de abajo: fuente + rastro
+    ASCIIRTTextureIndexChat = 25,     ///< RG8Uint por celda: (indice de caracter + 1, opacidad del globo)
+    ASCIIRTTextureIndexTextAtlas = 26,///< R8Unorm, atlas de texto para los globos
 };
 
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
@@ -452,6 +454,30 @@ typedef struct {
     /// sale mal pero la estructura de densidad sobrevive, asi que se lee como
     /// texto corrompido y no como ruido.
     float glitchScramble;
+
+    // ---- Chat ---------------------------------------------------------------
+    //
+    // El texto se escribe DIRECTO en la grilla, una letra por celda, y no se
+    // pasa por la rampa. Un texto convertido a ASCII queda ilegible a los
+    // tamanos de celda que se usan: se lee como una mancha de densidad con forma
+    // de renglon. El maquetado y los tiempos los resuelve la CPU y llegan aca
+    // como una textura de grid con (caracter, opacidad) por celda.
+    uint32_t chatEnabled;
+
+    /// La fuente es SOLO el chat: el generador escribe negro y los globos son
+    /// todo lo que hay. Va como parametro y no como una rama en Swift porque el
+    /// resto del pipeline tiene que correr igual — rampa, glitch, color y export
+    /// se comportan como con cualquier otra fuente.
+    uint32_t chatOnly;
+
+    /// Cuantas celdas ocupa cada caracter por lado. El shader lo necesita para
+    /// saber que pedazo del glifo le toca a cada celda.
+    uint32_t chatScale;
+
+    float chatTextR, chatTextG, chatTextB;
+    /// Color y opacidad del globo. En 0 el texto flota sin fondo.
+    float chatBubbleR, chatBubbleG, chatBubbleB;
+    float chatBubbleAlpha;
 } RenderParams;
 
 #endif /* RenderParams_h */
