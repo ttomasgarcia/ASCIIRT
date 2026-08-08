@@ -150,15 +150,26 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
             for (uint b = 0u; b < count; ++b) {
                 const uint h = mixHash(b * 0x165667b1u ^ burst);
                 const uint2 ratio = ratios[mixHash(h) & 7u];
-                const uint scale = 1u + uint(hash11(h ^ 0x2545f491u) * max(params.glitchBlockScale, 1.0));
+
+                // La escala es el LADO LARGO en modulos, no un multiplicador
+                // encima de la proporcion. Antes era lo segundo, y como la tabla
+                // llega hasta 4:1, en escala 1 un bloque podia salir igual de
+                // cuatro modulos de largo: «escala 1» no significaba nada.
+                //
+                // Consecuencia: en escala 1 la proporcion se aplasta y todos los
+                // bloques salen de un modulo. Es lo que uno espera de un 1, y las
+                // proporciones vuelven a aparecer solas al subir.
+                const uint longest = max(max(ratio.x, ratio.y), 1u);
+                const uint units = 1u + uint(hash11(h ^ 0x2545f491u)
+                                             * max(params.glitchBlockScale - 1.0, 0.0));
 
                 // Origen pegado a la grilla de modulos: los bloques se alinean
                 // entre si aunque no se toquen, que es de donde sale la lectura
                 // de grilla.
                 const int x0 = int((uint(hash11(h) * float(colsM))) * modW);
                 const int y0 = int((uint(hash11(h ^ 0x85ebca6bu) * float(rowsM))) * modH);
-                const int bw = int(ratio.x * scale * modW);
-                const int bh = int(ratio.y * scale * modH);
+                const int bw = int(max(ratio.x * units / longest, 1u) * modW);
+                const int bh = int(max(ratio.y * units / longest, 1u) * modH);
 
                 if (int(homeTile.x) >= x0 && int(homeTile.x) < x0 + bw &&
                     int(homeTile.y) >= y0 && int(homeTile.y) < y0 + bh) {
