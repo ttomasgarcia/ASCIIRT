@@ -116,6 +116,22 @@ struct Preset: Codable, Equatable {
     var eyeBlinkColor: [Double] = [1, 0.85, 0.2]
     var trailTint: Double = 0
     var trailDensity: Double = 1
+
+    // Glitch
+    var glitchEnabled: Bool = false
+    var glitchRate: Double = 1.2
+    var glitchDuty: Double = 0.18
+    var glitchChance: Double = 0.6
+    var glitchAmount: Double = 0.6
+    var glitchBandHeight: Double = 3
+    var glitchBandShift: Double = 8
+    var glitchBandAmount: Double = 0.35
+    var glitchBlockCount: Double = 5
+    var glitchBlockMin: Double = 2
+    var glitchBlockMax: Double = 10
+    var glitchBlockFill: UInt32 = 0
+    var glitchFreeze: Double = 0.25
+    var glitchScramble: Double = 0.2
     var eyePulseShape: Double = 0.6
     var eyeFieldNoise: Double = 0.55
     var eyeFieldChurn: Double = 6
@@ -227,6 +243,20 @@ struct Preset: Codable, Equatable {
         eyeBlinkColor = c.value(.eyeBlinkColor, d.eyeBlinkColor)
         trailTint = c.value(.trailTint, d.trailTint)
         trailDensity = c.value(.trailDensity, d.trailDensity)
+        glitchEnabled = c.value(.glitchEnabled, d.glitchEnabled)
+        glitchRate = c.value(.glitchRate, d.glitchRate)
+        glitchDuty = c.value(.glitchDuty, d.glitchDuty)
+        glitchChance = c.value(.glitchChance, d.glitchChance)
+        glitchAmount = c.value(.glitchAmount, d.glitchAmount)
+        glitchBandHeight = c.value(.glitchBandHeight, d.glitchBandHeight)
+        glitchBandShift = c.value(.glitchBandShift, d.glitchBandShift)
+        glitchBandAmount = c.value(.glitchBandAmount, d.glitchBandAmount)
+        glitchBlockCount = c.value(.glitchBlockCount, d.glitchBlockCount)
+        glitchBlockMin = c.value(.glitchBlockMin, d.glitchBlockMin)
+        glitchBlockMax = c.value(.glitchBlockMax, d.glitchBlockMax)
+        glitchBlockFill = c.value(.glitchBlockFill, d.glitchBlockFill)
+        glitchFreeze = c.value(.glitchFreeze, d.glitchFreeze)
+        glitchScramble = c.value(.glitchScramble, d.glitchScramble)
         eyePulseShape = c.value(.eyePulseShape, d.eyePulseShape)
         eyeFieldNoise = c.value(.eyeFieldNoise, d.eyeFieldNoise)
         eyeFieldChurn = c.value(.eyeFieldChurn, d.eyeFieldChurn)

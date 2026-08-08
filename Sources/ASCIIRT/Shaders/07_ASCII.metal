@@ -94,13 +94,66 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                         uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= params.outputSize.x || gid.y >= params.outputSize.y) { return; }
 
-    const uint2 tile = gid / params.tileSize;
+    uint2 tile = gid / params.tileSize;
 
     // Sobra de division no entera (spec §3 avisa en la UI, pero igual hay que
     // pintar algo): fuera del grid va fondo.
     if (tile.x >= params.gridSize.x || tile.y >= params.gridSize.y) {
         output.write(float4(0.0, 0.0, 0.0, 1.0), gid);
         return;
+    }
+
+    // --- Glitch ---------------------------------------------------------
+    //
+    // Todo cuantizado a la celda. Las bandas corren el tile de LECTURA, asi que
+    // se lleva el glifo, la luma y el color juntos: correr solo uno de los tres
+    // daria caracteres de un lado con el color del otro, que se lee como error
+    // de programa y no como corrupcion.
+    const uint2 homeTile = tile;
+    bool inBlock = false;
+    uint scramble = 0u;
+
+    if (params.glitchEnabled != 0u) {
+        uint burst = 0u;
+        const float on = glitchGate(params.time, params.glitchRate,
+                                    params.glitchDuty, params.glitchChance, burst);
+        const float k = on * saturate(params.glitchAmount);
+        if (k > 0.0) {
+            // Bandas: filas enteras corridas en horizontal.
+            const uint bandHeight = uint(max(params.glitchBandHeight, 1.0));
+            const uint band = homeTile.y / bandHeight;
+            if (hash11(mixHash(band * 0x27d4eb2du ^ burst)) < params.glitchBandAmount) {
+                const float dir = hash11(mixHash(band ^ (burst * 7919u))) * 2.0 - 1.0;
+                const int shift = int(dir * params.glitchBandShift * k);
+                tile.x = uint(clamp(int(tile.x) + shift, 0, int(params.gridSize.x) - 1));
+            }
+
+            // Bloques: se prueban contra el tile de ORIGEN, no contra el corrido.
+            // Si se probaran contra el corrido, los bloques viajarian con las
+            // bandas y dejarian de leerse como algo pegado a la pantalla.
+            const uint count = uint(clamp(params.glitchBlockCount, 0.0, 16.0));
+            for (uint b = 0u; b < count; ++b) {
+                const uint h = mixHash(b * 0x165667b1u ^ burst);
+                const float w = mix(params.glitchBlockMin, params.glitchBlockMax, hash11(h ^ 0x2545f491u));
+                const float ht = mix(params.glitchBlockMin, params.glitchBlockMax, hash11(h ^ 0x9e3779b9u));
+                const int x0 = int(hash11(h) * float(params.gridSize.x));
+                const int y0 = int(hash11(h ^ 0x85ebca6bu) * float(params.gridSize.y));
+                if (int(homeTile.x) >= x0 && int(homeTile.x) < x0 + int(w) &&
+                    int(homeTile.y) >= y0 && int(homeTile.y) < y0 + int(ht)) {
+                    inBlock = true;
+                    break;
+                }
+            }
+
+            // Corrupcion del indice: el caracter sale mal pero la densidad
+            // sobrevive, asi que se lee como texto roto y no como ruido.
+            if (params.glitchScramble > 0.0) {
+                const uint cell = mixHash(homeTile.x ^ (homeTile.y * 0x9e3779b9u)) ^ burst;
+                if (hash11(cell) < params.glitchScramble) {
+                    scramble = mixHash(cell ^ 0x27d4eb2du);
+                }
+            }
+        }
     }
 
     const float tileLuma = saturate(grid.read(tile).r);
@@ -110,6 +163,15 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     const uint2 decision = glyphs.read(tile).rg;
     uint index = decision.x;
     bool isEdge = decision.y != 0u;
+
+    // Solo se revuelven celdas que YA tenian algo. Revolver una celda vacia le
+    // pone un caracter donde no habia nada, y eso llena el negro de basura hasta
+    // tapar la imagen: deja de leerse como texto corrompido y pasa a ser ruido.
+    // Empezando desde 1 el revoltijo tampoco puede apagar una celda encendida,
+    // asi que la densidad total se mantiene y lo unico que cambia es cual glifo.
+    if (scramble != 0u && !isEdge && index > 0u && params.rampLength > 1u) {
+        index = 1u + (index - 1u + scramble) % (params.rampLength - 1u);
+    }
 
     const float3 foreground = float3(params.foregroundR, params.foregroundG, params.foregroundB);
     const float3 background = float3(params.backgroundR, params.backgroundG, params.backgroundB);
@@ -208,6 +270,20 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     // Invert cambia quien es tinta y quien es fondo, no el color: invertir el
     // color daria el negativo fotografico, que es otra cosa.
     float coverage = params.invert != 0u ? 1.0 - ink : ink;
+
+    // Bloque corrompido. No usa ningun glifo: la forma se dibuja aca, con lo
+    // cual no hace falta meter caracteres de bloque en el charset — que ademas
+    // desbalancearia la rampa calibrada, porque un solido pesa mas que cualquier
+    // glifo y se llevaria el extremo denso.
+    if (inBlock) {
+        switch (params.glitchBlockFill) {
+            case 0u: coverage = 1.0; break;                                  // solido
+            case 1u: coverage = float(((gid.x / 2u + gid.y / 2u) & 1u));     // trama
+                     break;
+            case 2u: coverage = 1.0 - coverage; break;                       // invertido
+            default: coverage = 0.0; break;                                  // vacio
+        }
+    }
 
     // Vaciar el interior: se quita la tinta del glifo, no el color. Asi el pleno
     // y el anillo siguen dibujandose y lo unico que desaparece adentro es el

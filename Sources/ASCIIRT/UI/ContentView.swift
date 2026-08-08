@@ -352,6 +352,7 @@ private struct ControlPanel: View {
     @State private var showMatrix = true
     @State private var showEyeLife = true
     @State private var showEyeMotion = true
+    @State private var showGlitch = true
     @State private var showProject = true
     @State private var showCoverage = false
 
@@ -442,6 +443,12 @@ private struct ControlPanel: View {
                              help: "Todo lo que tiene que ver con el tiempo: cuánto dura la imagen de un frame en el siguiente, cuánto tiene que cambiar algo para que el carácter cambie, y cómo se compensa el automático de exposición de la cámara. Sin histéresis la salida hierve aunque la escena esté quieta, y eso es lo que más delata que es un filtro.",
                              isExpanded: $showTemporal) {
                     temporalContent
+                }
+                Divider()
+                PanelSection(title: "Glitch", systemImage: "waveform.badge.exclamationmark",
+                             help: "Corrupción del código, cuantizada a la celda. Nada se corre medio carácter, así que la grilla tipográfica nunca se rompe y el resultado sale duro y geométrico en vez de baboso. Va a ráfagas y no continuo: un glitch permanente deja de leerse como falla y pasa a ser textura. Todo sale de hashes del número de ráfaga, que es una función del tiempo, así que el render offline saca exactamente la misma secuencia de fallas que viste en pantalla.",
+                             isExpanded: $showGlitch) {
+                    glitchContent
                 }
                 Divider()
                 PanelSection(title: "Matrix", systemImage: "cloud.rain",
@@ -1171,6 +1178,63 @@ private struct ControlPanel: View {
                         help: "A qué luminancia se lleva el promedio de la imagen. 0,5 lo centra en la rampa y usa todo el rango de glifos; más alto aclara y empuja la imagen hacia los caracteres densos; más bajo la oscurece.")
                 .disabled(model.autoLevelStrength <= 0)
             }
+        }
+    }
+
+    // MARK: Glitch
+
+    private var glitchContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            ParamToggle(label: "Activo", isOn: $model.glitchEnabled,
+                        help: "Enciende la corrupción. Todo lo de abajo sólo actúa durante las ráfagas; entre una y otra la imagen sale limpia.")
+
+            VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+                PanelGroupLabel(text: "Disparo", help: "Cuándo pasa. Es lo que decide si se lee como falla o como textura.")
+                ParamSlider(label: "Ritmo", value: $model.glitchRate, range: 0.05...8, decimals: 2,
+                            help: "Cada cuánto puede dispararse una ráfaga, en veces por segundo. Bajo deja largos tramos limpios y cada falla pega; alto se vuelve un estado permanente y deja de sorprender. Entre 0,5 y 2 es donde se lee como un sistema que falla cada tanto.")
+                ParamSlider(label: "Duración", value: $model.glitchDuty, range: 0.01...1, decimals: 2,
+                            help: "Qué parte de cada intervalo dura la ráfaga. Valores bajos dan chispazos de un par de cuadros — lo más parecido a un error real. Arriba de 0,5 la corrupción pasa a ser el estado normal y lo que se nota son los momentos limpios.")
+                ParamSlider(label: "Probabilidad", value: $model.glitchChance, range: 0...1,
+                            help: "Qué chance tiene cada intervalo de disparar. En 1 dispara siempre y el ritmo se vuelve de metrónomo, que es lo que más delata que hay un generador atrás. Bajándolo aparecen huecos irregulares y el patrón deja de ser previsible.")
+                ParamSlider(label: "Intensidad", value: $model.glitchAmount, range: 0...1,
+                            help: "Escala general del desplazamiento de las bandas. No afecta a los bloques ni al congelado, que tienen su propia cantidad.")
+
+                PanelGroupLabel(text: "Bandas", help: "Filas de celdas corridas en horizontal. El desgarro clásico de señal.")
+                ParamSlider(label: "Alto", value: $model.glitchBandHeight, range: 1...20, decimals: 0,
+                            help: "Alto de cada banda en celdas. Bandas de una celda dan un rasgado fino tipo interferencia; bandas gruesas parten la imagen en pocos bloques grandes y se lee más como un corte de edición que como ruido.")
+                ParamSlider(label: "Corrimiento", value: $model.glitchBandShift, range: 0...40, decimals: 0,
+                            help: "Cuántas celdas como máximo se puede correr una banda. Siempre es un número entero de celdas: por eso el desgarro sale a escuadra y no queda medio carácter cortado.")
+                ParamSlider(label: "Cantidad", value: $model.glitchBandAmount, range: 0...1,
+                            help: "Qué fracción de las bandas se corre en cada ráfaga. Bajo deja la imagen casi entera con un par de rasgaduras; en 1 se corren todas y la imagen se desarma completa.")
+
+                PanelGroupLabel(text: "Bloques", help: "Regiones rectangulares corrompidas. Es la parte geométrica dura.")
+                ParamSlider(label: "Cantidad", value: $model.glitchBlockCount, range: 0...16, decimals: 0,
+                            help: "Cuántos rectángulos aparecen por ráfaga. Cada uno se sortea de nuevo en cada ráfaga, así que no se repiten posiciones.")
+                ParamSlider(label: "Mínimo", value: $model.glitchBlockMin, range: 1...30, decimals: 0,
+                            help: "Lado más chico posible, en celdas.")
+                ParamSlider(label: "Máximo", value: $model.glitchBlockMax, range: 1...60, decimals: 0,
+                            help: "Lado más grande posible, en celdas. Con mínimo y máximo cerca los bloques salen todos parecidos y se lee como un patrón; separándolos aparece jerarquía y se lee como daño.")
+                HStack(spacing: 6) {
+                    Picker("", selection: $model.glitchBlockFill) {
+                        Text("Sólido").tag(UInt32(0))
+                        Text("Trama").tag(UInt32(1))
+                        Text("Invertido").tag(UInt32(2))
+                        Text("Vacío").tag(UInt32(3))
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    HelpMark("Con qué se rellena el rectángulo. Sólido lo pinta lleno. Trama usa un damero de dos píxeles, que a distancia lee como medio tono. Invertido cambia tinta por fondo dentro del bloque, así que el código sigue estando pero en negativo. Vacío lo apaga y deja un agujero. El relleno se dibuja directo y no usa ningún carácter: meter glifos de bloque en el charset desbalancearía la rampa calibrada, porque un sólido pesa más que cualquier glifo y se quedaría con el extremo denso.",
+                             title: "Relleno del bloque")
+                }
+
+                PanelGroupLabel(text: "Celda", help: "Corrupción carácter por carácter, sin geometría.")
+                ParamSlider(label: "Congelado", value: $model.glitchFreeze, range: 0...1,
+                            help: "Qué fracción de las celdas retiene el carácter que tenía, como un codec que perdió el keyframe. Se resuelve en la etapa que elige el glifo y no en la composición: ahí el valor retenido se propaga solo de cuadro a cuadro, así que la celda queda clavada toda la ráfaga en vez de quedar un cuadro atrasada. Es lo que más se parece a un video roto de verdad.")
+                ParamSlider(label: "Revoltijo", value: $model.glitchScramble, range: 0...1,
+                            help: "Qué fracción de las celdas recibe un carácter equivocado. La densidad de la imagen sobrevive porque sólo cambia cuál glifo se dibuja, no cuánta tinta hay en promedio: por eso se lee como texto corrompido y no como ruido encima. No toca los glifos de borde, que si se mezclaran romperían el contorno.")
+            }
+            .disabled(!model.glitchEnabled)
         }
     }
 

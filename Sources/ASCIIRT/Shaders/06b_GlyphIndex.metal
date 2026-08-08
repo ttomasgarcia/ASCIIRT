@@ -70,5 +70,25 @@ kernel void glyphIndexKernel(texture2d<float, access::read> grid [[texture(ASCII
         }
     }
 
+    // Congelado del glitch: la celda retiene el glifo del frame anterior, como
+    // un codec que perdio el keyframe.
+    //
+    // Va aca y no en la composicion porque aca el valor retenido se ESCRIBE, asi
+    // que se propaga solo de frame a frame y la celda queda clavada toda la
+    // racha. Resuelto en la composicion, cada frame tomaria el del anterior sin
+    // congelar y solo quedaria un cuadro de atraso, que no se ve.
+    if (params.glitchEnabled != 0u && params.glitchFreeze > 0.0) {
+        uint burst = 0u;
+        const float on = glitchGate(params.time, params.glitchRate,
+                                    params.glitchDuty, params.glitchChance, burst);
+        if (on > 0.0) {
+            const uint cell = mixHash(gid.x * 0x9e3779b9u) ^ mixHash(gid.y ^ burst);
+            if (hash11(cell) < params.glitchFreeze) {
+                next.write(previous.read(gid), gid);
+                return;
+            }
+        }
+    }
+
     next.write(uint4(fresh, 0u, 0u, 0u), gid);
 }

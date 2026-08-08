@@ -58,3 +58,18 @@ static inline float quasiField(float2 p, float t) {
     s      += sin((-p.x * 0.588 - p.y * 0.809) * kTau * 4.236 + t * 0.113 * kTau) * 0.11;
     return s;
 }
+
+/// Ventana de la rafaga de glitch. Devuelve 0 fuera de la racha y 1 adentro, y
+/// escribe en `burst` el numero de racha para sembrar el resto de los hashes.
+///
+/// El glitch va a rachas y no continuo: permanente deja de leerse como falla y
+/// pasa a ser textura. `chance` rompe el metronomo — con 1 dispara todos los
+/// intervalos y se vuelve predecible enseguida.
+static inline float glitchGate(float time, float rate, float duty, float chance,
+                               thread uint &burst) {
+    const float t = time * max(rate, 1e-4);
+    const float step = floor(t);
+    burst = uint(int(step) & 0xffff) ^ 0x51ed270bu;
+    if (hash11(mixHash(burst)) > saturate(chance)) { return 0.0; }
+    return (t - step) < saturate(duty) ? 1.0 : 0.0;
+}

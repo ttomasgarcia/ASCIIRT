@@ -389,6 +389,54 @@ typedef struct {
     /// Escala lo que ENTRA al rastro y no lo que sale. Escalar la salida se
     /// compondria frame a frame y terminaria siendo otro control de duracion.
     float trailDensity;
+
+    // ---- Glitch -------------------------------------------------------------
+    //
+    // Todo cuantizado a la CELDA: nada se corre medio caracter. Es lo que hace
+    // que se lea como corrupcion del codigo y no como un filtro de video con
+    // letras debajo, y lo que lo mantiene geometrico.
+    //
+    // Todo sale de hashes de (celda, numero de rafaga), y el numero de rafaga es
+    // floor(tiempo * ritmo). O sea que es una funcion pura del tiempo, igual que
+    // los modos de mirada: el render offline saca exactamente la misma secuencia
+    // de fallas que se vio en pantalla.
+    uint32_t glitchEnabled;
+
+    /// Rafagas por segundo. El glitch NO es continuo: pasa a rachas y el resto
+    /// del tiempo la imagen esta limpia. Un glitch permanente deja de leerse
+    /// como falla y pasa a ser textura.
+    float glitchRate;
+    /// Que fraccion de cada intervalo dura la racha.
+    float glitchDuty;
+    /// Probabilidad de que un intervalo dispare. Debajo de 1 el ritmo deja de
+    /// ser de metronomo, que es lo que mas delata que hay un generador atras.
+    float glitchChance;
+    /// Intensidad general. Escala el corrimiento de las bandas.
+    float glitchAmount;
+
+    /// Alto de cada banda en celdas, y cuanto se puede correr en horizontal.
+    float glitchBandHeight;
+    float glitchBandShift;
+    /// Que fraccion de las bandas se corre en cada racha.
+    float glitchBandAmount;
+
+    /// Bloques rectangulares corrompidos: cuantos, y su tamano en celdas.
+    float glitchBlockCount;
+    float glitchBlockMin;
+    float glitchBlockMax;
+    /// 0 solido, 1 trama, 2 invertido, 3 vacio.
+    uint32_t glitchBlockFill;
+
+    /// Fraccion de celdas que retienen el glifo del frame anterior. Se resuelve
+    /// en la etapa de indice y no en la composicion: ahi el valor retenido se
+    /// propaga solo de frame a frame, asi que la celda se queda clavada toda la
+    /// racha en vez de quedar un cuadro atrasada.
+    float glitchFreeze;
+
+    /// Fraccion de celdas a las que se les corre el indice de glifo. El caracter
+    /// sale mal pero la estructura de densidad sobrevive, asi que se lee como
+    /// texto corrompido y no como ruido.
+    float glitchScramble;
 } RenderParams;
 
 #endif /* RenderParams_h */

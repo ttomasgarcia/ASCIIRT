@@ -114,6 +114,22 @@ struct PipelineConfig: Equatable {
     var trailDensity: Float = 1
     /// `true` = la fuente llena la salida y se recorta lo que sobra.
     var sourceFill = false
+
+    // MARK: Glitch
+    var glitchEnabled: Bool = false
+    var glitchRate: Float = 1.2
+    var glitchDuty: Float = 0.18
+    var glitchChance: Float = 0.6
+    var glitchAmount: Float = 0.6
+    var glitchBandHeight: Float = 3
+    var glitchBandShift: Float = 8
+    var glitchBandAmount: Float = 0.35
+    var glitchBlockCount: Float = 5
+    var glitchBlockMin: Float = 2
+    var glitchBlockMax: Float = 10
+    var glitchBlockFill: UInt32 = 0
+    var glitchFreeze: Float = 0.25
+    var glitchScramble: Float = 0.2
     var eyePulseShape: Float = 0.6
     var eyeFieldNoise: Float = 0.55
     var eyeFieldChurn: Float = 6
@@ -631,7 +647,21 @@ final class ASCIIPipeline {
                             eyePulseShape: config.eyePulseShape,
                             trailDeltaScale: frameScale,
                             generative: config.generative ? 1 : 0,
-                            trailDensity: config.trailDensity)
+                            trailDensity: config.trailDensity,
+                            glitchEnabled: config.glitchEnabled ? 1 : 0,
+                            glitchRate: config.glitchRate,
+                            glitchDuty: config.glitchDuty,
+                            glitchChance: config.glitchChance,
+                            glitchAmount: config.glitchAmount,
+                            glitchBandHeight: config.glitchBandHeight,
+                            glitchBandShift: config.glitchBandShift,
+                            glitchBandAmount: config.glitchBandAmount,
+                            glitchBlockCount: config.glitchBlockCount,
+                            glitchBlockMin: config.glitchBlockMin,
+                            glitchBlockMax: config.glitchBlockMax,
+                            glitchBlockFill: config.glitchBlockFill,
+                            glitchFreeze: config.glitchFreeze,
+                            glitchScramble: config.glitchScramble)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se
