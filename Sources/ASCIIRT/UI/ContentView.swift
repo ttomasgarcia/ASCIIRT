@@ -1244,7 +1244,7 @@ private struct ControlPanel: View {
                         help: "Cuánto tarda en aparecer la opacidad, aparte del movimiento. Antes iban juntos y el globo se veía lavado durante todo el viaje; casi siempre conviene que el fundido sea bastante más corto que el desplazamiento. En 0 aparece opaco de entrada y sólo se mueve.")
             if model.chatEntrance == .bounce {
                 ParamSlider(label: "Rebote", value: $model.chatBounce, range: 0...1,
-                            help: "Cuánto se pasa el globo antes de asentarse. Es un resorte subamortiguado: en 0 queda sobreamortiguado y la curva es prácticamente la suave de siempre; en 1 se pasa varias veces. Ojo con la Subida: el sobrepaso se ve en escalones enteros de celda, no en fracciones, así que con una subida corta el rebote no llega a cruzar el redondeo y no se nota. Con 5 o más celdas empieza a leerse.")
+                            help: "Cuánto se pasa el globo antes de asentarse. Es un resorte: en 0 llega derecho, sin pasarse, que es lo más rápido posible sin rebote. Con Duración 0,35 el sobrepaso va de 1% en 0,25 hasta 40% en 1. Ahora que el globo se mueve por píxeles y no de a celdas, el sobrepaso se ve entero — antes el redondeo a la celda se comía la parte chica y por eso el mismo número se sentía más blando. Si te queda duro, bajá esto o subí la Duración.")
             }
             ParamSlider(label: "Subida", value: $model.chatRise, range: 0...20, decimals: 0,
                         help: "Cuántas celdas sube el globo mientras entra. Se mueve de a celdas enteras y no en píxeles sueltos: media celda dejaría el texto partido entre dos filas y se vería borroso. El escalonado se lee como movimiento de terminal, que es coherente con el resto.")
@@ -1280,14 +1280,20 @@ private struct ControlPanel: View {
                 HelpMark("Recto es un rectángulo lleno. Redondeado saca la casilla de cada esquina: en una grilla de caracteres no hay curva posible, así que el redondeo es un recorte en escalera — y a escala 2 o más ya se lee como globo. El recorte es de una casilla, o sea que crece con la Escala.",
                          title: "Forma del globo")
             }
+            if model.chatShape == .rounded {
+                ParamSlider(label: "Redondeo", value: $model.chatCorner, range: 0...1,
+                            help: "Radio de las esquinas, como fracción del lado corto del globo. En 1 los extremos quedan semicirculares, tipo pastilla. El borde se resuelve por PÍXEL y no por celda —el shader mide la distancia a un rectángulo redondeado— así que la curva sale lisa de verdad, sin escalones, por más grande que sea la celda. El texto sigue cayendo en la grilla: lo único que se sale de ella es el fondo.")
+            }
             ParamToggle(label: "Piquito", isOn: $model.chatTail,
                         help: "Agrega la puntita del globo de diálogo, abajo a la izquierda — del mismo lado por el que se alinean los globos. También en escalera: dos casillas y después una, que es lo que en una grilla se lee como la punta que apunta a quien habla.")
             ParamSlider(label: "Escala", value: $model.chatScale, range: 1...6, decimals: 0,
                         help: "Cuántas celdas ocupa cada letra por lado. En 1 el texto es del tamaño de un carácter del ASCII y se mezcla con el fondo; subiéndolo el mensaje se despega y se lee de lejos, que es lo que hace falta proyectando. Todo el maquetado vive en una grilla de este tamaño, así que los globos siempre caen alineados entre sí.")
             ParamSlider(label: "Ancho", value: $model.chatColumns, range: 8...80, decimals: 0,
                         help: "Ancho máximo del globo en caracteres, antes de cortar el renglón. El corte respeta las palabras salvo que una sola palabra no entre.")
-            ParamSlider(label: "Margen interno", value: $model.chatPadX, range: 0...6, decimals: 0,
-                        help: "Cuántos caracteres de aire quedan entre el texto y el borde del globo, a cada lado.")
+            ParamSlider(label: "Margen horiz.", value: $model.chatPadX, range: 0...6, decimals: 0,
+                        help: "Cuántos caracteres de aire quedan entre el texto y el borde del globo, a izquierda y derecha.")
+            ParamSlider(label: "Margen vert.", value: $model.chatPadY, range: 0...6, decimals: 0,
+                        help: "Cuántos renglones de aire quedan arriba y abajo del texto, dentro del globo. Con 0 el texto toca el borde, que con el globo redondeado se ve apretado; 1 ya le da respiro y hace que el redondeo tenga dónde curvarse.")
             ParamSlider(label: "Separación", value: $model.chatGap, range: 0...6, decimals: 0,
                         help: "Cuánto espacio queda entre un globo y el siguiente, en casillas. Con el piquito encendido el mínimo pasa a 3, porque la punta baja dos casillas por debajo del globo y si no se le monta al mensaje de abajo.")
             ParamSlider(label: "Margen izq.", value: $model.chatMarginLeft, range: 0...30, decimals: 0,

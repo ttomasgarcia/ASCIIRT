@@ -1,5 +1,6 @@
 import Foundation
 import Metal
+import ShaderTypes
 import simd
 
 /// Globos de diálogo escritos DIRECTO en la grilla de caracteres.
@@ -119,6 +120,11 @@ final class ChatLayer {
     var fadeIn: Float = 0.15
     var fadeOut: Float = 0.20
 
+    /// Los globos, en pixeles, para que el shader dibuje el fondo por pixel.
+    private(set) var rects: [ASCIIRTChatRect] = []
+    /// Mas de esto no entra en pantalla en ninguna configuracion razonable.
+    static let maxRects = 16
+
     /// Desplazamiento vertical en pixeles de salida, para el shader. Lo llena el
     /// maquetado del modo «uno por vez», que es el unico con un solo globo.
     private(set) var pixelOffset: Float = 0
@@ -141,7 +147,7 @@ final class ChatLayer {
     var maxColumns: Int = 28
     /// Margen interno del globo, en caracteres.
     var padX: Int = 1
-    var padY: Int = 0
+    var padY: Int = 0    // renglones de aire arriba y abajo del texto
     /// Separación entre globos, en caracteres.
     var gap: Int = 1
     /// Distancia al borde de abajo y al de la izquierda, en caracteres.
@@ -150,6 +156,12 @@ final class ChatLayer {
     /// Forma del globo y si lleva piquito.
     var shape: ChatBubbleShape = .rect
     var tail = false
+    /// Cuanto se redondean las esquinas, de 0 a 1 sobre el lado corto del globo.
+    /// En 1 el globo queda con los extremos semicirculares, tipo pastilla.
+    var corner: Float = 0.5
+    /// Ancho de celda en pixeles. Junto con el alto define la forma real de la
+    /// celda, que no es cuadrada, y sin eso el redondeo saldria ovalado.
+    var cellWidth: Int = 8
 
     // MARK: Salida
 
@@ -182,6 +194,7 @@ final class ChatLayer {
         let cols = Int(gridSize.x)
         let rows = Int(gridSize.y)
         for i in buffer.indices { buffer[i] = 0 }
+        rects.removeAll(keepingCapacity: true)
 
         let step = max(scale, 1)
         // Todo el maquetado se hace en "casillas" de `scale` celdas de lado, y
@@ -453,8 +466,15 @@ final class ChatLayer {
     /// que es lo mas rapido posible sin sobrepaso.
     private func spring(_ t: Float, response: Float) -> Float {
         guard t > 0 else { return 0 }
-        let omega = 6.5 / max(response, 0.03)
-        let zeta = max(1 - min(max(bounce, 0), 1) * 0.92, 0.08)
+        // Frecuencia y amortiguacion mas blandas que la primera version.
+        //
+        // Ese mapeo se calibro cuando el globo se movia de a celdas enteras y el
+        // redondeo se comia los sobrepasos chicos. Al pasar a pixeles el mismo
+        // numero paso a verse entero, y lo que antes era un rebote apenas
+        // insinuado se volvio un golpe. Con esto, medio slider da un rebote
+        // suave y el extremo sigue estando disponible para cuando se lo quiera.
+        let omega = 4.6 / max(response, 0.03)
+        let zeta = max(1 - min(max(bounce, 0), 1) * 0.72, 0.24)
         if zeta >= 0.999 {
             return 1 - exp(-omega * t) * (1 + omega * t)
         }
@@ -485,44 +505,49 @@ final class ChatLayer {
             if written > balloon.revealed { break }
         }
 
-        // Fondo del globo. Se pinta despues de las letras y solo donde no hay
-        // ninguna, para no tener que ordenar dos pasadas.
-        let lastX = balloon.width - 1
-        let lastY = balloon.height - 1
-        for row in 0..<balloon.height {
-            let by = balloon.originY + row
-            guard by >= 0, by < boxRows else { continue }
-            for column in 0..<balloon.width {
-                // Redondeado: se saca la casilla de cada esquina. En una grilla de
-                // caracteres no hay curva posible, y el recorte en escalera es lo
-                // que la sugiere — a escala 2 o mas se lee como redondeo.
-                if shape == .rounded, balloon.height > 1, balloon.width > 2,
-                   (column == 0 || column == lastX), (row == 0 || row == lastY) {
-                    continue
-                }
-                let bx = balloon.originX + column
-                guard bx >= 0, bx < boxCols else { continue }
-                stamp(box: SIMD2(bx, by), char: 0, alpha: alpha,
-                      step: step, cols: cols, rows: rows, backgroundOnly: true)
-            }
-        }
+        // El fondo ya no se pinta aca: se emite como rectangulo en pixeles y lo
+        // resuelve el shader. Lo unico que queda en la textura es el texto.
+        emitRect(balloon, step: step)
+    }
 
-        // Piquito. Va abajo a la izquierda, del mismo lado por el que se alinean
-        // los globos, y en escalera: dos casillas y despues una. Es lo que en una
-        // grilla se lee como la puntita de un globo de dialogo.
-        if tail {
-            let base = balloon.originY + balloon.height
-            for (row, run) in [(0, 2), (1, 1)] {
-                let by = base + row
-                guard by >= 0, by < boxRows else { continue }
-                for column in 0..<run {
-                    let bx = balloon.originX + 1 + column
-                    guard bx >= 0, bx < boxCols else { continue }
-                    stamp(box: SIMD2(bx, by), char: 0, alpha: alpha,
-                          step: step, cols: cols, rows: rows, backgroundOnly: true)
-                }
-            }
-        }
+    /// Rectangulo del globo —y del piquito— en pixeles de salida.
+    private func emitRect(_ balloon: Balloon, step: Int) {
+        guard rects.count < ChatLayer.maxRects, balloon.alpha > 0.002 else { return }
+        let cw = Float(max(cellWidth, 1))
+        let ch = Float(max(cellHeight, 1))
+        let origin = SIMD2<Float>(Float(balloon.originX * step) * cw,
+                                  Float(balloon.originY * step) * ch)
+        let size = SIMD2<Float>(Float(balloon.width * step) * cw,
+                                Float(balloon.height * step) * ch)
+        let radius = shape == .rounded
+            ? min(max(corner, 0), 1) * min(size.x, size.y) * 0.5
+            : 0
+        rects.append(ASCIIRTChatRect(origin: origin, size: size,
+                                     radius: radius, alpha: balloon.alpha,
+                                     _pad0: 0, _pad1: 0))
+
+        // Piquito: un rectangulo chico debajo del borde, con una punta redondeada
+        // del mismo radio para que se lea como parte del globo y no como un
+        // cuadradito pegado.
+        guard tail, rects.count < ChatLayer.maxRects else { return }
+        // Arranca DENTRO del globo y baja: si empezara en el borde, con el radio
+        // alto quedaria colgando de la curva en vez de saliendo de ella.
+        let tailW = cw * Float(step) * 1.5
+        let tailH = ch * Float(step) * 1.5
+        rects.append(ASCIIRTChatRect(
+            origin: SIMD2(origin.x + cw * Float(step) * 1.0,
+                          origin.y + size.y - tailH * 0.55),
+            size: SIMD2(tailW, tailH),
+            radius: min(tailW, tailH) * 0.35, alpha: balloon.alpha,
+            _pad0: 0, _pad1: 0))
+    }
+
+
+    /// Pinta el fondo de UNA celda, sin tocar el caracter que pueda haber.
+    private func stampCell(x: Int, y: Int, alpha: UInt8, cols: Int, rows: Int) {
+        guard x >= 0, x < cols, y >= 0, y < rows else { return }
+        let offset = (y * cols + x) * 2
+        if buffer[offset + 1] == 0 { buffer[offset + 1] = alpha }
     }
 
     /// Expande una casilla a las `step x step` celdas que ocupa.

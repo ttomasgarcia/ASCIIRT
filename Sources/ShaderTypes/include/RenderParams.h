@@ -70,11 +70,30 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexTextAtlas = 26,///< R8Unorm, atlas de texto para los globos
 };
 
+/// Un globo de chat, en PIXELES de salida.
+///
+/// El fondo no puede salir de la textura por celda: ahi el borde tiene la
+/// resolucion de la celda y el redondeo sale en escalera por mas radio que se le
+/// ponga. Pasando el rectangulo y el radio, el shader lo resuelve por pixel con
+/// una funcion de distancia y la curva queda lisa.
+///
+/// El TEXTO si sigue viniendo por celda: ahi la grilla es la que corresponde.
+typedef struct {
+    ASCIIRT_FLOAT2 origin;
+    ASCIIRT_FLOAT2 size;
+    float radius;
+    float alpha;
+    float _pad0;
+    float _pad1;
+} ASCIIRTChatRect;
+
 typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTBufferIndex) {
     ASCIIRTBufferIndexRenderParams = 0,
     /// Un float: la media movil de luminancia del frame. Vive en GPU entre
     /// frames para no tener que sincronizar con CPU (spec §4b).
     ASCIIRTBufferIndexLumaStats = 1,
+    /// Hasta `chatRectCount` globos.
+    ASCIIRTBufferIndexChatRects = 2,
 };
 
 /// Parametros por frame. Se sube con setBytes (entra holgado en el limite de
@@ -491,6 +510,9 @@ typedef struct {
     /// vez. En pila hay varios y cada uno con su animacion, y ahi se sigue
     /// moviendo de a celdas.
     float chatOffsetY;
+
+    /// Cuantos globos hay en el buffer de rectangulos.
+    uint32_t chatRectCount;
 } RenderParams;
 
 #endif /* RenderParams_h */

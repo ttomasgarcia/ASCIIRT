@@ -538,6 +538,7 @@ final class ASCIIPipeline {
         chat.ensure(device: context.device, gridSize: config.gridSize)
         if config.chatEnabled, let textAtlas {
             chat.cellHeight = Int(config.tileSize.y)
+            chat.cellWidth = Int(config.tileSize.x)
             chat.update(device: context.device, gridSize: config.gridSize,
                         atlas: textAtlas, time: currentTime)
         }
@@ -545,6 +546,16 @@ final class ASCIIPipeline {
             encoder.setTexture(layer, index: Int(ASCIIRTTextureIndexChat.rawValue))
             encoder.setTexture(textAtlas.texture, index: Int(ASCIIRTTextureIndexTextAtlas.rawValue))
         }
+        // Los globos van como datos y no como textura: el shader necesita el
+        // rectangulo y el radio para resolver el borde por pixel.
+        var chatRects = chat.rects
+        if chatRects.isEmpty {
+            chatRects = [ASCIIRTChatRect(origin: .zero, size: .zero, radius: 0, alpha: 0,
+                                         _pad0: 0, _pad1: 0)]
+        }
+        encoder.setBytes(&chatRects,
+                         length: MemoryLayout<ASCIIRTChatRect>.stride * chatRects.count,
+                         index: Int(ASCIIRTBufferIndexChatRects.rawValue))
 
         encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: asciiThreadgroup())
 
@@ -714,7 +725,8 @@ final class ASCIIPipeline {
                             chatBubbleG: config.chatBubbleColor.y,
                             chatBubbleB: config.chatBubbleColor.z,
                             chatBubbleAlpha: config.chatBubbleAlpha,
-                            chatOffsetY: chat.pixelOffset)
+                            chatOffsetY: chat.pixelOffset,
+                            chatRectCount: UInt32(chat.rects.count))
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

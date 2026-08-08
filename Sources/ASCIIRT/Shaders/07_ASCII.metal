@@ -90,6 +90,7 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                         texture2d<float, access::read>  height [[texture(ASCIIRTTextureIndexHeight)]],
                         texture2d<float, access::read>  spawn  [[texture(ASCIIRTTextureIndexSpawn)]],
                         texture2d<uint,  access::read>  chat [[texture(ASCIIRTTextureIndexChat)]],
+                        constant ASCIIRTChatRect *chatRects [[buffer(ASCIIRTBufferIndexChatRects)]],
                         texture2d<float, access::read>  textAtlas [[texture(ASCIIRTTextureIndexTextAtlas)]],
                         texture2d<float, access::write> output [[texture(ASCIIRTTextureIndexOutput)]],
                         constant RenderParams &params [[buffer(ASCIIRTBufferIndexRenderParams)]],
@@ -365,14 +366,33 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
         const uint2 chatGid = uint2(gid.x, uint(max(shifted, 0)));
         const uint2 chatTile = chatGid / params.tileSize;
         const uint2 slot = onScreen ? chat.read(chatTile).rg : uint2(0u, 0u);
-        const float bubble = float(slot.y) / 255.0;
-        if (bubble > 0.0) {
+        const float textAlpha = float(slot.y) / 255.0;
+
+        // El fondo se resuelve por PIXEL, con la distancia a un rectangulo
+        // redondeado. La celda solo decide donde va cada letra; el borde del
+        // globo no tiene por que heredar esa resolucion, y heredandola el
+        // redondeo salia en escalera por mas radio que se le pusiera.
+        float bubble = 0.0;
+        if (onScreen) {
+            const float2 p = float2(chatGid);
+            for (uint i = 0u; i < params.chatRectCount; ++i) {
+                const float r = chatRects[i].radius;
+                const float2 halfSize = chatRects[i].size * 0.5;
+                const float2 d = abs(p - chatRects[i].origin - halfSize) - (halfSize - r);
+                const float sd = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
+                // Medio pixel de transicion: lo justo para que el borde no
+                // escalone, y no tanto como para que se vea borroso.
+                bubble = max(bubble, saturate(0.5 - sd) * chatRects[i].alpha);
+            }
+        }
+
+        if (bubble > 0.0 || textAlpha > 0.0) {
             const float3 bubbleColor = float3(params.chatBubbleR, params.chatBubbleG, params.chatBubbleB);
             const float bubbleMix = bubble * params.chatBubbleAlpha;
             finalRGB = mix(finalRGB, bubbleColor, bubbleMix);
             finalCoverage = max(finalCoverage, bubbleMix);
 
-            if (slot.x > 0u) {
+            if (slot.x > 0u && textAlpha > 0.0) {
                 // Un caracter ocupa `chatScale` celdas de lado, asi que hay que
                 // averiguar que pedazo del glifo cae en esta celda. La CPU
                 // garantiza que todo arranca en multiplos de la escala, y por eso
@@ -390,7 +410,7 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                 // se lee al instante como un error.
                 const uint2 texel = uint2((slot.x - 1u) * params.tileSize.x + within.x,
                                           within.y);
-                const float glyph = textAtlas.read(texel).r * bubble;
+                const float glyph = textAtlas.read(texel).r * textAlpha;
 
                 const float3 textColor = float3(params.chatTextR, params.chatTextG, params.chatTextB);
                 finalRGB = mix(finalRGB, textColor, glyph);
