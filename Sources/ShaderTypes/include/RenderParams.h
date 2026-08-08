@@ -478,6 +478,19 @@ typedef struct {
     /// Color y opacidad del globo. En 0 el texto flota sin fondo.
     float chatBubbleR, chatBubbleG, chatBubbleB;
     float chatBubbleAlpha;
+
+    /// Desplazamiento vertical del globo, en PIXELES de salida y hacia abajo.
+    ///
+    /// El maquetado vive en la grilla, asi que la CPU solo puede mover el globo
+    /// de a celdas enteras y el movimiento sale a los saltos. Corriendo la
+    /// lectura de la capa por pixeles, en cambio, el globo se desliza suave sin
+    /// que el texto pierda nitidez: lo que se mueve es de donde se lee, no como
+    /// se dibuja.
+    ///
+    /// Es UNO solo para toda la capa, asi que solo sirve cuando hay un globo a la
+    /// vez. En pila hay varios y cada uno con su animacion, y ahi se sigue
+    /// moviendo de a celdas.
+    float chatOffsetY;
 } RenderParams;
 
 #endif /* RenderParams_h */

@@ -1235,7 +1235,9 @@ private struct ControlPanel: View {
                             ? "Cuánto dura cada mensaje de punta a punta: entrada, permanencia y salida. Se mide así y no como tiempo entre mensajes porque si no, subir la duración de la animación acortaría el tiempo de lectura sin avisar. La animación tiene un techo de un tercio del ciclo, para que el mensaje siempre llegue a quedarse quieto."
                             : "Segundos entre la llegada de un mensaje y la del siguiente. Es el ritmo de la conversación: valores altos dan pausas de lectura, valores bajos hacen que se amontonen como cuando alguien escribe rápido.")
             ParamSlider(label: "Duración", value: $model.chatDuration, range: 0.05...3, decimals: 2,
-                        help: "Cuánto dura la animación de entrada. Corta se lee como que el mensaje aparece; larga, como que sube flotando. Con «Se escribe» esto es cuánto tarda en terminar de tipearse el mensaje entero.")
+                        help: "Cuánto tarda el MOVIMIENTO de entrada. Con Rebote es el tiempo de respuesta del resorte —cuánto tarda en llegar— y el resorte se sigue asentando un poco después, como corresponde. No toca la opacidad: eso es Fundido. Con «Se escribe» es cuánto tarda en terminar de tipearse el mensaje entero.")
+            ParamSlider(label: "Fundido entrada", value: $model.chatFadeIn, range: 0.0...2, decimals: 2,
+                        help: "Cuánto tarda en aparecer la opacidad, aparte del movimiento. Antes iban juntos y el globo se veía lavado durante todo el viaje; casi siempre conviene que el fundido sea bastante más corto que el desplazamiento. En 0 aparece opaco de entrada y sólo se mueve.")
             if model.chatEntrance == .bounce {
                 ParamSlider(label: "Rebote", value: $model.chatBounce, range: 0...1,
                             help: "Cuánto se pasa el globo antes de asentarse. Es un resorte subamortiguado: en 0 queda sobreamortiguado y la curva es prácticamente la suave de siempre; en 1 se pasa varias veces. Ojo con la Subida: el sobrepaso se ve en escalones enteros de celda, no en fracciones, así que con una subida corta el rebote no llega a cruzar el redondeo y no se nota. Con 5 o más celdas empieza a leerse.")
@@ -1254,6 +1256,8 @@ private struct ControlPanel: View {
                     HelpMark("Fundido se apaga en el lugar. Se va arriba sigue subiendo mientras se apaga — es lo que más se lee como «el mensaje pasó» en vez de «alguien lo borró». Se va abajo cae, que se lee como descartado. Corte lo saca de un cuadro al otro, sin transición, y ahí la duración no hace nada.",
                              title: "Salida")
                 }
+                ParamSlider(label: "Fundido salida", value: $model.chatFadeOut, range: 0.0...3, decimals: 2,
+                            help: "Cuánto tarda en apagarse, aparte del movimiento de salida. En 0 desaparece de golpe al final del ciclo.")
                 ParamSlider(label: "Duración salida", value: $model.chatExitDuration, range: 0...3, decimals: 2,
                             help: "Cuánto tarda en irse. Va aparte de la duración de entrada porque casi nunca se quieren iguales: entrar tiene que llamar la atención, irse no. En 0 desaparece de golpe. Entre la entrada y la salida no pueden pasarse del 90% del ciclo; si las dos suman más, se achican en proporción para que el mensaje siempre llegue a quedarse quieto.")
             }

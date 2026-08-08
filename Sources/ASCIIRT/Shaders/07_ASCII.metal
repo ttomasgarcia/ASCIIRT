@@ -358,7 +358,13 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     // mensaje, y un mensaje que el glitch o el pleno pueden tapar deja de
     // cumplir su unica funcion.
     if (params.chatEnabled != 0u) {
-        const uint2 slot = chat.read(homeTile).rg;
+        // La capa se lee corrida: mover de donde se lee es lo que permite que el
+        // globo se deslice por pixeles sin que el texto deje de caer en la celda.
+        const int shifted = int(gid.y) - int(params.chatOffsetY);
+        const bool onScreen = shifted >= 0 && shifted < int(params.outputSize.y);
+        const uint2 chatGid = uint2(gid.x, uint(max(shifted, 0)));
+        const uint2 chatTile = chatGid / params.tileSize;
+        const uint2 slot = onScreen ? chat.read(chatTile).rg : uint2(0u, 0u);
         const float bubble = float(slot.y) / 255.0;
         if (bubble > 0.0) {
             const float3 bubbleColor = float3(params.chatBubbleR, params.chatBubbleG, params.chatBubbleB);
@@ -372,8 +378,8 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
                 // garantiza que todo arranca en multiplos de la escala, y por eso
                 // el resto de la division alcanza para ubicarse.
                 const uint escala = max(params.chatScale, 1u);
-                const uint2 sub = homeTile % escala;
-                const uint2 inCell = gid % params.tileSize;
+                const uint2 sub = chatTile % escala;
+                const uint2 inCell = chatGid % params.tileSize;
                 const uint2 within = (sub * params.tileSize + inCell) / escala;
 
                 // SIN dar vuelta la Y, al reves que el muestreo de la rampa.

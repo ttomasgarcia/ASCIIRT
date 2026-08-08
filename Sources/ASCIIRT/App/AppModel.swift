@@ -256,6 +256,8 @@ final class AppModel: ObservableObject {
     @Published var chatExit: ChatExit = .fade { didSet { syncChat() } }
     @Published var chatExitDuration: Double = 0.35 { didSet { syncChat() } }
     @Published var chatBounce: Double = 0.5 { didSet { syncChat() } }
+    @Published var chatFadeIn: Double = 0.15 { didSet { syncChat() } }
+    @Published var chatFadeOut: Double = 0.20 { didSet { syncChat() } }
     @Published var chatInterval: Double = 2.5 { didSet { syncChat() } }
     @Published var chatDuration: Double = 0.45 { didSet { syncChat() } }
     @Published var chatRise: Double = 4 { didSet { syncChat() } }
@@ -279,6 +281,8 @@ final class AppModel: ObservableObject {
         layer.exit = chatExit
         layer.exitDuration = Float(chatExitDuration)
         layer.bounce = Float(chatBounce)
+        layer.fadeIn = Float(chatFadeIn)
+        layer.fadeOut = Float(chatFadeOut)
         layer.interval = Float(chatInterval)
         layer.entranceDuration = Float(chatDuration)
         layer.riseCells = Float(chatRise)
@@ -795,6 +799,8 @@ final class AppModel: ObservableObject {
         preset.chatExit = chatExit.rawValue
         preset.chatExitDuration = chatExitDuration
         preset.chatBounce = chatBounce
+        preset.chatFadeIn = chatFadeIn
+        preset.chatFadeOut = chatFadeOut
         preset.chatInterval = chatInterval
         preset.chatDuration = chatDuration
         preset.chatRise = chatRise
@@ -978,6 +984,8 @@ final class AppModel: ObservableObject {
         chatExit = ChatExit(rawValue: preset.chatExit) ?? .fade
         chatExitDuration = preset.chatExitDuration
         chatBounce = preset.chatBounce
+        chatFadeIn = preset.chatFadeIn
+        chatFadeOut = preset.chatFadeOut
         chatInterval = preset.chatInterval
         chatDuration = preset.chatDuration
         chatRise = preset.chatRise

@@ -92,6 +92,17 @@ final class ChatLayer {
     var exitDuration: Float = 0.35
     /// Cuanto se pasa el rebote, de 0 (sin rebote) a 1 (elastico).
     var bounce: Float = 0.5
+    /// Cuanto tarda la opacidad, aparte del movimiento. Un globo que se desliza
+    /// en medio segundo pero tarda ese mismo medio segundo en aparecer se ve
+    /// lavado todo el viaje; el fundido casi siempre quiere ser mas corto.
+    var fadeIn: Float = 0.15
+    var fadeOut: Float = 0.20
+
+    /// Desplazamiento vertical en pixeles de salida, para el shader. Lo llena el
+    /// maquetado del modo «uno por vez», que es el unico con un solo globo.
+    private(set) var pixelOffset: Float = 0
+    /// Alto de celda en pixeles: hace falta para pasar de casillas a pixeles.
+    var cellHeight: Int = 16
     /// Cuántas celdas sube el globo mientras entra.
     var riseCells: Float = 4
     /// Si repite la conversación desde el principio al terminar.
@@ -233,6 +244,10 @@ final class ChatLayer {
             return layoutSingle(texts: texts, innerWidth: innerWidth,
                                 boxRows: boxRows, clock: clock, period: period)
         }
+        // En pila hay varios globos, cada uno en su momento de la animacion, y el
+        // corrimiento del shader es uno solo para toda la capa. Ahi se sigue
+        // moviendo de a celdas.
+        pixelOffset = 0
 
         // Cuántos entraron ya, y hace cuánto entró el último.
         let entered = min(Int(clock / period) + 1, texts.count)
@@ -245,7 +260,8 @@ final class ChatLayer {
         for i in stride(from: entered - 1, through: 0, by: -1) {
             let age = clock - Float(i) * period
             let t = min(max(age / max(entranceDuration, 0.01), 0), 1)
-            let eased = entrance == .bounce ? springEase(t) : t * t * (3 - 2 * t)
+            let eased = entrance == .bounce ? spring(age, response: max(entranceDuration, 0.01))
+                                            : t * t * (3 - 2 * t)
 
             let lines = wrap(texts[i], width: innerWidth)
             let bodyWidth = lines.map(\.count).max() ?? 0
@@ -255,15 +271,15 @@ final class ChatLayer {
             var alpha: Float = 1
             var offset = 0
             switch entrance {
-            case .fade: alpha = eased
+            case .fade: alpha = min(age / max(fadeIn, 0.01), 1)
             case .rise: offset = Int((1 - eased) * riseCells)
             case .riseFade:
-                alpha = eased
-                offset = Int((1 - eased) * riseCells)
+                alpha = min(age / max(fadeIn, 0.01), 1)
+                offset = Int(((1 - eased) * riseCells).rounded())
             case .type: break
             case .bounce:
                 offset = Int(((1 - eased) * riseCells).rounded())
-                alpha = min(t * 3, 1)
+                alpha = min(age / max(fadeIn, 0.01), 1)
             }
 
             let revealed: Int
@@ -315,8 +331,19 @@ final class ChatLayer {
         } else {
             tOut = min(max((age - (period - animOut)) / animOut, 0), 1)
         }
-        let easeIn = entrance == .bounce ? springEase(tIn) : tIn * tIn * (3 - 2 * tIn)
+        // El movimiento del rebote se evalua en segundos y puede seguir despues
+        // de `animIn`: un resorte se sigue asentando aunque ya haya llegado.
+        let easeIn = entrance == .bounce ? spring(age, response: animIn)
+                                         : tIn * tIn * (3 - 2 * tIn)
         let easeOut = tOut * tOut * (3 - 2 * tOut)
+
+        // La opacidad tiene sus propios tiempos, mas cortos que el movimiento.
+        let fadeInT = min(max(age / max(fadeIn, 0.01), 0), 1)
+        let fadeOutStart = period - max(fadeOut, 0)
+        let fadeOutT = max(fadeOut, 0) <= 0 ? (age >= period - 1e-4 ? 1 : 0)
+                                            : min(max((age - fadeOutStart) / max(fadeOut, 0.01), 0), 1)
+        let appear = fadeInT * fadeInT * (3 - 2 * fadeInT)
+        let vanish = fadeOutT * fadeOutT * (3 - 2 * fadeOutT)
 
         let lines = wrap(texts[index], width: innerWidth)
         let bodyWidth = lines.map(\.count).max() ?? 0
@@ -325,27 +352,26 @@ final class ChatLayer {
         var alpha: Float = 1
         var offset: Float = 0
         switch entrance {
-        case .fade: alpha = easeIn
+        case .fade: break
         case .rise: offset = (1 - easeIn) * riseCells
-        case .riseFade:
-            alpha = easeIn
-            offset = (1 - easeIn) * riseCells
+        case .riseFade: offset = (1 - easeIn) * riseCells
         case .type: break
         case .bounce:
             // El rebote se pasa de largo: `easeIn` cruza 1 y vuelve, asi que el
             // desplazamiento se hace negativo un momento y el globo aparece un
             // poco mas arriba de su lugar antes de asentarse.
             offset = (1 - easeIn) * riseCells
-            alpha = min(tIn * 3, 1)   // la opacidad no rebota: solo la posicion
         }
+        // La opacidad NO sigue al movimiento: tiene su propio tiempo.
+        if entrance != .type { alpha = appear }
 
         switch exit {
-        case .fade: alpha *= 1 - easeOut
+        case .fade: alpha *= 1 - vanish
         case .riseAway:
-            alpha *= 1 - easeOut
+            alpha *= 1 - vanish
             offset -= easeOut * riseCells
         case .fallAway:
-            alpha *= 1 - easeOut
+            alpha *= 1 - vanish
             offset += easeOut * riseCells
         case .cut: alpha *= tOut >= 1 ? 0 : 1
         }
@@ -362,8 +388,13 @@ final class ChatLayer {
         // el mismo aunque el mensaje siguiente tenga otra cantidad de renglones.
         let originY = boxRows - marginBottom - height
 
+        // El globo se maqueta en su lugar de reposo y el desplazamiento viaja en
+        // pixeles al shader. Es lo que saca los saltos de celda: la CPU no puede
+        // escribir medio caracter, pero correr de donde se lee si se puede.
+        pixelOffset = offset * Float(max(scale, 1) * max(cellHeight, 1))
+
         return [Balloon(lines: lines, width: bodyWidth + padX * 2, height: height,
-                        originX: marginLeft, originY: originY + Int(offset.rounded()),
+                        originX: marginLeft, originY: originY,
                         alpha: alpha, revealed: revealed)]
     }
 
@@ -374,16 +405,25 @@ final class ChatLayer {
     /// —el maquetado vive en la grilla— asi que con la subida corta el rebote no
     /// llega a notarse: hacen falta unas cuantas celdas para que el sobrepaso
     /// cruce el redondeo.
-    private func springEase(_ t: Float) -> Float {
-        guard t < 1 else { return 1 }
-        let amount = min(max(bounce, 0), 1)
-        // Menos amortiguacion = mas rebote. En 0 queda sobreamortiguado y la
-        // curva es practicamente la suave de siempre.
-        let zeta = 0.9 - 0.75 * amount
-        let omega: Float = 9
+    /// Resorte normalizado, evaluado en SEGUNDOS y no en fraccion de animacion.
+    ///
+    /// Antes corria sobre `t` de 0 a 1 con frecuencia fija, asi que la duracion
+    /// estiraba o comprimia la curva entera y el rebote siempre tardaba lo mismo
+    /// en proporcion: se sentia mecanico. Ahora la duracion es el TIEMPO DE
+    /// RESPUESTA —cuanto tarda en llegar— y el rebote solo cambia cuanto se pasa,
+    /// que es como se parametriza un resorte de UI.
+    ///
+    /// En rebote 0 queda criticamente amortiguado: llega derecho y no se pasa,
+    /// que es lo mas rapido posible sin sobrepaso.
+    private func spring(_ t: Float, response: Float) -> Float {
+        guard t > 0 else { return 0 }
+        let omega = 6.5 / max(response, 0.03)
+        let zeta = max(1 - min(max(bounce, 0), 1) * 0.92, 0.08)
+        if zeta >= 0.999 {
+            return 1 - exp(-omega * t) * (1 + omega * t)
+        }
         let wd = omega * (1 - zeta * zeta).squareRoot()
-        let decay = exp(-zeta * omega * t)
-        return 1 - decay * (cos(wd * t) + (zeta * omega / wd) * sin(wd * t))
+        return 1 - exp(-zeta * omega * t) * (cos(wd * t) + (zeta * omega / wd) * sin(wd * t))
     }
 
     // MARK: - Pintado

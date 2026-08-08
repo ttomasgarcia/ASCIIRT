@@ -537,6 +537,7 @@ final class ASCIIPipeline {
         // una condicion de runtime, asi que el binding tiene que existir igual.
         chat.ensure(device: context.device, gridSize: config.gridSize)
         if config.chatEnabled, let textAtlas {
+            chat.cellHeight = Int(config.tileSize.y)
             chat.update(device: context.device, gridSize: config.gridSize,
                         atlas: textAtlas, time: currentTime)
         }
@@ -712,7 +713,8 @@ final class ASCIIPipeline {
                             chatBubbleR: config.chatBubbleColor.x,
                             chatBubbleG: config.chatBubbleColor.y,
                             chatBubbleB: config.chatBubbleColor.z,
-                            chatBubbleAlpha: config.chatBubbleAlpha)
+                            chatBubbleAlpha: config.chatBubbleAlpha,
+                            chatOffsetY: chat.pixelOffset)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se
