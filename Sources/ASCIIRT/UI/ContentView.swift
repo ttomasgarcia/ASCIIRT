@@ -1212,8 +1212,8 @@ private struct ControlPanel: View {
                             help: "Cuántos rectángulos aparecen por ráfaga. Cada uno se sortea de nuevo en cada ráfaga, así que no se repiten posiciones.")
                 ParamSlider(label: "Módulo", value: $model.glitchModule, range: 1...12, decimals: 0,
                             help: "Lado del módulo base, en filas de celda. Todos los bloques miden un múltiplo entero de esto y arrancan pegados a la grilla de módulos, así que se alinean entre sí aunque no se toquen — de ahí sale la lectura de grilla. El ancho del módulo se deriva solo del aspecto de la celda para que salga cuadrado en pantalla: una celda tipográfica es más alta que ancha, así que un módulo de n×n celdas saldría un rectángulo parado y la grilla entera se vería estirada.")
-                ParamSlider(label: "Escala", value: $model.glitchBlockScale, range: 1...8, decimals: 0,
-                            help: "Cuántos módulos de lado puede llegar a medir un bloque. Las proporciones salen de una tabla corta —1:1, 2:1, 1:2, 3:1, 1:3, 2:2, 4:1, 1:4— y no de un sorteo continuo: con medidas libres cada rectángulo es distinto y el conjunto se lee como accidente; repitiendo pocas proporciones se lee como sistema. En 1 son todos del tamaño del módulo y quedan como mosaicos.")
+                ParamSlider(label: "Escala", value: $model.glitchBlockScale, range: 1...4, decimals: 1,
+                            help: "Cuántos módulos de lado puede llegar a medir un bloque. En 1 son todos exactamente del tamaño del módulo y quedan como mosaico parejo. Los valores con decimal mezclan: en 1,3 la mayoría queda en un módulo y de a ratos aparece uno de dos, que es donde se arma jerarquía sin perder la lectura de grilla. Las proporciones salen de una tabla corta —1:1, 2:1, 1:2, 3:1, 1:3, 2:2, 4:1, 1:4— y no de un sorteo continuo, que es lo que hace que el conjunto se lea como sistema y no como accidente. Si querés bloques más chicos que el módulo, lo que hay que bajar es el Módulo.")
                 HStack(spacing: 6) {
                     Picker("", selection: $model.glitchBlockFill) {
                         Text("Sólido").tag(UInt32(0))

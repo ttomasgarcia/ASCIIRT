@@ -71,5 +71,5 @@
   "glitchFreeze": 0.0,
   "glitchScramble": 0.35,
   "glitchModule": 1,
-  "glitchBlockScale": 2
+  "glitchBlockScale": 1.6
 }
