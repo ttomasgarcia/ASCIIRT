@@ -709,7 +709,7 @@ final class ChatLayer {
         let originY = originYRow
 
         emitCursor(lines: lines, revealed: revealed, originX: originX, originY: originY,
-                   time: clock)
+                   blockWidth: width, time: clock)
 
         return [Balloon(lines: lines, width: width, height: lines.count,
                         originX: originX, originY: originY,
@@ -718,7 +718,7 @@ final class ChatLayer {
 
     /// Cursor de bloque despues del ultimo caracter escrito.
     private func emitCursor(lines: [String], revealed: Int,
-                            originX: Int, originY: Int, time: Float) {
+                            originX: Int, originY: Int, blockWidth: Int, time: Float) {
         guard rects.count < ChatLayer.maxRects else { return }
         let blink = time * max(cursorBlink, 0.05)
         guard blink - blink.rounded(.down) < 0.55 else { return }
@@ -731,7 +731,11 @@ final class ChatLayer {
             if left <= line.count { break }
             left -= line.count
         }
-        let column = min(left, lines[row].count)
+        // Cada renglon se centra por separado, asi que el cursor tiene que
+        // llevar la MISMA sangria que su renglon. Usando solo el origen del
+        // bloque, en la segunda linea —mas corta— el cursor quedaba corrido a la
+        // izquierda, debajo de donde no hay nada.
+        let column = min(left, lines[row].count) + (blockWidth - lines[row].count) / 2
 
         let stepF = Float(max(scale, 1))
         let cw = Float(max(cellWidth, 1))
