@@ -1238,6 +1238,14 @@ private struct ControlPanel: View {
                 ParamSlider(label: "Pausa", value: $model.chatPause, range: 0...10, decimals: 2,
                             help: "Cuánto queda la pantalla vacía entre un mensaje y el siguiente. En 0 el próximo entra apenas se fue el anterior, sin respiro. Es aparte del Ciclo: el Ciclo es cuánto dura el mensaje en pantalla —entrada, permanencia y salida— y la Pausa es el hueco después. Sumados dan el tiempo de mensaje a mensaje. En modo Pila no aparece porque ahí nada se va: el Intervalo ya es el tiempo entre una llegada y la siguiente.")
             }
+            ParamToggle(label: "Escribiendo…", isOn: $model.chatTyping,
+                        help: "Antes de cada mensaje aparece un globo chico con tres puntos, en el mismo lugar donde va a caer el mensaje. Los puntos no se mueven: late su opacidad, cada uno desfasado un tercio de ciclo, que es lo que hace que la onda recorra los tres en vez de que parpadeen juntos. Subirlos y bajarlos costaría una celda entera de salto, que en una grilla de caracteres es enorme — y el latido es además lo que hacen los clientes de chat de verdad.")
+            if model.chatTyping {
+                ParamSlider(label: "Duración puntos", value: $model.chatTypingDuration, range: 0.2...6, decimals: 2,
+                            help: "Cuánto se ven los puntos antes de que aparezca el mensaje. Es tiempo que se suma al ciclo, no que se le resta: el mensaje sigue durando lo que dice Ciclo. Alrededor de un segundo se lee como que alguien está tipeando; mucho más largo empieza a impacientar, que a veces es justo lo que se quiere.")
+                ParamSlider(label: "Ritmo puntos", value: $model.chatTypingSpeed, range: 0.2...4, decimals: 2,
+                            help: "Ciclos por segundo de la onda que recorre los tres puntos. Cerca de 1,4 es el ritmo de Messenger; más lento se lee pensativo y más rápido, ansioso.")
+            }
             ParamSlider(label: "Duración", value: $model.chatDuration, range: 0.05...3, decimals: 2,
                         help: "Cuánto tarda el MOVIMIENTO de entrada. Con Rebote es el tiempo de respuesta del resorte —cuánto tarda en llegar— y el resorte se sigue asentando un poco después, como corresponde. No toca la opacidad: eso es Fundido. Con «Se escribe» es cuánto tarda en terminar de tipearse el mensaje entero.")
             ParamSlider(label: "Fundido entrada", value: $model.chatFadeIn, range: 0.0...2, decimals: 2,

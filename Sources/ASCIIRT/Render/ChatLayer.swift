@@ -120,6 +120,13 @@ final class ChatLayer {
     var fadeIn: Float = 0.15
     var fadeOut: Float = 0.20
 
+    /// Puntitos de «esta escribiendo» antes de cada mensaje.
+    var typingEnabled = false
+    /// Cuanto se ven antes de que aparezca el mensaje.
+    var typingDuration: Float = 1.2
+    /// Ciclos por segundo de la onda que recorre los puntos.
+    var typingSpeed: Float = 1.4
+
     /// Los globos, en pixeles, para que el shader dibuje el fondo por pixel.
     private(set) var rects: [ASCIIRTChatRect] = []
     /// Mas de esto no entra en pantalla en ninguna configuracion razonable.
@@ -230,6 +237,13 @@ final class ChatLayer {
         var originY: Int    // borde superior, en casillas
         var alpha: Float
         var revealed: Int   // caracteres visibles, para la entrada tipeada
+        /// Fase de la animacion de los puntitos. `nil` = globo de mensaje.
+        ///
+        /// Los puntos no se mueven: late su opacidad, cada uno desfasado un
+        /// tercio de ciclo. En una grilla de caracteres subirlos y bajarlos
+        /// costaria una celda entera de salto, que es enorme; el latido de
+        /// opacidad es ademas lo que hacen los clientes de chat de verdad.
+        var typingPhase: Float?
     }
 
     /// Corta el texto en renglones que entren en `maxColumns`, sin partir
@@ -270,7 +284,8 @@ final class ChatLayer {
         // la pausa con la pantalla vacia. En pila no hay pausa: el intervalo ya
         // es el tiempo entre una llegada y la siguiente.
         let visibleFor = max(interval, 0.05)
-        let period = mode == .single ? visibleFor + max(pause, 0) : visibleFor
+        let typing = typingEnabled ? max(typingDuration, 0) : 0
+        let period = mode == .single ? typing + visibleFor + max(pause, 0) : visibleFor
         let total = Float(texts.count) * period
         var clock = max(time - startDelay, 0)
         // En pila se agrega un periodo de mas para que el ultimo mensaje se
@@ -291,7 +306,8 @@ final class ChatLayer {
 
         if mode == .single {
             return layoutSingle(texts: texts, innerWidth: innerWidth, boxRows: boxRows,
-                                clock: clock, period: period, visibleFor: visibleFor)
+                                clock: clock, period: period, visibleFor: visibleFor,
+                                typing: typing)
         }
         // En pila hay varios globos, cada uno en su momento de la animacion, y el
         // corrimiento del shader es uno solo para toda la capa. Ahi se sigue
@@ -304,6 +320,21 @@ final class ChatLayer {
 
         var stack: [Balloon] = []
         var cursorY = boxRows - marginBottom   // borde inferior de la pila
+
+        // En pila los puntos van al pie, ocupando el lugar donde va a caer el
+        // mensaje que viene, y el resto de la pila ya esta empujada hacia arriba.
+        // Asi el globo nuevo no da un salto al reemplazarlos.
+        if typingEnabled, entered < texts.count {
+            let untilNext = Float(entered) * period - clock
+            if untilNext <= max(typingDuration, 0) {
+                let height = 1 + padY * 2
+                cursorY -= height
+                stack.append(dotsBalloon(boxRows: cursorY + height + marginBottom,
+                                         phase: clock * max(typingSpeed, 0.05),
+                                         alpha: 1))
+                cursorY -= gap
+            }
+        }
 
         // Se recorre del más nuevo al más viejo, apilando hacia arriba.
         for i in stride(from: entered - 1, through: 0, by: -1) {
@@ -342,7 +373,7 @@ final class ChatLayer {
             cursorY -= height
             stack.append(Balloon(lines: lines, width: width, height: height,
                                  originX: marginLeft, originY: cursorY + offset,
-                                 alpha: alpha, revealed: revealed))
+                                 alpha: alpha, revealed: revealed, typingPhase: nil))
             // El piquito baja dos casillas por debajo del globo, asi que con
             // separacion 1 se le montaba encima del mensaje de abajo.
             cursorY -= tail ? max(gap, 3) : gap
@@ -364,9 +395,20 @@ final class ChatLayer {
     /// desde abajo y despues vuelve a bajar se lee como que alguien lo borro; uno
     /// que sigue de largo se lee como que paso.
     private func layoutSingle(texts: [String], innerWidth: Int, boxRows: Int,
-                              clock: Float, period: Float, visibleFor: Float) -> [Balloon] {
+                              clock: Float, period: Float, visibleFor: Float,
+                              typing: Float) -> [Balloon] {
         let index = min(Int(clock / period), texts.count - 1)
-        let age = clock - Float(index) * period
+        let raw = clock - Float(index) * period
+
+        // Los puntitos van ANTES del mensaje y en su mismo lugar: el globo chico
+        // esta donde va a estar el grande, asi que se lee como que el mensaje se
+        // esta escribiendo ahi y no como un elemento aparte.
+        if typing > 0, raw < typing {
+            pixelOffset = 0
+            return [dotsBalloon(boxRows: boxRows, phase: clock * max(typingSpeed, 0.05),
+                                alpha: min(raw / max(fadeIn, 0.01), 1))]
+        }
+        let age = raw - typing
 
         // Pausa: el mensaje ya se fue y el proximo todavia no llega.
         guard age <= visibleFor else {
@@ -452,7 +494,7 @@ final class ChatLayer {
 
         return [Balloon(lines: lines, width: bodyWidth + padX * 2, height: height,
                         originX: marginLeft, originY: originY,
-                        alpha: alpha, revealed: revealed)]
+                        alpha: alpha, revealed: revealed, typingPhase: nil)]
     }
 
     /// Curva de entrada con sobrepaso: resorte subamortiguado normalizado.
@@ -490,6 +532,14 @@ final class ChatLayer {
         return 1 - exp(-zeta * omega * t) * (cos(wd * t) + (zeta * omega / wd) * sin(wd * t))
     }
 
+    /// Globo chico con tres puntos, anclado abajo igual que un mensaje.
+    private func dotsBalloon(boxRows: Int, phase: Float, alpha: Float) -> Balloon {
+        let height = 1 + padY * 2
+        return Balloon(lines: ["···"], width: 3 + padX * 2, height: height,
+                       originX: marginLeft, originY: boxRows - marginBottom - height,
+                       alpha: alpha, revealed: Int.max, typingPhase: phase)
+    }
+
     // MARK: - Pintado
 
     private func paint(_ balloon: Balloon, atlas: TextAtlas,
@@ -507,7 +557,17 @@ final class ChatLayer {
                 written += 1
                 guard written <= balloon.revealed else { break }
                 let index = atlas.index(of: character)
-                stamp(box: SIMD2(bx, by), char: index, alpha: alpha,
+
+                // Cada punto late desfasado un tercio de ciclo respecto del
+                // anterior: eso es lo que hace que la onda RECORRA los tres en
+                // vez de que parpadeen los tres juntos.
+                var cellAlpha = alpha
+                if let phase = balloon.typingPhase {
+                    let t = phase - Float(column) * 0.33
+                    let wave = 0.5 - 0.5 * cos((t - t.rounded(.down)) * 2 * .pi)
+                    cellAlpha = UInt8(max(0, min(255, Int(Float(alpha) * (0.2 + 0.8 * wave)))))
+                }
+                stamp(box: SIMD2(bx, by), char: index, alpha: cellAlpha,
                       step: step, cols: cols, rows: rows)
             }
             if written > balloon.revealed { break }
