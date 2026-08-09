@@ -265,7 +265,7 @@ final class AppModel: ObservableObject {
     @Published var chatInterval: Double = 2.5 { didSet { syncChat() } }
     @Published var chatDuration: Double = 0.45 { didSet { syncChat() } }
     @Published var chatRise: Double = 4 { didSet { syncChat() } }
-    @Published var chatColumns: Double = 28 { didSet { syncChat() } }
+    @Published var chatWidth: Double = 0.35 { didSet { syncChat() } }
     @Published var chatGap: Double = 1 { didSet { syncChat() } }
     @Published var chatPadX: Double = 1 { didSet { syncChat() } }
     @Published var chatPadY: Double = 0 { didSet { syncChat() } }
@@ -295,7 +295,7 @@ final class AppModel: ObservableObject {
         layer.interval = Float(chatInterval)
         layer.entranceDuration = Float(chatDuration)
         layer.riseCells = Float(chatRise)
-        layer.maxColumns = Int(chatColumns)
+        layer.widthFraction = Float(chatWidth)
         layer.gap = Int(chatGap)
         layer.padX = Int(chatPadX)
         layer.padY = Int(chatPadY)
@@ -818,7 +818,7 @@ final class AppModel: ObservableObject {
         preset.chatInterval = chatInterval
         preset.chatDuration = chatDuration
         preset.chatRise = chatRise
-        preset.chatColumns = chatColumns
+        preset.chatWidth = chatWidth
         preset.chatGap = chatGap
         preset.chatPadX = chatPadX
         preset.chatPadY = chatPadY
@@ -1008,7 +1008,9 @@ final class AppModel: ObservableObject {
         chatInterval = preset.chatInterval
         chatDuration = preset.chatDuration
         chatRise = preset.chatRise
-        chatColumns = preset.chatColumns
+        // Los presets viejos guardaban el ancho en caracteres. Un valor mayor a 1
+        // solo puede venir de ahi, y se convierte a fraccion contra un grid tipico.
+        chatWidth = preset.chatWidth > 1 ? min(preset.chatWidth / 80, 1) : preset.chatWidth
         chatGap = preset.chatGap
         chatPadX = preset.chatPadX
         chatPadY = preset.chatPadY

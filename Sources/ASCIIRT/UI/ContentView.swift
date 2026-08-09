@@ -1288,8 +1288,8 @@ private struct ControlPanel: View {
                         help: "Agrega la puntita del globo de diálogo, abajo a la izquierda — del mismo lado por el que se alinean los globos. También en escalera: dos casillas y después una, que es lo que en una grilla se lee como la punta que apunta a quien habla.")
             ParamSlider(label: "Escala", value: $model.chatScale, range: 1...6, decimals: 0,
                         help: "Cuántas celdas ocupa cada letra por lado. En 1 el texto es del tamaño de un carácter del ASCII y se mezcla con el fondo; subiéndolo el mensaje se despega y se lee de lejos, que es lo que hace falta proyectando. Todo el maquetado vive en una grilla de este tamaño, así que los globos siempre caen alineados entre sí.")
-            ParamSlider(label: "Ancho", value: $model.chatColumns, range: 8...80, decimals: 0,
-                        help: "Ancho máximo del globo en caracteres, antes de cortar el renglón. El corte respeta las palabras salvo que una sola palabra no entre.")
+            ParamSlider(label: "Ancho", value: $model.chatWidth, range: 0.1...1, decimals: 2,
+                        help: "Ancho del globo como fracción del ancho de pantalla. Se mide así y no en caracteres justamente para que se pueda pedir «letra más grande, globo igual»: en caracteres el ancho quedaba atado a la Escala y agrandar la letra agrandaba el globo. Ahora el ancho en pantalla lo fijás acá, la Escala fija el tamaño de letra, y cuántos caracteres entran por renglón sale solo de dividir. El corte de renglón respeta las palabras salvo que una sola palabra no entre.")
             ParamSlider(label: "Margen horiz.", value: $model.chatPadX, range: 0...6, decimals: 0,
                         help: "Cuántos caracteres de aire quedan entre el texto y el borde del globo, a izquierda y derecha.")
             ParamSlider(label: "Margen vert.", value: $model.chatPadY, range: 0...6, decimals: 0,

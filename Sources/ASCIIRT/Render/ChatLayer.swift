@@ -143,8 +143,14 @@ final class ChatLayer {
     /// entero, así que todo el maquetado vive en una grilla más gruesa que la de
     /// celdas y por eso las posiciones siempre caen en múltiplos de este número.
     var scale: Int = 2
-    /// Ancho máximo del globo en caracteres, antes de cortar el renglón.
-    var maxColumns: Int = 28
+    /// Ancho del globo como FRACCION del ancho de pantalla.
+    ///
+    /// Se mide asi y no en caracteres porque en caracteres el ancho del globo
+    /// queda atado al tamano de letra: agrandar la letra agrandaba el globo, y no
+    /// habia forma de pedir "letra mas grande, globo igual". Con una fraccion, el
+    /// ancho en pantalla lo fija este numero y la cantidad de caracteres por
+    /// renglon cae sola de dividir por la escala.
+    var widthFraction: Float = 0.35
     /// Margen interno del globo, en caracteres.
     var padX: Int = 1
     var padY: Int = 0    // renglones de aire arriba y abajo del texto
@@ -278,8 +284,10 @@ final class ChatLayer {
         // El ancho pedido se acota a lo que entra de verdad. Con escala alta la
         // grilla de casillas es chica —a escala 6 sobre 160 columnas quedan 26— y
         // un globo de 28 caracteres se saldria de cuadro por la derecha.
+        // Cuantos caracteres entran en el ancho pedido, a la escala actual.
         let usable = max(boxCols - marginLeft - 1, 4)
-        let innerWidth = max(min(maxColumns, usable) - padX * 2, 1)
+        let wanted = Int((min(max(widthFraction, 0.05), 1) * Float(boxCols)).rounded())
+        let innerWidth = max(min(wanted, usable) - padX * 2, 1)
 
         if mode == .single {
             return layoutSingle(texts: texts, innerWidth: innerWidth, boxRows: boxRows,

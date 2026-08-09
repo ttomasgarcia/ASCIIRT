@@ -74,12 +74,13 @@ struct Preset: Codable, Equatable {
     var chatFadeOut: Double = 0.20
     var chatPause: Double = 0
     var chatShape: UInt32 = 0
+    var chatColumns: Double = 0
     var chatTail: Bool = false
     var chatCorner: Double = 0.5
     var chatInterval: Double = 2.5
     var chatDuration: Double = 0.45
     var chatRise: Double = 4
-    var chatColumns: Double = 28
+    var chatWidth: Double = 0.35
     var chatGap: Double = 1
     var chatPadX: Double = 1
     var chatPadY: Double = 0
@@ -236,7 +237,10 @@ struct Preset: Codable, Equatable {
         chatInterval = c.value(.chatInterval, d.chatInterval)
         chatDuration = c.value(.chatDuration, d.chatDuration)
         chatRise = c.value(.chatRise, d.chatRise)
-        chatColumns = c.value(.chatColumns, d.chatColumns)
+        // `chatColumns` es el nombre viejo, en caracteres. Se lee por si el preset
+        // es de antes; el decodificador tolerante devuelve 0 si no esta.
+        let legacyColumns = c.value(.chatColumns, 0.0)
+        chatWidth = legacyColumns > 1 ? legacyColumns : c.value(.chatWidth, d.chatWidth)
         chatGap = c.value(.chatGap, d.chatGap)
         chatPadX = c.value(.chatPadX, d.chatPadX)
         chatPadY = c.value(.chatPadY, d.chatPadY)
