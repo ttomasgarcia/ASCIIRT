@@ -379,6 +379,23 @@ final class ASCIIPipeline {
             eyeMotion.step(deltaTime: deltaTime, time: currentTime)
         }
 
+        // El maquetado del chat va ANTES de armar los parametros.
+        //
+        // Estaba despues, asi que `chatOffsetY` viajaba con un frame de atraso
+        // mientras la textura y los rectangulos eran los de este frame. Mientras
+        // un globo se desliza el atraso es constante y no se ve, pero en el
+        // cuadro en que cambia el mensaje el desplazamiento pertenecia todavia al
+        // globo anterior: un frame con la posicion equivocada, una vez por
+        // mensaje. Calculandolo primero, todo lo que se dibuja es del mismo
+        // instante.
+        chat.ensure(device: context.device, gridSize: config.gridSize)
+        if config.chatEnabled, let textAtlas {
+            chat.cellHeight = Int(config.tileSize.y)
+            chat.cellWidth = Int(config.tileSize.x)
+            chat.update(device: context.device, gridSize: config.gridSize,
+                        atlas: textAtlas, time: currentTime)
+        }
+
         var params = makeParams(sourceWidth: source?.width ?? Int(config.outputSize.x),
                                 sourceHeight: source?.height ?? Int(config.outputSize.y),
                                 deltaTime: deltaTime)
@@ -535,13 +552,6 @@ final class ASCIIPipeline {
         //
         // La textura se crea aunque el chat este apagado: el shader la lee por
         // una condicion de runtime, asi que el binding tiene que existir igual.
-        chat.ensure(device: context.device, gridSize: config.gridSize)
-        if config.chatEnabled, let textAtlas {
-            chat.cellHeight = Int(config.tileSize.y)
-            chat.cellWidth = Int(config.tileSize.x)
-            chat.update(device: context.device, gridSize: config.gridSize,
-                        atlas: textAtlas, time: currentTime)
-        }
         if let layer = chat.texture, let textAtlas {
             encoder.setTexture(layer, index: Int(ASCIIRTTextureIndexChat.rawValue))
             encoder.setTexture(textAtlas.texture, index: Int(ASCIIRTTextureIndexTextAtlas.rawValue))
