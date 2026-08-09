@@ -89,6 +89,22 @@ enum ChatBubbleShape: UInt32, CaseIterable, Identifiable {
     }
 }
 
+/// Como se presenta el texto.
+enum ChatStyle: UInt32, CaseIterable, Identifiable {
+    /// Globos de chat, alineados a un margen.
+    case bubbles = 0
+    /// Terminal: sin globo, centrado, tipeado con un cursor que parpadea.
+    case terminal = 1
+
+    var id: UInt32 { rawValue }
+    var label: String {
+        switch self {
+        case .bubbles: return "Globos"
+        case .terminal: return "Terminal"
+        }
+    }
+}
+
 final class ChatLayer {
 
     // MARK: Contenido
@@ -169,6 +185,16 @@ final class ChatLayer {
     var marginBottom: Int = 2
     var marginLeft: Int = 2
     /// Forma del globo y si lleva piquito.
+    var style: ChatStyle = .bubbles
+    /// Terminal: caracteres por segundo del tipeado.
+    var typeSpeed: Float = 22
+    /// Terminal: altura del renglon, como fraccion de la pantalla.
+    var terminalY: Float = 0.72
+    /// Terminal: ancho del cursor como fraccion del ancho de celda, y parpadeos
+    /// por segundo. Mas ancho que un caracter se lee como cursor de bloque.
+    var cursorWidth: Float = 0.5
+    var cursorBlink: Float = 1.6
+
     var shape: ChatBubbleShape = .rect
     var tail = false
     /// Cuanto se redondean las esquinas, de 0 a 1 sobre el lado corto del globo.
@@ -280,7 +306,8 @@ final class ChatLayer {
         // es el tiempo entre una llegada y la siguiente.
         let visibleFor = max(interval, 0.05)
         let typing = typingEnabled ? max(typingDuration, 0) : 0
-        let period = mode == .single ? typing + visibleFor + max(pause, 0) : visibleFor
+        let period = (mode == .single || style == .terminal)
+            ? typing + visibleFor + max(pause, 0) : visibleFor
         let total = Float(texts.count) * period
         var clock = max(time - startDelay, 0)
         // En pila se agrega un periodo de mas para que el ultimo mensaje se
@@ -299,6 +326,11 @@ final class ChatLayer {
         let wanted = Int((min(max(widthFraction, 0.05), 1) * Float(boxCols)).rounded())
         let innerWidth = max(min(wanted, usable) - padX * 2, 1)
 
+        if style == .terminal {
+            return layoutTerminal(texts: texts, boxCols: boxCols, boxRows: boxRows,
+                                  clock: clock, period: period, visibleFor: visibleFor,
+                                  innerWidth: innerWidth, typing: typing)
+        }
         if mode == .single {
             return layoutSingle(texts: texts, innerWidth: innerWidth, boxRows: boxRows,
                                 clock: clock, period: period, visibleFor: visibleFor,
@@ -557,7 +589,13 @@ final class ChatLayer {
         let rowTop = textRow * step2 * ch
         let rowHeight = step2 * ch
         let baseY = rowTop + (rowHeight - size) * 0.5
+        emitDotsAt(x: baseX, y: baseY, size: size, time: time, alpha: alpha)
+    }
 
+    /// Los tres circulos en una posicion dada, en pixeles.
+    private func emitDotsAt(x: Float, y: Float, size: Float, time: Float, alpha: Float) {
+        guard alpha > 0.002 else { return }
+        let step = size * 1.6
         for i in 0..<3 {
             guard rects.count < ChatLayer.maxRects else { return }
             let phase = time * max(typingSpeed, 0.05) - Float(i) * 0.33
@@ -566,12 +604,102 @@ final class ChatLayer {
             // lo que hace que se lea como una onda recorriendolos.
             let lift = wave * size * 0.5
             rects.append(ASCIIRTChatRect(
-                origin: SIMD2(baseX + Float(i) * step, baseY - lift),
+                origin: SIMD2(x + Float(i) * step, y - lift),
                 size: SIMD2(size, size),
                 radius: size * 0.5,
                 alpha: alpha * (0.35 + 0.65 * wave),
                 _pad0: 0, _pad1: 0))
         }
+    }
+
+    /// Terminal: un renglon centrado que se escribe caracter por caracter, con
+    /// un cursor que parpadea al final.
+    ///
+    /// No lleva globo: el texto va directo sobre lo que haya detras — el ojo, la
+    /// camara, lo que sea. Por eso tampoco se alinea a un margen sino que se
+    /// centra: sin caja que lo ancle, un texto pegado a la izquierda se lee como
+    /// que quedo suelto, y centrado se lee como que el sistema esta hablando.
+    private func layoutTerminal(texts: [String], boxCols: Int, boxRows: Int,
+                                clock: Float, period: Float, visibleFor: Float,
+                                innerWidth: Int, typing: Float) -> [Balloon] {
+        pixelOffset = 0
+        let index = min(Int(clock / period), texts.count - 1)
+        let raw = clock - Float(index) * period
+
+        let lines = wrap(texts[index], width: innerWidth)
+        let originYRow = max(min(Int(terminalY * Float(boxRows)), boxRows - lines.count), 0)
+
+        // Los puntitos piensan ANTES de escribir, centrados en el mismo renglon
+        // donde va a aparecer el texto.
+        if typing > 0, raw < typing {
+            let stepF = Float(max(scale, 1))
+            let ch = Float(max(cellHeight, 1))
+            let cw = Float(max(cellWidth, 1))
+            let size = max(typingSize, 0.2) * ch
+            let ancho = size * 1.6 * 2 + size
+            emitDotsAt(x: (Float(boxCols) * stepF * cw - ancho) * 0.5,
+                       y: Float(originYRow) * stepF * ch + (stepF * ch - size) * 0.5,
+                       size: size, time: clock,
+                       alpha: min(raw / max(fadeIn, 0.01), 1)
+                            * min((typing - raw) / max(fadeOut, 0.01), 1))
+            return []
+        }
+        let age = raw - typing
+        guard age <= visibleFor else { return [] }
+
+        let total = lines.reduce(0) { $0 + $1.count }
+
+        // El tipeado se mide en caracteres por segundo y no en una duracion:
+        // asi un mensaje largo tarda mas que uno corto, que es lo que hace una
+        // terminal de verdad. Con una duracion fija, los largos salen disparados.
+        let revealed = min(Int(age * max(typeSpeed, 1)), total)
+
+        let width = lines.map(\.count).max() ?? 0
+        let originX = max((boxCols - width) / 2, 0)
+        let originY = originYRow
+
+        emitCursor(lines: lines, revealed: revealed, originX: originX, originY: originY,
+                   time: clock)
+
+        return [Balloon(lines: lines, width: width, height: lines.count,
+                        originX: originX, originY: originY,
+                        alpha: 1, revealed: revealed)]
+    }
+
+    /// Cursor de bloque despues del ultimo caracter escrito.
+    private func emitCursor(lines: [String], revealed: Int,
+                            originX: Int, originY: Int, time: Float) {
+        guard rects.count < ChatLayer.maxRects else { return }
+        let blink = time * max(cursorBlink, 0.05)
+        guard blink - blink.rounded(.down) < 0.55 else { return }
+
+        // En que renglon y columna quedo el cursor.
+        var left = revealed
+        var row = 0
+        for (i, line) in lines.enumerated() {
+            row = i
+            if left <= line.count { break }
+            left -= line.count
+        }
+        let column = min(left, lines[row].count)
+
+        let stepF = Float(max(scale, 1))
+        let cw = Float(max(cellWidth, 1))
+        let ch = Float(max(cellHeight, 1))
+        // Alto contra la LETRA y no contra la celda. La celda tipografica es
+        // mucho mas alta que el ojo de la letra —lleva ascendentes, descendentes
+        // y espaciado— asi que un cursor del alto de la celda sobresale por
+        // arriba el doble de lo que mide el texto. Medido: 53 px de cursor
+        // contra 22 de letra.
+        let rowH = stepF * ch
+        let w = max(cursorWidth, 0.05) * stepF * cw
+        let h = rowH * 0.55
+
+        // Apoyado en la base del renglon, que es donde se apoya la letra.
+        rects.append(ASCIIRTChatRect(
+            origin: SIMD2(Float(originX + column) * stepF * cw,
+                          Float(originY + row) * rowH + rowH - h - rowH * 0.22),
+            size: SIMD2(w, h), radius: 0, alpha: 1, _pad0: 0, _pad1: 0))
     }
 
     // MARK: - Pintado
@@ -585,8 +713,9 @@ final class ChatLayer {
         for (row, line) in balloon.lines.enumerated() {
             let by = balloon.originY + padY + row
             guard by >= 0, by < boxRows else { continue }
+            let indent = style == .terminal ? (balloon.width - line.count) / 2 : padX
             for (column, character) in line.enumerated() {
-                let bx = balloon.originX + padX + column
+                let bx = balloon.originX + indent + column
                 guard bx >= 0, bx < boxCols else { continue }
                 written += 1
                 guard written <= balloon.revealed else { break }
@@ -600,7 +729,8 @@ final class ChatLayer {
 
         // El fondo ya no se pinta aca: se emite como rectangulo en pixeles y lo
         // resuelve el shader. Lo unico que queda en la textura es el texto.
-        emitRect(balloon, step: step)
+        // En terminal no hay fondo: el texto va directo sobre la imagen.
+        if style != .terminal { emitRect(balloon, step: step) }
     }
 
     /// Rectangulo del globo —y del piquito— en pixeles de salida.

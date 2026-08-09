@@ -263,6 +263,11 @@ final class AppModel: ObservableObject {
     @Published var chatTypingDuration: Double = 1.2 { didSet { syncChat() } }
     @Published var chatTypingSpeed: Double = 1.4 { didSet { syncChat() } }
     @Published var chatTypingSize: Double = 2 { didSet { syncChat() } }
+    @Published var chatStyle: ChatStyle = .bubbles { didSet { syncChat() } }
+    @Published var chatTypeSpeed: Double = 22 { didSet { syncChat() } }
+    @Published var chatTerminalY: Double = 0.72 { didSet { syncChat() } }
+    @Published var chatCursorWidth: Double = 0.5 { didSet { syncChat() } }
+    @Published var chatCursorBlink: Double = 1.6 { didSet { syncChat() } }
     @Published var chatShape: ChatBubbleShape = .rect { didSet { syncChat() } }
     @Published var chatTail = false { didSet { syncChat() } }
     @Published var chatCorner: Double = 0.5 { didSet { syncChat() } }
@@ -297,6 +302,11 @@ final class AppModel: ObservableObject {
         layer.typingDuration = Float(chatTypingDuration)
         layer.typingSpeed = Float(chatTypingSpeed)
         layer.typingSize = Float(chatTypingSize)
+        layer.style = chatStyle
+        layer.typeSpeed = Float(chatTypeSpeed)
+        layer.terminalY = Float(chatTerminalY)
+        layer.cursorWidth = Float(chatCursorWidth)
+        layer.cursorBlink = Float(chatCursorBlink)
         layer.shape = chatShape
         layer.tail = chatTail
         layer.corner = Float(chatCorner)
@@ -825,6 +835,11 @@ final class AppModel: ObservableObject {
         preset.chatTypingSpeed = chatTypingSpeed
         preset.chatTypingSize = chatTypingSize
         preset.chatShape = chatShape.rawValue
+        preset.chatStyle = chatStyle.rawValue
+        preset.chatTypeSpeed = chatTypeSpeed
+        preset.chatTerminalY = chatTerminalY
+        preset.chatCursorWidth = chatCursorWidth
+        preset.chatCursorBlink = chatCursorBlink
         preset.chatTail = chatTail
         preset.chatCorner = chatCorner
         preset.chatInterval = chatInterval
@@ -1019,6 +1034,11 @@ final class AppModel: ObservableObject {
         chatTypingSpeed = preset.chatTypingSpeed
         chatTypingSize = preset.chatTypingSize
         chatShape = ChatBubbleShape(rawValue: preset.chatShape) ?? .rect
+        chatStyle = ChatStyle(rawValue: preset.chatStyle) ?? .bubbles
+        chatTypeSpeed = preset.chatTypeSpeed
+        chatTerminalY = preset.chatTerminalY
+        chatCursorWidth = preset.chatCursorWidth
+        chatCursorBlink = preset.chatCursorBlink
         chatTail = preset.chatTail
         chatCorner = preset.chatCorner
         chatInterval = preset.chatInterval

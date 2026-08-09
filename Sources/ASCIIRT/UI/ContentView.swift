@@ -377,7 +377,7 @@ private struct ControlPanel: View {
                              isExpanded: $showSource) {
                     sourceContent
                 }
-                if model.sourceKind == .chat {
+                if model.sourceKind == .chat || model.sourceKind == .eye {
                     Divider()
                     PanelSection(title: "Chat", systemImage: "bubble.left.and.bubble.right",
                                  help: "Globos de diálogo escritos DIRECTO en la grilla, una letra por celda. La alternativa era dibujarlos en una imagen y dejar que el pipeline los convirtiera a ASCII como a cualquier fuente, pero a los tamaños de celda que se usan un texto pasado por la rampa queda ilegible — se lee como una mancha de densidad con forma de renglón. Escribiéndolos en la grilla el texto queda nítido y además la app dibuja lo que es: caracteres en una grilla.",
@@ -1201,6 +1201,21 @@ private struct ControlPanel: View {
 
     private var chatContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            if model.sourceKind != .chat {
+                ParamToggle(label: "Activo", isOn: $model.chatEnabled,
+                            help: "Enciende los mensajes encima de la fuente actual. En la fuente Chat están siempre; acá sirve para poner texto sobre el ojo, que es lo que hace falta para una presentación — el ojo mira y el sistema habla debajo.")
+            }
+            HStack(spacing: 6) {
+                Picker("", selection: $model.chatStyle) {
+                    ForEach(ChatStyle.allCases) { s in Text(s.label).tag(s) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                HelpMark("Globos: cajas de chat alineadas a un margen, con su forma y su color. Terminal: sin caja, el texto centrado y escribiéndose carácter por carácter con un cursor que parpadea, directo sobre lo que haya detrás. El centrado no es capricho — sin caja que lo ancle, un texto pegado a la izquierda se lee como que quedó suelto; centrado se lee como que el sistema está hablando.",
+                         title: "Estilo")
+            }
+
             PanelGroupLabel(text: "Mensajes", help: "Un mensaje por renglón, en orden. Se edita como texto porque escribir una conversación es escribir, no llenar un formulario.")
             TextEditor(text: $model.chatScript)
                 .font(.system(size: 11, design: .monospaced))
@@ -1279,7 +1294,20 @@ private struct ControlPanel: View {
             ParamToggle(label: "Repetir", isOn: $model.chatLoops,
                         help: "Al terminar el último mensaje vuelve a empezar la conversación. Para un loop de sala conviene encendido; para un pase único, apagado.")
 
-            PanelGroupLabel(text: "Forma", help: "Tamaño del texto y del globo, todo medido en celdas.")
+            if model.chatStyle == .terminal {
+                PanelGroupLabel(text: "Terminal", help: "Tipeado, posición y cursor.")
+                ParamSlider(label: "Velocidad", value: $model.chatTypeSpeed, range: 2...80, decimals: 0,
+                            help: "Caracteres por segundo. Se mide así y no como una duración fija a propósito: con caracteres por segundo un mensaje largo tarda más que uno corto, que es lo que hace una terminal de verdad. Con duración fija, los largos salen disparados y los cortos se arrastran. Entre 15 y 30 se lee como alguien tipeando; arriba de 50, como una máquina volcando texto.")
+                ParamSlider(label: "Altura", value: $model.chatTerminalY, range: 0...0.95, decimals: 2,
+                            help: "Dónde cae el renglón, como fracción de la altura de pantalla. 0,72 lo deja debajo del ojo con aire; subiéndolo se acerca al centro y le compite, bajándolo se va al pie.")
+                ParamSlider(label: "Grosor cursor", value: $model.chatCursorWidth, range: 0.1...1.5, decimals: 2,
+                            help: "Ancho del cursor como fracción del ancho de celda. En 1 ocupa una celda entera, o sea un cursor de bloque como el de una terminal; por debajo queda una barra. Se dibuja por píxel, así que el grosor es exacto y no salta de a celdas.")
+                ParamSlider(label: "Parpadeo", value: $model.chatCursorBlink, range: 0...6, decimals: 2,
+                            help: "Parpadeos por segundo del cursor. Cerca de 1,5 es el ritmo de una terminal; en 0 queda fijo y encendido.")
+            }
+
+            PanelGroupLabel(text: "Forma", help: "Tamaño del texto y, con globos, también del globo.")
+            if model.chatStyle == .bubbles {
             HStack(spacing: 6) {
                 Picker("", selection: $model.chatShape) {
                     ForEach(ChatBubbleShape.allCases) { s in Text(s.label).tag(s) }
@@ -1296,6 +1324,7 @@ private struct ControlPanel: View {
             }
             ParamToggle(label: "Piquito", isOn: $model.chatTail,
                         help: "Agrega la puntita del globo de diálogo, abajo a la izquierda — del mismo lado por el que se alinean los globos. También en escalera: dos casillas y después una, que es lo que en una grilla se lee como la punta que apunta a quien habla.")
+            }
             ParamSlider(label: "Escala", value: $model.chatScale, range: 1...6, decimals: 0,
                         help: "Cuántas celdas ocupa cada letra por lado. En 1 el texto es del tamaño de un carácter del ASCII y se mezcla con el fondo; subiéndolo el mensaje se despega y se lee de lejos, que es lo que hace falta proyectando. Todo el maquetado vive en una grilla de este tamaño, así que los globos siempre caen alineados entre sí.")
             ParamSlider(label: "Ancho", value: $model.chatWidth, range: 0.1...1, decimals: 2,
