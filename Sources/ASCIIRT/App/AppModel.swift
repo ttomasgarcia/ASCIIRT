@@ -262,6 +262,7 @@ final class AppModel: ObservableObject {
     @Published var chatTyping = false { didSet { syncChat() } }
     @Published var chatTypingDuration: Double = 1.2 { didSet { syncChat() } }
     @Published var chatTypingSpeed: Double = 1.4 { didSet { syncChat() } }
+    @Published var chatTypingSize: Double = 2 { didSet { syncChat() } }
     @Published var chatShape: ChatBubbleShape = .rect { didSet { syncChat() } }
     @Published var chatTail = false { didSet { syncChat() } }
     @Published var chatCorner: Double = 0.5 { didSet { syncChat() } }
@@ -295,6 +296,7 @@ final class AppModel: ObservableObject {
         layer.typingEnabled = chatTyping
         layer.typingDuration = Float(chatTypingDuration)
         layer.typingSpeed = Float(chatTypingSpeed)
+        layer.typingSize = Float(chatTypingSize)
         layer.shape = chatShape
         layer.tail = chatTail
         layer.corner = Float(chatCorner)
@@ -821,6 +823,7 @@ final class AppModel: ObservableObject {
         preset.chatTyping = chatTyping
         preset.chatTypingDuration = chatTypingDuration
         preset.chatTypingSpeed = chatTypingSpeed
+        preset.chatTypingSize = chatTypingSize
         preset.chatShape = chatShape.rawValue
         preset.chatTail = chatTail
         preset.chatCorner = chatCorner
@@ -1014,6 +1017,7 @@ final class AppModel: ObservableObject {
         chatTyping = preset.chatTyping
         chatTypingDuration = preset.chatTypingDuration
         chatTypingSpeed = preset.chatTypingSpeed
+        chatTypingSize = preset.chatTypingSize
         chatShape = ChatBubbleShape(rawValue: preset.chatShape) ?? .rect
         chatTail = preset.chatTail
         chatCorner = preset.chatCorner

@@ -126,6 +126,8 @@ final class ChatLayer {
     var typingDuration: Float = 1.2
     /// Ciclos por segundo de la onda que recorre los puntos.
     var typingSpeed: Float = 1.4
+    /// Diametro de cada punto, en alturas de celda.
+    var typingSize: Float = 2
 
     /// Los globos, en pixeles, para que el shader dibuje el fondo por pixel.
     private(set) var rects: [ASCIIRTChatRect] = []
@@ -237,13 +239,6 @@ final class ChatLayer {
         var originY: Int    // borde superior, en casillas
         var alpha: Float
         var revealed: Int   // caracteres visibles, para la entrada tipeada
-        /// Fase de la animacion de los puntitos. `nil` = globo de mensaje.
-        ///
-        /// Los puntos no se mueven: late su opacidad, cada uno desfasado un
-        /// tercio de ciclo. En una grilla de caracteres subirlos y bajarlos
-        /// costaria una celda entera de salto, que es enorme; el latido de
-        /// opacidad es ademas lo que hacen los clientes de chat de verdad.
-        var typingPhase: Float?
     }
 
     /// Corta el texto en renglones que entren en `maxColumns`, sin partir
@@ -329,9 +324,7 @@ final class ChatLayer {
             if untilNext <= max(typingDuration, 0) {
                 let height = 1 + padY * 2
                 cursorY -= height
-                stack.append(dotsBalloon(boxRows: cursorY + height + marginBottom,
-                                         phase: clock * max(typingSpeed, 0.05),
-                                         alpha: 1))
+                emitDots(boxRows: cursorY + height + marginBottom, time: clock, alpha: 1)
                 cursorY -= gap
             }
         }
@@ -373,7 +366,7 @@ final class ChatLayer {
             cursorY -= height
             stack.append(Balloon(lines: lines, width: width, height: height,
                                  originX: marginLeft, originY: cursorY + offset,
-                                 alpha: alpha, revealed: revealed, typingPhase: nil))
+                                 alpha: alpha, revealed: revealed))
             // El piquito baja dos casillas por debajo del globo, asi que con
             // separacion 1 se le montaba encima del mensaje de abajo.
             cursorY -= tail ? max(gap, 3) : gap
@@ -405,8 +398,12 @@ final class ChatLayer {
         // esta escribiendo ahi y no como un elemento aparte.
         if typing > 0, raw < typing {
             pixelOffset = 0
-            return [dotsBalloon(boxRows: boxRows, phase: clock * max(typingSpeed, 0.05),
-                                alpha: min(raw / max(fadeIn, 0.01), 1))]
+            // Los puntos salen SUELTOS, sin globo: se emiten como circulos en
+            // pixeles y no hay ningun caracter que dibujar.
+            emitDots(boxRows: boxRows, time: clock,
+                     alpha: min(raw / max(fadeIn, 0.01), 1)
+                          * min((typing - raw) / max(fadeOut, 0.01), 1))
+            return []
         }
         let age = raw - typing
 
@@ -494,7 +491,7 @@ final class ChatLayer {
 
         return [Balloon(lines: lines, width: bodyWidth + padX * 2, height: height,
                         originX: marginLeft, originY: originY,
-                        alpha: alpha, revealed: revealed, typingPhase: nil)]
+                        alpha: alpha, revealed: revealed)]
     }
 
     /// Curva de entrada con sobrepaso: resorte subamortiguado normalizado.
@@ -532,12 +529,49 @@ final class ChatLayer {
         return 1 - exp(-zeta * omega * t) * (cos(wd * t) + (zeta * omega / wd) * sin(wd * t))
     }
 
-    /// Globo chico con tres puntos, anclado abajo igual que un mensaje.
-    private func dotsBalloon(boxRows: Int, phase: Float, alpha: Float) -> Balloon {
-        let height = 1 + padY * 2
-        return Balloon(lines: ["···"], width: 3 + padX * 2, height: height,
-                       originX: marginLeft, originY: boxRows - marginBottom - height,
-                       alpha: alpha, revealed: Int.max, typingPhase: phase)
+    /// Tres circulos sueltos, animados en pixeles.
+    ///
+    /// Van como rectangulos con el radio al maximo —o sea circulos— y no como
+    /// caracteres: asi son redondos de verdad, tienen su propio tamano
+    /// independiente de la escala del texto, y sobre todo pueden MOVERSE, porque
+    /// los rectangulos viven en pixeles. Como caracteres solo podian latir de
+    /// opacidad; subirlos costaba una celda entera de salto.
+    private func emitDots(boxRows: Int, time: Float, alpha: Float) {
+        guard alpha > 0.002 else { return }
+        let ch = Float(max(cellHeight, 1))
+        let cw = Float(max(cellWidth, 1))
+        let size = max(typingSize, 0.2) * ch
+        let step = size * 1.6
+
+        // Alineados con el TEXTO y no con el borde del globo: arrancan donde
+        // arranca la primera letra —o sea despues del margen interno— y quedan
+        // centrados en el renglon de mas abajo, que es donde va a leerse el
+        // mensaje. Alineandolos con el globo, los puntos aparecian corridos
+        // respecto del texto que venia despues y el salto se notaba.
+        let step2 = Float(max(scale, 1))
+        let baseX = Float(marginLeft + padX) * step2 * cw
+
+        // Renglon inferior del mensaje que viene: el globo llega hasta
+        // `marginBottom`, y adentro el texto deja `padY` renglones de aire.
+        let textRow = Float(boxRows - marginBottom - padY - 1)
+        let rowTop = textRow * step2 * ch
+        let rowHeight = step2 * ch
+        let baseY = rowTop + (rowHeight - size) * 0.5
+
+        for i in 0..<3 {
+            guard rects.count < ChatLayer.maxRects else { return }
+            let phase = time * max(typingSpeed, 0.05) - Float(i) * 0.33
+            let wave = 0.5 - 0.5 * cos((phase - phase.rounded(.down)) * 2 * .pi)
+            // Sube y baja medio diametro, y ademas late: las dos cosas juntas es
+            // lo que hace que se lea como una onda recorriendolos.
+            let lift = wave * size * 0.5
+            rects.append(ASCIIRTChatRect(
+                origin: SIMD2(baseX + Float(i) * step, baseY - lift),
+                size: SIMD2(size, size),
+                radius: size * 0.5,
+                alpha: alpha * (0.35 + 0.65 * wave),
+                _pad0: 0, _pad1: 0))
+        }
     }
 
     // MARK: - Pintado
@@ -558,16 +592,7 @@ final class ChatLayer {
                 guard written <= balloon.revealed else { break }
                 let index = atlas.index(of: character)
 
-                // Cada punto late desfasado un tercio de ciclo respecto del
-                // anterior: eso es lo que hace que la onda RECORRA los tres en
-                // vez de que parpadeen los tres juntos.
-                var cellAlpha = alpha
-                if let phase = balloon.typingPhase {
-                    let t = phase - Float(column) * 0.33
-                    let wave = 0.5 - 0.5 * cos((t - t.rounded(.down)) * 2 * .pi)
-                    cellAlpha = UInt8(max(0, min(255, Int(Float(alpha) * (0.2 + 0.8 * wave)))))
-                }
-                stamp(box: SIMD2(bx, by), char: index, alpha: cellAlpha,
+                stamp(box: SIMD2(bx, by), char: index, alpha: alpha,
                       step: step, cols: cols, rows: rows)
             }
             if written > balloon.revealed { break }

@@ -1239,10 +1239,12 @@ private struct ControlPanel: View {
                             help: "Cuánto queda la pantalla vacía entre un mensaje y el siguiente. En 0 el próximo entra apenas se fue el anterior, sin respiro. Es aparte del Ciclo: el Ciclo es cuánto dura el mensaje en pantalla —entrada, permanencia y salida— y la Pausa es el hueco después. Sumados dan el tiempo de mensaje a mensaje. En modo Pila no aparece porque ahí nada se va: el Intervalo ya es el tiempo entre una llegada y la siguiente.")
             }
             ParamToggle(label: "Escribiendo…", isOn: $model.chatTyping,
-                        help: "Antes de cada mensaje aparece un globo chico con tres puntos, en el mismo lugar donde va a caer el mensaje. Los puntos no se mueven: late su opacidad, cada uno desfasado un tercio de ciclo, que es lo que hace que la onda recorra los tres en vez de que parpadeen juntos. Subirlos y bajarlos costaría una celda entera de salto, que en una grilla de caracteres es enorme — y el latido es además lo que hacen los clientes de chat de verdad.")
+                        help: "Antes de cada mensaje aparecen tres círculos sueltos, sin globo alrededor, apoyados donde va a caer el mensaje. Suben y bajan medio diámetro y además laten, cada uno desfasado un tercio de ciclo: por eso la onda los recorre en vez de que parpadeen juntos. No son caracteres sino círculos dibujados en píxeles, así que son redondos de verdad, tienen su propio tamaño independiente de la Escala del texto, y pueden moverse — como caracteres sólo podían latir, porque subirlos costaría una celda entera de salto.")
             if model.chatTyping {
                 ParamSlider(label: "Duración puntos", value: $model.chatTypingDuration, range: 0.2...6, decimals: 2,
                             help: "Cuánto se ven los puntos antes de que aparezca el mensaje. Es tiempo que se suma al ciclo, no que se le resta: el mensaje sigue durando lo que dice Ciclo. Alrededor de un segundo se lee como que alguien está tipeando; mucho más largo empieza a impacientar, que a veces es justo lo que se quiere.")
+                ParamSlider(label: "Tamaño puntos", value: $model.chatTypingSize, range: 0.4...8, decimals: 1,
+                            help: "Diámetro de cada círculo, medido en alturas de celda. Es independiente de la Escala del texto: podés tener mensajes chicos con puntos grandes o al revés. Alrededor de 2 es el tamaño que se lee de lejos sin competirle al mensaje.")
                 ParamSlider(label: "Ritmo puntos", value: $model.chatTypingSpeed, range: 0.2...4, decimals: 2,
                             help: "Ciclos por segundo de la onda que recorre los tres puntos. Cerca de 1,4 es el ritmo de Messenger; más lento se lee pensativo y más rápido, ansioso.")
             }

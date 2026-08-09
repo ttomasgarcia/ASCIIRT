@@ -76,6 +76,7 @@ struct Preset: Codable, Equatable {
     var chatTyping: Bool = false
     var chatTypingDuration: Double = 1.2
     var chatTypingSpeed: Double = 1.4
+    var chatTypingSize: Double = 2
     var chatShape: UInt32 = 0
     var chatColumns: Double = 0
     var chatTail: Bool = false
@@ -237,6 +238,7 @@ struct Preset: Codable, Equatable {
         chatTyping = c.value(.chatTyping, d.chatTyping)
         chatTypingDuration = c.value(.chatTypingDuration, d.chatTypingDuration)
         chatTypingSpeed = c.value(.chatTypingSpeed, d.chatTypingSpeed)
+        chatTypingSize = c.value(.chatTypingSize, d.chatTypingSize)
         chatShape = ChatBubbleShape(rawValue: c.value(.chatShape, d.chatShape))?.rawValue ?? d.chatShape
         chatTail = c.value(.chatTail, d.chatTail)
         chatCorner = c.value(.chatCorner, d.chatCorner)
