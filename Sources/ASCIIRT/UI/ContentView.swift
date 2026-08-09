@@ -1094,7 +1094,7 @@ private struct ControlPanel: View {
 
     private var exportContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            PanelGroupLabel(text: "Formato", help: "Formato de salida, tanto para REC como para el render offline. ProRes para llevar a post, H.264 para mandar por ahí, secuencia PNG para máxima calidad con alpha. El ASCII es el peor caso posible para un codec de transformada, así que si podés evitá H.264.")
+            PanelGroupLabel(text: "Formato", help: "Formato de salida, tanto para REC como para el render offline. ProRes 422 HQ para llevar a post. ProRes 4444 y secuencia PNG guardan alfa sin comprimir, pesado pero exacto. HEVC con alfa guarda el alfa en una capa auxiliar del mismo archivo y pesa un orden de magnitud menos — es lo más parecido a un WebM con alfa que existe nativo en macOS, y lo abren QuickTime, Safari, Premiere y After Effects. H.264 para mandar por ahí, sin alfa. El ASCII es el peor caso posible para un codec de transformada, así que si podés evitá H.264.")
             Picker("", selection: $model.exportCodec) {
                 ForEach(ExportCodec.allCases) { codec in Text(codec.rawValue).tag(codec) }
             }
@@ -1447,7 +1447,9 @@ private struct ControlPanel: View {
         case .pngSequence:
             return "Sin pérdida y con alpha. Solo en render offline; es el único destino donde el frame vuelve a CPU."
         case .proRes4444:
-            return "El único formato de video acá que conserva el fondo transparente."
+            return "Conserva el fondo transparente, sin comprimir el alfa. Pesado."
+        case .hevcAlpha:
+            return "Alfa en una capa auxiliar del mismo archivo: pesa un orden de magnitud menos que ProRes 4444. Lo abren QuickTime, Safari, Premiere y After Effects."
         case .proRes422HQ:
             return "Sin pérdida perceptible, pesado. Es lo que va a post."
         }

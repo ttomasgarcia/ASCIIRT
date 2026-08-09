@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreVideo
+import VideoToolbox
 import Foundation
 import Metal
 import QuartzCore
@@ -8,6 +9,7 @@ import QuartzCore
 enum ExportCodec: String, CaseIterable, Identifiable, Codable {
     case proRes422HQ = "ProRes 422 HQ"
     case proRes4444 = "ProRes 4444"
+    case hevcAlpha = "HEVC con alfa"
     case h264 = "H.264"
     case pngSequence = "Secuencia PNG"
 
@@ -21,13 +23,18 @@ enum ExportCodec: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .proRes422HQ: return .proRes422HQ
         case .proRes4444: return .proRes4444
+        case .hevcAlpha: return .hevcWithAlpha
         case .h264: return .h264
         case .pngSequence: return .proRes4444   // nunca se usa; ver isImageSequence
         }
     }
 
     /// ProRes 4444 es el unico que lleva alpha; los demas aplastan contra negro.
-    var supportsAlpha: Bool { self == .proRes4444 || self == .pngSequence }
+    /// ProRes 4444 y la secuencia PNG guardan alfa sin comprimir; HEVC con alfa
+    /// lo guarda en una capa auxiliar del mismo archivo y pesa un orden de
+    /// magnitud menos. Es lo mas parecido a un WebM con alfa que existe nativo en
+    /// macOS — WebM necesitaria un encoder VP9 que el sistema no trae.
+    var supportsAlpha: Bool { self == .proRes4444 || self == .pngSequence || self == .hevcAlpha }
 
     var fileExtension: String {
         switch self {
@@ -116,6 +123,18 @@ final class VideoWriter {
             AVVideoWidthKey: Int(size.x),
             AVVideoHeightKey: Int(size.y)
         ]
+        if codec == .hevcAlpha {
+            settings[AVVideoCompressionPropertiesKey] = [
+                // El pipeline escribe alfa PREMULTIPLICADO —lo dice la etapa de
+                // composicion— asi que hay que declararlo: con el modo por
+                // defecto los bordes antialiaseados de los glifos salen con halo.
+                kVTCompressionPropertyKey_AlphaChannelMode as String:
+                    kVTAlphaChannelMode_PremultipliedAlpha as String,
+                AVVideoAverageBitRateKey: codec.suggestedBitrate(width: Int(size.x),
+                                                                 height: Int(size.y),
+                                                                 fps: fps)
+            ]
+        }
         if codec == .h264 {
             settings[AVVideoCompressionPropertiesKey] = [
                 AVVideoAverageBitRateKey: codec.suggestedBitrate(width: Int(size.x),
