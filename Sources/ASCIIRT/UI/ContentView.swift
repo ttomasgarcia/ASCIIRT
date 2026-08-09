@@ -1244,10 +1244,10 @@ private struct ControlPanel: View {
                         help: "Cuánto tarda en aparecer la opacidad, aparte del movimiento. Antes iban juntos y el globo se veía lavado durante todo el viaje; casi siempre conviene que el fundido sea bastante más corto que el desplazamiento. En 0 aparece opaco de entrada y sólo se mueve.")
             if model.chatEntrance == .bounce {
                 ParamSlider(label: "Rebote", value: $model.chatBounce, range: 0...1,
-                            help: "Cuánto se pasa el globo antes de asentarse. Es un resorte: en 0 llega derecho, sin pasarse, que es lo más rápido posible sin rebote. Con Duración 0,35 el sobrepaso va de 1% en 0,25 hasta 40% en 1. Ahora que el globo se mueve por píxeles y no de a celdas, el sobrepaso se ve entero — antes el redondeo a la celda se comía la parte chica y por eso el mismo número se sentía más blando. Si te queda duro, bajá esto o subí la Duración.")
+                            help: "Cuánto se pasa el globo antes de asentarse. Es un resorte: en 0 llega derecho, sin pasarse. El sobrepaso se mide sobre la SUBIDA, así que con una subida corta el rebote es corto por más que subas esto — con subida 3,5 y escala 2 el globo viaja 106 px y se pasa 42; con subida 8 viaja 240 y se pasa 96. Si no lo ves, el control es la Subida, no éste. En modo Pila el movimiento se sigue haciendo de a celdas enteras y el rebote se pierde en el redondeo: para verlo hay que estar en «uno por vez».")
             }
             ParamSlider(label: "Subida", value: $model.chatRise, range: 0...20, decimals: 0,
-                        help: "Cuántas celdas sube el globo mientras entra. Se mueve de a celdas enteras y no en píxeles sueltos: media celda dejaría el texto partido entre dos filas y se vería borroso. El escalonado se lee como movimiento de terminal, que es coherente con el resto.")
+                        help: "Cuánto viaja el globo al entrar, en casillas de la Escala. Es lo que fija el tamaño del rebote: el sobrepaso es un porcentaje de esto, así que con una subida corta no hay rebote posible por más que subas el control de Rebote. En «uno por vez» el movimiento es por píxeles y sale liso; en Pila se hace de a celdas enteras, porque ahí hay varios globos animando a la vez y el corrimiento fino del shader es uno solo para toda la capa.")
             if model.chatMode == .single {
                 PanelGroupLabel(text: "Salida", help: "Cómo se va cada mensaje. Sólo aplica en «uno por vez»: en pila nada se va.")
                 HStack(spacing: 6) {
