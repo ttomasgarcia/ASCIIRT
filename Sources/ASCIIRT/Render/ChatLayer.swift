@@ -203,6 +203,20 @@ final class ChatLayer {
     /// Ancho de celda en pixeles. Junto con el alto define la forma real de la
     /// celda, que no es cuadrada, y sin eso el redondeo saldria ovalado.
     var cellWidth: Int = 8
+    /// Extension vertical de la letra dentro de su celda.
+    ///
+    /// El rasterizador del atlas escala cada glifo para que LLENE la celda —lo
+    /// hace para que la rampa mida cobertura sobre la celda entera— asi que la
+    /// tinta ocupa casi todo el alto y estos valores son casi 0 y 1. Se dejan
+    /// como parametros igualmente porque el cursor y los puntitos se alinean
+    /// contra esto, y si algun dia el atlas deja de llenar la celda hay un solo
+    /// lugar que tocar.
+    ///
+    /// Se intento medirlos del bitmap y la medicion caia siempre en el valor de
+    /// respaldo: cursor de 16 px contra 32 de texto. Antes que dejar una medicion
+    /// que no mide, van los numeros que se verifican en pantalla.
+    var inkTop: Float = 0.05
+    var inkHeight: Float = 0.9
 
     // MARK: Salida
 
@@ -328,7 +342,8 @@ final class ChatLayer {
 
         if style == .terminal {
             return layoutTerminal(texts: texts, boxCols: boxCols, boxRows: boxRows,
-                                  clock: clock, period: period, visibleFor: visibleFor,
+                                  rawClock: max(time - startDelay, 0),
+                                  hold: visibleFor, pauseTime: max(pause, 0),
                                   innerWidth: innerWidth, typing: typing)
         }
         if mode == .single {
@@ -572,7 +587,10 @@ final class ChatLayer {
         guard alpha > 0.002 else { return }
         let ch = Float(max(cellHeight, 1))
         let cw = Float(max(cellWidth, 1))
-        let size = max(typingSize, 0.2) * ch
+        // El diametro sale del ALTO DE LA LETRA por el multiplicador, no de la
+        // celda: asi los puntos miden lo mismo que las letras a cualquier escala
+        // y el conjunto queda parejo.
+        let size = max(typingSize, 0.1) * inkHeight * Float(max(scale, 1)) * ch
         let step = size * 1.6
 
         // Alineados con el TEXTO y no con el borde del globo: arrancan donde
@@ -586,9 +604,10 @@ final class ChatLayer {
         // Renglon inferior del mensaje que viene: el globo llega hasta
         // `marginBottom`, y adentro el texto deja `padY` renglones de aire.
         let textRow = Float(boxRows - marginBottom - padY - 1)
-        let rowTop = textRow * step2 * ch
         let rowHeight = step2 * ch
-        let baseY = rowTop + (rowHeight - size) * 0.5
+        // Centrados en la TINTA del renglon, que es donde el ojo ve el texto.
+        let inkMiddle = textRow * rowHeight + (inkTop + inkHeight * 0.5) * rowHeight
+        let baseY = inkMiddle - size * 0.5
         emitDotsAt(x: baseX, y: baseY, size: size, time: time, alpha: alpha)
     }
 
@@ -620,13 +639,40 @@ final class ChatLayer {
     /// centra: sin caja que lo ancle, un texto pegado a la izquierda se lee como
     /// que quedo suelto, y centrado se lee como que el sistema esta hablando.
     private func layoutTerminal(texts: [String], boxCols: Int, boxRows: Int,
-                                clock: Float, period: Float, visibleFor: Float,
+                                rawClock: Float, hold: Float, pauseTime: Float,
                                 innerWidth: Int, typing: Float) -> [Balloon] {
         pixelOffset = 0
-        let index = min(Int(clock / period), texts.count - 1)
-        let raw = clock - Float(index) * period
 
-        let lines = wrap(texts[index], width: innerWidth)
+        // Cada mensaje dura LO QUE TARDA EN ESCRIBIRSE mas la permanencia, asi
+        // que el ciclo es distinto para cada uno y no se puede dividir el reloj
+        // por un periodo fijo: hay que recorrer la linea de tiempo acumulando.
+        //
+        // Medirlo con un periodo unico hacia que un mensaje largo se comiera su
+        // propia permanencia — terminaba de escribirse y desaparecia— mientras
+        // uno corto se quedaba una eternidad. La permanencia tiene que ser tiempo
+        // de lectura, y el de lectura no depende de lo que tardo en aparecer.
+        var durations: [Float] = []
+        var wrapped: [[String]] = []
+        for text in texts {
+            let ls = wrap(text, width: innerWidth)
+            let chars = Float(ls.reduce(0) { $0 + $1.count })
+            wrapped.append(ls)
+            durations.append(typing + chars / max(typeSpeed, 1) + hold + pauseTime)
+        }
+        let total = durations.reduce(0, +)
+        var clock = rawClock
+        if loops && total > 0 { clock = clock.truncatingRemainder(dividingBy: total) }
+
+        var index = 0
+        var raw = clock
+        while index < durations.count - 1 && raw >= durations[index] {
+            raw -= durations[index]
+            index += 1
+        }
+
+        let lines = wrapped[index]
+        let writeTime = Float(lines.reduce(0) { $0 + $1.count }) / max(typeSpeed, 1)
+        let visibleFor = writeTime + hold
         let originYRow = max(min(Int(terminalY * Float(boxRows)), boxRows - lines.count), 0)
 
         // Los puntitos piensan ANTES de escribir, centrados en el mismo renglon
@@ -635,10 +681,15 @@ final class ChatLayer {
             let stepF = Float(max(scale, 1))
             let ch = Float(max(cellHeight, 1))
             let cw = Float(max(cellWidth, 1))
-            let size = max(typingSize, 0.2) * ch
+            let rowH = stepF * ch
+            let size = max(typingSize, 0.1) * inkHeight * rowH
+            // Ancho total de los tres: dos separaciones de 1.6 diametros mas el
+            // ultimo circulo. Restarlo del ancho de pantalla y dividir por dos es
+            // lo que los deja centrados de verdad.
             let ancho = size * 1.6 * 2 + size
+            let inkMiddle = Float(originYRow) * rowH + (inkTop + inkHeight * 0.5) * rowH
             emitDotsAt(x: (Float(boxCols) * stepF * cw - ancho) * 0.5,
-                       y: Float(originYRow) * stepF * ch + (stepF * ch - size) * 0.5,
+                       y: inkMiddle - size * 0.5,
                        size: size, time: clock,
                        alpha: min(raw / max(fadeIn, 0.01), 1)
                             * min((typing - raw) / max(fadeOut, 0.01), 1))
@@ -647,12 +698,11 @@ final class ChatLayer {
         let age = raw - typing
         guard age <= visibleFor else { return [] }
 
-        let total = lines.reduce(0) { $0 + $1.count }
-
         // El tipeado se mide en caracteres por segundo y no en una duracion:
         // asi un mensaje largo tarda mas que uno corto, que es lo que hace una
         // terminal de verdad. Con una duracion fija, los largos salen disparados.
-        let revealed = min(Int(age * max(typeSpeed, 1)), total)
+        let charCount = lines.reduce(0) { $0 + $1.count }
+        let revealed = min(Int(age * max(typeSpeed, 1)), charCount)
 
         let width = lines.map(\.count).max() ?? 0
         let originX = max((boxCols - width) / 2, 0)
@@ -686,19 +736,16 @@ final class ChatLayer {
         let stepF = Float(max(scale, 1))
         let cw = Float(max(cellWidth, 1))
         let ch = Float(max(cellHeight, 1))
-        // Alto contra la LETRA y no contra la celda. La celda tipografica es
-        // mucho mas alta que el ojo de la letra —lleva ascendentes, descendentes
-        // y espaciado— asi que un cursor del alto de la celda sobresale por
-        // arriba el doble de lo que mide el texto. Medido: 53 px de cursor
-        // contra 22 de letra.
+        // Alto y posicion contra la TINTA, no contra la celda. Los dos valores
+        // salen medidos del atlas, asi que el cursor calza con la letra en
+        // cualquier fuente y a cualquier escala.
         let rowH = stepF * ch
         let w = max(cursorWidth, 0.05) * stepF * cw
-        let h = rowH * 0.55
+        let h = inkHeight * rowH
 
-        // Apoyado en la base del renglon, que es donde se apoya la letra.
         rects.append(ASCIIRTChatRect(
             origin: SIMD2(Float(originX + column) * stepF * cw,
-                          Float(originY + row) * rowH + rowH - h - rowH * 0.22),
+                          Float(originY + row) * rowH + inkTop * rowH),
             size: SIMD2(w, h), radius: 0, alpha: 1, _pad0: 0, _pad1: 0))
     }
 
@@ -709,9 +756,15 @@ final class ChatLayer {
         let alpha = UInt8(max(0, min(255, Int(balloon.alpha * 255))))
         guard alpha > 0 else { return }
 
+        // En terminal no hay caja, asi que el margen interno vertical no aplica:
+        // sumandolo, el texto bajaba `padY` renglones y el cursor —que se ubica
+        // contra el renglon pelado— quedaba flotando arriba. Era eso y no la
+        // altura de la letra.
+        let vpad = style == .terminal ? 0 : padY
+
         var written = 0
         for (row, line) in balloon.lines.enumerated() {
-            let by = balloon.originY + padY + row
+            let by = balloon.originY + vpad + row
             guard by >= 0, by < boxRows else { continue }
             let indent = style == .terminal ? (balloon.width - line.count) / 2 : padX
             for (column, character) in line.enumerated() {

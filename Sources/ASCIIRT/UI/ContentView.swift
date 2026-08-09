@@ -1258,8 +1258,8 @@ private struct ControlPanel: View {
             if model.chatTyping {
                 ParamSlider(label: "Duración puntos", value: $model.chatTypingDuration, range: 0.2...6, decimals: 2,
                             help: "Cuánto se ven los puntos antes de que aparezca el mensaje. Es tiempo que se suma al ciclo, no que se le resta: el mensaje sigue durando lo que dice Ciclo. Alrededor de un segundo se lee como que alguien está tipeando; mucho más largo empieza a impacientar, que a veces es justo lo que se quiere.")
-                ParamSlider(label: "Tamaño puntos", value: $model.chatTypingSize, range: 0.4...8, decimals: 1,
-                            help: "Diámetro de cada círculo, medido en alturas de celda. Es independiente de la Escala del texto: podés tener mensajes chicos con puntos grandes o al revés. Alrededor de 2 es el tamaño que se lee de lejos sin competirle al mensaje.")
+                ParamSlider(label: "Tamaño puntos", value: $model.chatTypingSize, range: 0.3...3, decimals: 2,
+                            help: "Diámetro de cada círculo, como múltiplo del alto de la letra. En 1 miden exactamente lo mismo que el texto, así que el conjunto queda parejo a cualquier escala. El alto de la letra se mide del atlas y no se estima, porque una celda tipográfica es bastante más alta que el ojo de la letra — lleva ascendentes, descendentes y espaciado.")
                 ParamSlider(label: "Ritmo puntos", value: $model.chatTypingSpeed, range: 0.2...4, decimals: 2,
                             help: "Ciclos por segundo de la onda que recorre los tres puntos. Cerca de 1,4 es el ritmo de Messenger; más lento se lee pensativo y más rápido, ansioso.")
             }

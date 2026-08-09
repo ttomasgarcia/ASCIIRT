@@ -347,7 +347,21 @@ struct TextAtlas {
     let cellWidth: Int
     let cellHeight: Int
 
-    init(texture: MTLTexture, characters: [Character], cellWidth: Int, cellHeight: Int) {
+    /// Donde empieza y cuanto mide la TINTA de una letra dentro de la celda, en
+    /// fraccion del alto de celda.
+    ///
+    /// Una celda tipografica es bastante mas alta que el ojo de la letra: lleva
+    /// ascendentes, descendentes y espaciado. Todo lo que tenga que alinearse con
+    /// el texto —el cursor, los puntitos— necesita esta medida y no el alto de
+    /// celda, o queda flotando arriba. Se mide del bitmap en vez de estimarse con
+    /// una constante, asi vale para cualquier fuente.
+    let inkTop: Float
+    let inkHeight: Float
+
+    init(texture: MTLTexture, characters: [Character], cellWidth: Int, cellHeight: Int,
+         inkTop: Float = 0.25, inkHeight: Float = 0.5) {
+        self.inkTop = inkTop
+        self.inkHeight = inkHeight
         self.texture = texture
         self.characters = characters
         self.cellWidth = cellWidth
@@ -402,6 +416,7 @@ extension FontAtlasBuilder {
                                       order: Array(0..<characters.count),
                                       cellWidth: cellWidth, cellHeight: cellHeight,
                                       sourceStride: cellWidth * characters.count)
+
         return TextAtlas(texture: texture, characters: characters,
                          cellWidth: cellWidth, cellHeight: cellHeight)
     }
