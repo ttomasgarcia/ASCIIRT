@@ -64,8 +64,16 @@ static inline RainSample matrixRain(uint2 tile, float relief01, float2 spawn,
     // Gana la gota mas fuerte, no la suma: dos rastros solapados sumados
     // saturarian a blanco y se perderia la cabeza de las dos.
     for (uint k = 0u; k < drops; ++k) {
-        const float speed = params.matrixSpeed
+        // La velocidad de cada gota se redondea al multiplo de `span/periodo`
+        // mas cercano: asi cada una recorre un numero ENTERO de caidas dentro
+        // del loop y vuelve a arrancar donde estaba. Sin esto la lluvia es lo
+        // primero que delata el corte, porque son decenas de ciclos por columna.
+        float speed = params.matrixSpeed
             * (0.45 + 1.10 * hash11(tile.x * 7919u + k * 31u + 13u));
+        if (params.loopPeriod > 0.0) {
+            const float unit = span / params.loopPeriod;
+            speed = max(round(speed / unit), 1.0) * unit;
+        }
         const float phase = hash11(tile.x * 104729u + k * 6151u + 7u) * 997.0;
 
         const float head = origin + fmod(params.time * speed + phase, span);
@@ -119,7 +127,8 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     if (params.glitchEnabled != 0u) {
         uint burst = 0u;
         const float on = glitchGate(params.time, params.glitchRate,
-                                    params.glitchDuty, params.glitchChance, burst);
+                                    params.glitchDuty, params.glitchChance,
+                                    params.loopPeriod, burst);
         const float k = on * saturate(params.glitchAmount);
         if (k > 0.0) {
             // Bandas: filas enteras corridas en horizontal.
@@ -213,8 +222,8 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
             // El reloj de cada celda arranca desfasado por su hash: si todas
             // mutaran en el mismo frame se veria un parpadeo global en vez de
             // caracteres cambiando por su cuenta.
-            const float step = floor(params.time * params.codeChurn
-                                     + hash21(tile) * 17.0);
+            const float step = loopStepIndex(params.time, params.codeChurn,
+                                             hash21(tile) * 17.0, params.loopPeriod);
             const uint pick = uint(hash11(uint(step) * 2246822519u
                                           ^ mixHash(uint(field.line) * 2654435761u
                                                     ^ (tile.x * 3266489917u)))
@@ -282,7 +291,8 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
             // El glifo cambia por celda a `matrixChurn` cambios por segundo. El
             // hash de la celda desfasa el reloj de cada una: si todas mutaran en
             // el mismo frame se veria un parpadeo global.
-            const float step = floor(params.time * params.matrixChurn + hash21(tile) * 13.0);
+            const float step = loopStepIndex(params.time, params.matrixChurn,
+                                             hash21(tile) * 13.0, params.loopPeriod);
             const uint churn = uint(hash11(uint(step) * 2654435761u
                                            ^ (tile.x * 2246822519u + tile.y * 3266489917u))
                                     * float(params.rampLength));

@@ -93,8 +93,46 @@ struct EyeMotion {
     /// alcanza con cuantizar las frecuencias.
     private func tremor(at time: Float) -> SIMD2<Float> {
         let t = time * driftSpeed
-        return SIMD2(sin(t * 0.37) * 0.6 + sin(t * 0.83) * 0.4,
-                     cos(t * 0.29) * 0.6 + cos(t * 0.71) * 0.4) * driftAmount
+        guard loopPeriod > 0 else {
+            return SIMD2(sin(t * 0.37) * 0.6 + sin(t * 0.83) * 0.4,
+                         cos(t * 0.29) * 0.6 + cos(t * 0.71) * 0.4) * driftAmount
+        }
+        // Se cuantiza el ritmo COMPUESTO —driftSpeed por cada constante— y no
+        // driftSpeed solo: lo que tiene que cerrar es cada seno, y con un unico
+        // factor comun los cuatro no pueden cerrar a la vez.
+        let tau = Float.pi * 2
+        let f = [0.37, 0.83, 0.29, 0.71].map { (k: Float) in
+            snap(driftSpeed * k / tau, floor: 0) * tau
+        }
+        return SIMD2(sin(time * f[0]) * 0.6 + sin(time * f[1]) * 0.4,
+                     cos(time * f[2]) * 0.6 + cos(time * f[3]) * 0.4) * driftAmount
+    }
+
+    /// Periodo del loop en segundos; 0 = sin loop.
+    var loopPeriod: Float = 0
+
+    /// Redondea una frecuencia (en ciclos por segundo) para que entre un numero
+    /// entero de ciclos en el periodo del loop.
+    ///
+    /// `floor` es el minimo de ciclos admitido. Para el temblor es 0 —una
+    /// oscilacion mas lenta que el loop entero no puede cerrar, y dejarla quieta
+    /// no se nota a esa amplitud— pero para la mirada es 1: congelar el recorrido
+    /// del ojo porque no llegaba a completar una vuelta seria peor que acelerarlo
+    /// hasta que complete una.
+    private func snap(_ rate: Float, floor minimum: Float) -> Float {
+        guard loopPeriod > 0 else { return rate }
+        return max(minimum, (rate * loopPeriod).rounded()) / loopPeriod
+    }
+
+    /// El ritmo de los modos por pasos. En `scan` el recorrido completo son
+    /// `2 * stops` pasos —ida y vuelta—, asi que no alcanza con que entren pasos
+    /// enteros en el loop: tienen que entrar zigzags enteros.
+    private func steppedRate(stops: Float?) -> Float {
+        guard loopPeriod > 0 else { return gazeRate }
+        let steps = max(1, (gazeRate * loopPeriod).rounded())
+        guard let stops else { return steps / loopPeriod }
+        let block = max(2 * stops, 2)
+        return max(block, (steps / block).rounded() * block) / loopPeriod
     }
 
     /// Hash determinista para los modos por pasos. No necesita calidad; lo unico
@@ -114,28 +152,30 @@ struct EyeMotion {
             return .zero
 
         case .drift:
-            let t = time * gazeRate
-            return SIMD2(sin(t * tau * 0.31) * 0.7 + sin(t * tau * 0.73) * 0.3,
-                         cos(t * tau * 0.23) * 0.7 + cos(t * tau * 0.61) * 0.3) * gazeExtent
+            let f = [0.31, 0.73, 0.23, 0.61].map { (k: Float) in
+                snap(gazeRate * k, floor: 1) * tau
+            }
+            return SIMD2(sin(time * f[0]) * 0.7 + sin(time * f[1]) * 0.3,
+                         cos(time * f[2]) * 0.7 + cos(time * f[3]) * 0.3) * gazeExtent
 
         case .sweep:
             // La y va a la mitad de frecuencia y desfasada: sin eso el recorrido
             // es una linea recta de ida y vuelta.
-            let t = time * gazeRate * tau
-            return SIMD2(sin(t), sin(t * 0.5 + 1.3)) * gazeExtent
+            return SIMD2(sin(time * snap(gazeRate, floor: 1) * tau),
+                         sin(time * snap(gazeRate * 0.5, floor: 1) * tau + 1.3)) * gazeExtent
 
         case .saccade:
             // El objetivo salta en cada paso y se queda quieto hasta el
             // siguiente; el resorte se encarga del viaje. La pausa sale sola de
             // que el objetivo sea constante dentro del paso.
-            let step = (time * gazeRate).rounded(.down)
+            let step = (time * steppedRate(stops: nil)).rounded(.down)
             return SIMD2(hash(step) * 2 - 1, hash(step + 91.7) * 2 - 1) * gazeExtent
 
         case .scan:
             // Recorrido sistematico de izquierda a derecha y vuelta en zigzag,
             // como quien pasa la vista por una fila de butacas.
             let stops = max(gazeStops, 2)
-            let step = (time * gazeRate).rounded(.down)
+            let step = (time * steppedRate(stops: stops)).rounded(.down)
             let index = step - (step / stops).rounded(.down) * stops
             let cycle = (step / stops).rounded(.down)
             let forward = cycle - (cycle / 2).rounded(.down) * 2 < 1
@@ -144,7 +184,7 @@ struct EyeMotion {
             return SIMD2((x * 2 - 1), (hash(step) * 2 - 1) * 0.35) * gazeExtent
 
         case .orbit:
-            let t = time * gazeRate * tau
+            let t = time * snap(gazeRate, floor: 1) * tau
             return SIMD2(cos(t), sin(t)) * gazeExtent
         }
     }

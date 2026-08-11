@@ -80,7 +80,8 @@ kernel void glyphIndexKernel(texture2d<float, access::read> grid [[texture(ASCII
     if (params.glitchEnabled != 0u && params.glitchFreeze > 0.0) {
         uint burst = 0u;
         const float on = glitchGate(params.time, params.glitchRate,
-                                    params.glitchDuty, params.glitchChance, burst);
+                                    params.glitchDuty, params.glitchChance,
+                                    params.loopPeriod, burst);
         if (on > 0.0) {
             const uint cell = mixHash(gid.x * 0x9e3779b9u) ^ mixHash(gid.y ^ burst);
             if (hash11(cell) < params.glitchFreeze) {

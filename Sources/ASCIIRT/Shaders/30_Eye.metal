@@ -48,7 +48,7 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // Respiracion: oscilacion lenta del radio. Amplitud relativa, asi cambiar el
     // tamano del ojo no cambia cuanto respira.
     const float breath = 1.0 + params.eyeBreathAmount
-                       * sin(params.time * params.eyeBreathSpeed * kTau);
+                       * sin(params.time * loopSnap(params.eyeBreathSpeed, params.loopPeriod) * kTau);
     const float radius = max(params.eyeRadius * breath, 1e-4);
 
     // --- Capas ---
@@ -118,15 +118,22 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // ya alcanza para que dos partes del mismo frente esten en oposicion.
     const float wavelength = 1.0 / max(params.eyePulseFrequency, 1e-3);
 
-    const float warp = quasiField(p * 2.6, params.time);
+    const float warp = quasiField(p * 2.6, params.time, 1.0, params.loopPeriod);
     const float rw = r + warp * shape * wavelength * 0.60;
 
     // Dos octavas radiales. La segunda va a 1.7 veces la frecuencia y 0.63 veces
     // la velocidad: al no ser multiplos enteros la suma no vuelve a alinearse, y
     // los frentes no salen igualmente espaciados. Los pesos suman 1 para que la
     // amplitud siga significando lo mismo.
-    const float phase1 = (rw - params.time * params.eyePulseSpeed) * params.eyePulseFrequency;
-    const float phase2 = (rw - params.time * params.eyePulseSpeed * 0.63) * params.eyePulseFrequency * 1.7;
+    // La parte espacial y la temporal se separan para poder redondear SOLO la
+    // temporal: lo que tiene que cerrar en el loop es cuantos frentes pasan por
+    // segundo, y eso es velocidad por frecuencia, no cada factor por su cuenta.
+    const float rate1 = loopSnap(params.eyePulseSpeed * params.eyePulseFrequency,
+                                 params.loopPeriod);
+    const float rate2 = loopSnap(params.eyePulseSpeed * 0.63 * params.eyePulseFrequency * 1.7,
+                                 params.loopPeriod);
+    const float phase1 = rw * params.eyePulseFrequency - params.time * rate1;
+    const float phase2 = rw * params.eyePulseFrequency * 1.7 - params.time * rate2;
     const float waveRaw = sin(phase1 * kTau) * 0.68 + sin(phase2 * kTau) * 0.32;
 
     // Y la fuerza tampoco es pareja: un segundo campo de ruido, mas grande y mas
@@ -135,7 +142,7 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // delatando que atras hay una sola funcion.
     // El mismo campo a otra escala y otra velocidad, corrido para que no quede
     // correlacionado con el que deforma el frente.
-    const float breakup = quasiField(p * 1.1 + 31.7, params.time * 0.54);
+    const float breakup = quasiField(p * 1.1 + 31.7, params.time, 0.54, params.loopPeriod);
     const float wave = waveRaw * mix(1.0, saturate(0.55 + breakup), shape);
 
     // La envolvente arranca de la forma del halo —no de su intensidad— asi que
@@ -151,7 +158,8 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // Solo afecta al campo de afuera (halo + pulsos) y no al cuerpo del ojo: el
     // iris tiene que quedar limpio o el ojo se ve sucio.
     const uint2 cell = gid / max(params.tileSize, uint2(1u));
-    const float churnStep = floor(params.time * params.eyeFieldChurn);
+    const float churnStep = loopStepIndex(params.time, params.eyeFieldChurn, 0.0,
+                                          params.loopPeriod);
     const uint cellHash = mixHash(cell.x) ^ (cell.y * 0x9e3779b9u);
     const float grain = hash11(cellHash ^ mixHash(uint(churnStep))) - 0.5;
     const float field = (halo + pulse) * (1.0 + grain * params.eyeFieldNoise * 2.0);
@@ -172,10 +180,12 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     float gradient = 0.0;
     if (params.eyeGradientMode == 1u) {
         const float rNorm = r / radius;
-        gradient = fract(rNorm * params.eyeGradientCycles - params.time * params.eyeGradientSpeed);
+        gradient = fract(rNorm * params.eyeGradientCycles
+                         - params.time * loopSnap(params.eyeGradientSpeed, params.loopPeriod));
     } else if (params.eyeGradientMode == 2u) {
         const float angle = atan2(p.y, p.x) / (2.0 * M_PI_F) + 0.5;
-        gradient = fract(angle * params.eyeGradientCycles + params.time * params.eyeGradientSpeed);
+        gradient = fract(angle * params.eyeGradientCycles
+                         + params.time * loopSnap(params.eyeGradientSpeed, params.loopPeriod));
     }
     // Triangulo en vez de rampa: con `fract` sola el gradiente salta del ultimo
     // color al primero y queda una costura dura girando por el aro.
@@ -209,7 +219,7 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
     // siempre prendido y no se puede pedir un destello corto.
     float blink = 0.0;
     if (params.eyeBlinkEnabled != 0u) {
-        const float phase = fract(params.time * params.eyeBlinkRate);
+        const float phase = fract(params.time * loopSnap(params.eyeBlinkRate, params.loopPeriod));
         const float duty = clamp(params.eyeBlinkDuty, 0.01, 0.99);
         // El flanco nunca es cero: un corte instantaneo titila feo cuando el
         // ritmo no es multiplo de los fps. Arriba llega a medio pulso, que es

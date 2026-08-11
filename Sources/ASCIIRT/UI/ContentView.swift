@@ -36,6 +36,21 @@ struct ContentView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    if model.isRendering { model.cancelOfflineRender() } else { model.startLoopRender() }
+                } label: {
+                    Label(model.isRendering
+                          ? "\(Int(model.renderProgress.fraction * 100))%"
+                          : "Loop",
+                          systemImage: model.isRendering ? "stop.fill" : "repeat")
+                }
+                .help(model.isRendering
+                      ? "Cancelar el render"
+                      : "Exportar un clip que empalma consigo mismo. Solo para Ojo, Chat y Código: la duración y los fps están en la sección Export.")
+                .disabled(!(model.sourceKind == .eye || model.sourceKind == .chat
+                            || model.sourceKind == .code))
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     withAnimation(.easeInOut(duration: 0.15)) { showControls.toggle() }
                 } label: {
                     Image(systemName: "sidebar.right")
@@ -1136,6 +1151,12 @@ private struct ControlPanel: View {
             // el ojo no hay cuadros que recorrer: lo que se graba es el REC.
             if model.sourceKind == .file {
             Divider().padding(.vertical, 2)
+            PanelGroupLabel(text: "Loop", help: "El botón «Loop» de la barra exporta un clip que empalma consigo mismo: el último cuadro deja todo donde lo encuentra el primero, así que reproducido en bucle no se ve dónde corta. Para lograrlo, cada frecuencia del seteo —el pulso, la respiración, la mutación, la lluvia, el recorrido de la mirada— se redondea al valor más cercano que complete un número entero de ciclos dentro de la duración. Con duraciones de decenas de segundos el redondeo mueve las velocidades menos de un 2%, así que el clip se ve igual que el preview. Además se renderizan DOS vueltas y se guarda la segunda: la estela y la histeresis son estado, y arrancando de una pantalla limpia el primer cuadro no se parecería al último.")
+            ParamSlider(label: "Duración", value: $model.loopDuration, range: 2...120, decimals: 0,
+                        help: "Segundos del loop. Cuanto más corto, más se nota el redondeo de las frecuencias lentas: una oscilación que no llega a completar un ciclo dentro del período se queda quieta.")
+            ParamSlider(label: "FPS", value: $model.loopFPS, range: 12...60, decimals: 0,
+                        help: "Cuadros por segundo del clip. 30 alcanza para ASCII: lo que se mueve son glifos que cambian de a saltos, no un degradé continuo, y a 60 el archivo pesa el doble sin verse el doble.")
+
             PanelGroupLabel(text: "Render offline", help: "Procesa un archivo cuadro a cuadro sin reloj: cada frame de entrada da exactamente uno de salida, tarde lo que tarde. A diferencia del REC, acá no se pierde ningún frame y el resultado es reproducible — dos renders del mismo material dan lo mismo.")
             Text("Desacoplado del reloj: cada frame de entrada produce uno de salida.")
                 .font(.system(size: 9))

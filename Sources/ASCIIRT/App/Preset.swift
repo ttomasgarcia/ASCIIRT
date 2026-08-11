@@ -61,6 +61,9 @@ struct Preset: Codable, Equatable {
     var outputPreset: String = "Fuente"
     var sourceFill: Bool = false
 
+    var loopDuration: Double = 60
+    var loopFPS: Double = 30
+
     // Codigo
     var codeDensity: Double = 0.85
     var codeChurn: Double = 6.0
@@ -239,6 +242,8 @@ struct Preset: Codable, Equatable {
         exportCodec = c.value(.exportCodec, d.exportCodec)
         outputPreset = c.value(.outputPreset, d.outputPreset)
         sourceFill = c.value(.sourceFill, d.sourceFill)
+        loopDuration = c.value(.loopDuration, d.loopDuration)
+        loopFPS = c.value(.loopFPS, d.loopFPS)
         codeDensity = c.value(.codeDensity, d.codeDensity)
         codeChurn = c.value(.codeChurn, d.codeChurn)
         codeScroll = c.value(.codeScroll, d.codeScroll)

@@ -851,6 +851,8 @@ final class AppModel: ObservableObject {
         preset.sourceFill = sourceFill
         preset.chatScript = chatScript
         preset.chatEnabled = chatEnabled
+        preset.loopDuration = loopDuration
+        preset.loopFPS = loopFPS
         preset.codeDensity = codeDensity
         preset.codeChurn = codeChurn
         preset.codeScroll = codeScroll
@@ -1058,6 +1060,8 @@ final class AppModel: ObservableObject {
         // que trae la app y la pantalla quedaria negra sin explicacion.
         if !preset.chatScript.isEmpty { chatScript = preset.chatScript }
         chatEnabled = preset.chatEnabled
+        loopDuration = preset.loopDuration
+        loopFPS = preset.loopFPS
         codeDensity = preset.codeDensity
         codeChurn = preset.codeChurn
         codeScroll = preset.codeScroll
@@ -1544,6 +1548,59 @@ final class AppModel: ObservableObject {
                                self.report(error)
                            }
                        })
+    }
+
+    // MARK: - Loop
+
+    /// Duracion del loop en segundos.
+    @Published var loopDuration: Double = 60 { didSet { autosave() } }
+
+    /// Cuadros por segundo del loop. 30 por defecto: un minuto de ASCII a 60 en
+    /// ProRes pesa el doble sin que se vea el doble, porque lo que se mueve son
+    /// glifos que cambian de a saltos y no un degrade continuo.
+    @Published var loopFPS: Double = 30 { didSet { autosave() } }
+
+    /// Exporta un clip que empalma consigo mismo.
+    ///
+    /// Solo para las fuentes generativas: la camara no es reproducible y un
+    /// archivo ya tiene su propia duracion, que es lo que hace el render offline.
+    func startLoopRender() {
+        guard !isRendering else { return }
+        guard sourceKind == .eye || sourceKind == .chat || sourceKind == .code else {
+            report(AppError(.capture, "El loop es para las fuentes generativas.",
+                            detail: "Con Cámara no hay nada reproducible que repetir, y un archivo ya "
+                                  + "tiene su propia duración: para eso está el render offline."))
+            return
+        }
+        if isRecording { Task { await stopRecording() } }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "asciirt_loop." + exportCodec.fileExtension
+        panel.allowedContentTypes = exportCodec == .h264 ? [.mpeg4Movie] : [.quickTimeMovie]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        isRendering = true
+        renderProgress = OfflineRenderer.Progress()
+        lastRenderSummary = nil
+
+        offline.renderLoop(destination: destination, config: config, codec: exportCodec,
+                           duration: loopDuration, fps: loopFPS,
+                           onProgress: { [weak self] progress in
+                               self?.renderProgress = progress
+                           },
+                           onFinish: { [weak self] result in
+                               guard let self else { return }
+                               self.isRendering = false
+                               switch result {
+                               case .success(let frames):
+                                   self.lastRenderSummary = "\(frames) frames · loop de "
+                                       + String(format: "%.0f s", self.loopDuration)
+                                   NSWorkspace.shared.activateFileViewerSelecting([destination])
+                               case .failure(let error):
+                                   self.report(error)
+                               }
+                           })
     }
 
     func cancelOfflineRender() {

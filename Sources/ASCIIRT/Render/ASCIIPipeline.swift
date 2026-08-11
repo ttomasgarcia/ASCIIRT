@@ -115,6 +115,11 @@ struct PipelineConfig: Equatable {
     /// `true` = la fuente llena la salida y se recorta lo que sobra.
     var sourceFill = false
 
+    /// Periodo del loop en segundos; 0 = sin loop. Solo lo pone el export de
+    /// loop: con un periodo puesto, toda frecuencia temporal se redondea para
+    /// que entre un numero entero de ciclos y el clip empalme consigo mismo.
+    var loopPeriod: Float = 0
+
     // MARK: Codigo
     /// La fuente es el campo de codigo. Va junto con `generative`: el pipeline
     /// no recibe frame y la imagen la escribe `codeKernel`.
@@ -382,6 +387,7 @@ final class ASCIIPipeline {
             eyeMotion.gazeExtent = config.gazeExtent
             eyeMotion.gazeHold = config.gazeHold
             eyeMotion.gazeStops = config.gazeStops
+            eyeMotion.loopPeriod = config.loopPeriod
             eyeMotion.manualOverride = config.eyeManualOverride
             eyeMotion.clampEnabled = config.eyeClampToScreen
             // El radio del halo esta en unidades de media altura; para llevarlo
@@ -760,7 +766,8 @@ final class ASCIIPipeline {
                             codeRagged: config.codeRagged,
                             codeWordLength: config.codeWordLength,
                             codeLevel: config.codeLevel,
-                            codeVariation: config.codeVariation)
+                            codeVariation: config.codeVariation,
+                            loopPeriod: config.loopPeriod)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

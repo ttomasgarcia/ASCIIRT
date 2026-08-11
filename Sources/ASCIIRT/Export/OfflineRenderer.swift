@@ -238,6 +238,159 @@ final class OfflineRenderer {
         }
     }
 
+    // MARK: - Loop
+
+    /// Render de un loop de duracion fija para las fuentes generativas.
+    ///
+    /// Dos cosas lo separan del render de archivo, y las dos son lo que hace que
+    /// el clip empalme consigo mismo:
+    ///
+    /// 1. **Periodo.** `config.loopPeriod` hace que toda frecuencia temporal se
+    ///    redondee para que entre un numero entero de ciclos. Sin esto cada
+    ///    oscilacion queda cortada en una fase cualquiera y el corte salta.
+    ///
+    /// 2. **Vuelta de precalentamiento.** Se renderizan DOS periodos y se escribe
+    ///    solo el segundo. La estela, la histeresis y el resorte del ojo son
+    ///    estado: al empezar de cero el primer periodo arranca con la pantalla
+    ///    limpia y el ojo quieto, y eso no se parece a como esta el sistema al
+    ///    llegar al final. Descartando la primera vuelta, el cuadro inicial del
+    ///    clip tiene atras exactamente la misma historia que el ultimo.
+    func renderLoop(destination: URL,
+                    config: PipelineConfig,
+                    codec: ExportCodec,
+                    duration: Double,
+                    fps: Double,
+                    onProgress: @escaping (Progress) -> Void,
+                    onFinish: @escaping (Result<Int, AppError>) -> Void) {
+        cancelLock.lock(); cancelled = false; cancelLock.unlock()
+
+        queue.async { [weak self] in
+            guard let self else { return }
+            do {
+                let written = try self.runLoop(destination: destination, config: config,
+                                               codec: codec, duration: duration, fps: fps,
+                                               onProgress: onProgress)
+                DispatchQueue.main.async { onFinish(.success(written)) }
+            } catch let error as AppError {
+                DispatchQueue.main.async { onFinish(.failure(error)) }
+            } catch {
+                DispatchQueue.main.async {
+                    onFinish(.failure(AppError(.capture, "Falló el render del loop.", underlying: error)))
+                }
+            }
+        }
+    }
+
+    private func runLoop(destination: URL,
+                         config: PipelineConfig,
+                         codec: ExportCodec,
+                         duration: Double,
+                         fps: Double,
+                         onProgress: @escaping (Progress) -> Void) throws -> Int {
+        // El periodo se mide en CUADROS y de ahi se deriva en segundos. Si se
+        // tomara la duracion pedida tal cual, con un fps que no la divide entero
+        // el ultimo cuadro caeria fuera del periodo y el empalme fallaria por una
+        // fraccion de cuadro.
+        let periodFrames = max(Int((duration * fps).rounded()), 1)
+        let period = Double(periodFrames) / fps
+
+        var jobConfig = config
+        jobConfig.loopPeriod = Float(period)
+
+        let pipeline = try ASCIIPipeline(context: context, config: jobConfig)
+        let writer = VideoWriter()
+
+        let sequence: ImageSequenceWriter?
+        if codec.isImageSequence {
+            let folder = destination.deletingPathExtension()
+            let seq = ImageSequenceWriter(folder: folder, basename: folder.lastPathComponent)
+            try seq.prepare()
+            sequence = seq
+            try writer.startPixelBufferPoolOnly(size: jobConfig.outputSize)
+        } else {
+            sequence = nil
+            try writer.start(url: destination, size: jobConfig.outputSize,
+                             codec: codec, fps: fps, realTime: false)
+        }
+
+        var blitState: MTLRenderPipelineState?
+        var written = 0
+
+        // Dos vueltas: la primera solo deja el estado como corresponde.
+        for index in 0..<(periodFrames * 2) {
+            if isCancelled { break }
+            let keep = index >= periodFrames
+
+            guard let target = writer.dequeuePixelBuffer() else {
+                throw AppError(.capture, "El pool de buffers de salida se agotó.")
+            }
+            let (targetTexture, targetKeepAlive) = try context.makeTexture(from: target)
+            if blitState == nil { blitState = try makeBlitState() }
+
+            guard let commandBuffer = context.commandQueue.makeCommandBuffer() else {
+                throw AppError(.metal, "No se pudo crear el command buffer del loop.")
+            }
+
+            // El tiempo se envuelve en el periodo: lo que ve el cuadro 0 de la
+            // segunda vuelta es identico a lo que veria el cuadro que sigue al
+            // ultimo, que es justamente la definicion de que el clip cierre.
+            pipeline.timeOverride = Float(Double(index % periodFrames) / fps)
+            try pipeline.encode(commandBuffer: commandBuffer, source: nil,
+                                deltaTime: Float(1.0 / fps))
+
+            let descriptor = MTLRenderPassDescriptor()
+            descriptor.colorAttachments[0].texture = targetTexture
+            descriptor.colorAttachments[0].loadAction = .dontCare
+            descriptor.colorAttachments[0].storeAction = .store
+            guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor),
+                  let blitState else {
+                throw AppError(.metal, "No se pudo crear el encoder de salida del loop.")
+            }
+            encoder.setRenderPipelineState(blitState)
+            encoder.setFragmentTexture(pipeline.outputTexture,
+                                       index: Int(ASCIIRTTextureIndexSource.rawValue))
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+            encoder.endEncoding()
+
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            _ = targetKeepAlive
+
+            if keep {
+                if let sequence {
+                    try sequence.write(target, index: written,
+                                       withAlpha: jobConfig.transparentBackground)
+                } else {
+                    let presentation = CMTime(value: CMTimeValue(written),
+                                              timescale: CMTimeScale(fps.rounded()))
+                    guard writer.appendSynchronously(target, at: presentation) else {
+                        throw AppError(.capture, "El escritor rechazó el frame \(written).")
+                    }
+                }
+                written += 1
+            }
+
+            let progress = Progress(framesDone: index + 1, framesTotal: periodFrames * 2)
+            DispatchQueue.main.async { onProgress(progress) }
+        }
+
+        if isCancelled {
+            _ = await_finish(writer)
+            try? FileManager.default.removeItem(at: sequence?.folder ?? destination)
+            throw AppError(.capture, "Loop cancelado.")
+        }
+
+        if sequence != nil {
+            writer.stopPixelBufferPoolOnly()
+            return written
+        }
+
+        switch await_finish(writer) {
+        case .success: return written
+        case .failure(let error): throw error
+        }
+    }
+
     /// Puente sincrono al `finish()` async del writer: este metodo ya corre en
     /// su propia cola, y hacerlo async contagiaria de concurrencia a todo el
     /// bucle por un solo await.

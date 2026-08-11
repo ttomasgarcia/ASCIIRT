@@ -548,6 +548,18 @@ typedef struct {
 
     /// Cuanto varia el brillo entre palabras.
     float codeVariation;
+
+    /// Periodo del loop en segundos. 0 = sin loop (preview y REC en vivo).
+    ///
+    /// Con un periodo puesto, TODA frecuencia temporal se redondea para que
+    /// entre un numero entero de ciclos adentro. Es lo unico que hace que un
+    /// minuto exportado empalme consigo mismo: sin esto cada oscilacion —el
+    /// pulso, la respiracion, el churn, la lluvia— queda cortada en una fase
+    /// cualquiera y el corte se ve como un salto.
+    ///
+    /// El redondeo mueve las velocidades menos de un 2% con periodos de decenas
+    /// de segundos, asi que el preview y el loop se ven iguales.
+    float loopPeriod;
 } RenderParams;
 
 #endif /* RenderParams_h */

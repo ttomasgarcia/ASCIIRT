@@ -51,11 +51,48 @@ static inline float hash21(uint2 p) {
 /// muestra, dos muestras por pixel, a resolucion completa. Medido, costaba 40%
 /// del tiempo de frame. Esto cuesta cuatro senos y reparte la energia angular
 /// incluso mejor (42% en los tres primeros armonicos contra 58% del ruido).
-static inline float quasiField(float2 p, float t) {
-    float s = sin(( p.x               ) * kTau * 1.000 + t * 0.130 * kTau) * 0.40;
-    s      += sin(( p.x * 0.309 + p.y * 0.951) * kTau * 1.618 - t * 0.098 * kTau) * 0.30;
-    s      += sin((-p.x * 0.809 + p.y * 0.588) * kTau * 2.618 + t * 0.071 * kTau) * 0.19;
-    s      += sin((-p.x * 0.588 - p.y * 0.809) * kTau * 4.236 + t * 0.113 * kTau) * 0.11;
+/// Redondea una frecuencia para que entre un numero ENTERO de ciclos en el
+/// periodo del loop. Con periodo 0 devuelve la frecuencia intacta, que es el
+/// caso del preview y del REC en vivo.
+///
+/// Redondear a 0 ciclos es un resultado valido y correcto: una oscilacion mas
+/// lenta que el loop entero no puede cerrar de ninguna manera, y dejarla quieta
+/// es preferible a un salto.
+static inline float loopSnap(float rate, float period) {
+    if (period <= 0.0) { return rate; }
+    return round(rate * period) / period;
+}
+
+/// Indice de paso de un contador `floor(tiempo * ritmo + desfase)`, reducido al
+/// numero de pasos que entran en el periodo.
+///
+/// El modulo no es cosmetico: sin el, el contador vale ~n al final del periodo y
+/// 0 al principio, asi que en el cuadro del empalme TODAS las celdas cambian de
+/// golpe —el seed salta n de una— cuando normalmente cada una muta en su propio
+/// momento. Medido, ese unico cuadro daba un salto 3,3 veces mayor que el peor
+/// paso normal: el loop cerraba, pero se veia el hipo. Reducido modulo n, el
+/// paso del empalme es exactamente igual a cualquier otro.
+static inline float loopStepIndex(float time, float rate, float offset, float period) {
+    const float snapped = loopSnap(rate, period);
+    const float step = floor(time * snapped + offset);
+    if (period <= 0.0) { return step; }
+    const float count = max(round(snapped * period), 1.0);
+    return step - floor(step / count) * count;
+}
+
+static inline float quasiField(float2 p, float t, float timeScale, float period) {
+    // Las cuatro frecuencias temporales pasan por el redondeo del loop. Van
+    // multiplicadas por la escala de tiempo ANTES de redondear: lo que tiene que
+    // cerrar es la frecuencia con la que este campo oscila en pantalla, no la
+    // constante escrita aca.
+    const float f0 = loopSnap(0.130 * timeScale, period);
+    const float f1 = loopSnap(0.098 * timeScale, period);
+    const float f2 = loopSnap(0.071 * timeScale, period);
+    const float f3 = loopSnap(0.113 * timeScale, period);
+    float s = sin(( p.x               ) * kTau * 1.000 + t * f0 * kTau) * 0.40;
+    s      += sin(( p.x * 0.309 + p.y * 0.951) * kTau * 1.618 - t * f1 * kTau) * 0.30;
+    s      += sin((-p.x * 0.809 + p.y * 0.588) * kTau * 2.618 + t * f2 * kTau) * 0.19;
+    s      += sin((-p.x * 0.588 - p.y * 0.809) * kTau * 4.236 + t * f3 * kTau) * 0.11;
     return s;
 }
 
@@ -66,10 +103,17 @@ static inline float quasiField(float2 p, float t) {
 /// pasa a ser textura. `chance` rompe el metronomo — con 1 dispara todos los
 /// intervalos y se vuelve predecible enseguida.
 static inline float glitchGate(float time, float rate, float duty, float chance,
-                               thread uint &burst) {
-    const float t = time * max(rate, 1e-4);
+                               float period, thread uint &burst) {
+    const float t = time * loopSnap(max(rate, 1e-4), period);
     const float step = floor(t);
-    burst = uint(int(step) & 0xffff) ^ 0x51ed270bu;
+    // El numero de racha se reduce al periodo por la misma razon que el resto de
+    // los contadores: si no, la racha del empalme nunca coincide con la de la
+    // vuelta siguiente.
+    const float seeded = period > 0.0
+        ? step - floor(step / max(round(max(rate, 1e-4) * period), 1.0))
+                 * max(round(max(rate, 1e-4) * period), 1.0)
+        : step;
+    burst = uint(int(seeded) & 0xffff) ^ 0x51ed270bu;
     if (hash11(mixHash(burst)) > saturate(chance)) { return 0.0; }
     return (t - step) < saturate(duty) ? 1.0 : 0.0;
 }
@@ -92,7 +136,8 @@ static inline CodeCell codeField(uint2 cell, constant RenderParams &params) {
     // El desplazamiento es de a renglones ENTEROS. Uno suave, por pixel,
     // deslizaria el bloque encendido dejando las letras quietas dentro de su
     // celda: el campo se movería y el texto no.
-    const int line = int(cell.y) + int(floor(params.time * params.codeScroll));
+    const int line = int(cell.y)
+        + int(loopStepIndex(params.time, params.codeScroll, 0.0, params.loopPeriod));
     out.line = line;
     out.level = 0.0;
 
