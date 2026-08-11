@@ -262,6 +262,10 @@ final class AppModel: ObservableObject {
     /// Cuanto varia el brillo entre palabras.
     @Published var codeVariation: Double = 0.5 { didSet { sync() } }
 
+    /// El ojo se dibuja. Apagado quedan solo las capas de encima sobre fondo
+    /// limpio, sin perder los seteos del ojo ni su recorrido.
+    @Published var eyeVisible = true { didSet { sync() } }
+
     @Published var chatEnabled = false { didSet { sync() } }
     /// La escala es el unico parametro del chat que viaja por los DOS caminos:
     /// el shader la necesita para saber que pedazo del glifo le toca a cada
@@ -625,6 +629,7 @@ final class AppModel: ObservableObject {
 
         var next = PipelineConfig()
         next.generative = sourceKind == .eye || sourceKind == .chat || sourceKind == .code
+        next.eyeVisible = eyeVisible
         next.chatOnly = sourceKind == .chat
         next.codeSource = sourceKind == .code
         next.codeDensity = Float(codeDensity)
@@ -861,6 +866,7 @@ final class AppModel: ObservableObject {
         preset.codeWordLength = codeWordLength
         preset.codeLevel = codeLevel
         preset.codeVariation = codeVariation
+        preset.eyeVisible = eyeVisible
         preset.chatScale = chatScale
         preset.chatEntrance = chatEntrance.rawValue
         preset.chatMode = chatMode.rawValue
@@ -1070,6 +1076,7 @@ final class AppModel: ObservableObject {
         codeWordLength = preset.codeWordLength
         codeLevel = preset.codeLevel
         codeVariation = preset.codeVariation
+        eyeVisible = preset.eyeVisible
         chatScale = preset.chatScale
         chatEntrance = ChatEntrance(rawValue: preset.chatEntrance) ?? .riseFade
         chatMode = ChatMode(rawValue: preset.chatMode) ?? .stack

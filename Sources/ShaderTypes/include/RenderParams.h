@@ -483,6 +483,12 @@ typedef struct {
     // como una textura de grid con (caracter, opacidad) por celda.
     uint32_t chatEnabled;
 
+    /// El ojo se dibuja. Apagado, el generador escribe negro y queda solo lo que
+    /// venga encima —chat, lluvia, glitch— sobre fondo limpio. No es lo mismo que
+    /// cambiar de fuente: los seteos del ojo, su estela y su recorrido siguen
+    /// donde estaban, listos para volver a encenderlo.
+    uint32_t eyeVisible;
+
     /// La fuente es SOLO el chat: el generador escribe negro y los globos son
     /// todo lo que hay. Va como parametro y no como una rama en Swift porque el
     /// resto del pipeline tiene que correr igual — rampa, glitch, color y export

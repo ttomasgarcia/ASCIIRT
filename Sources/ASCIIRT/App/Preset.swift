@@ -77,6 +77,7 @@ struct Preset: Codable, Equatable {
     // Chat
     var chatScript: String = ""
     var chatEnabled: Bool = false
+    var eyeVisible: Bool = true
     var chatScale: Double = 2
     var chatEntrance: UInt32 = 2
     var chatMode: UInt32 = 0
@@ -254,6 +255,7 @@ struct Preset: Codable, Equatable {
         codeVariation = c.value(.codeVariation, d.codeVariation)
         chatScript = c.value(.chatScript, d.chatScript)
         chatEnabled = c.value(.chatEnabled, d.chatEnabled)
+        eyeVisible = c.value(.eyeVisible, d.eyeVisible)
         chatScale = c.value(.chatScale, d.chatScale)
         chatEntrance = c.value(.chatEntrance, d.chatEntrance)
         chatMode = c.value(.chatMode, d.chatMode)

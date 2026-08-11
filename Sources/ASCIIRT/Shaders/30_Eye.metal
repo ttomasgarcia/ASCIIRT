@@ -22,10 +22,11 @@ kernel void eyeKernel(texture2d<float, access::write> luma  [[texture(ASCIIRTTex
                       uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= params.outputSize.x || gid.y >= params.outputSize.y) { return; }
 
-    // Fuente Chat: no hay ojo, solo fondo. Se sale por aca en vez de no
-    // despachar el kernel para que las texturas queden igual limpias todos los
-    // frames; si no, el ultimo ojo dibujado se quedaria congelado abajo.
-    if (params.chatOnly != 0u) {
+    // Sin ojo —fuente Chat, o el ojo apagado a mano— queda solo el fondo. Se
+    // sale por aca en vez de no despachar el kernel para que las texturas queden
+    // igual limpias todos los frames; si no, el ultimo ojo dibujado se quedaria
+    // congelado abajo.
+    if (params.chatOnly != 0u || params.eyeVisible == 0u) {
         luma.write(float4(0.0), gid);
         color.write(float4(0.0), gid);
         mask.write(float4(0.0), gid);

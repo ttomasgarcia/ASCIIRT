@@ -135,6 +135,7 @@ struct PipelineConfig: Equatable {
 
     // MARK: Chat
     var chatEnabled = false
+    var eyeVisible = true
     var chatOnly = false
     var chatScale: UInt32 = 2
     var chatTextColor: SIMD3<Float> = SIMD3(1, 1, 1)
@@ -747,6 +748,7 @@ final class ASCIIPipeline {
                             glitchFreeze: config.glitchFreeze,
                             glitchScramble: config.glitchScramble,
                             chatEnabled: config.chatEnabled ? 1 : 0,
+                            eyeVisible: config.eyeVisible ? 1 : 0,
                             chatOnly: config.chatOnly ? 1 : 0,
                             chatScale: max(config.chatScale, 1),
                             chatTextR: config.chatTextColor.x,

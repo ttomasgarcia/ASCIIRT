@@ -761,7 +761,9 @@ private struct ControlPanel: View {
 
     private var eyeShapeContent: some View {
         VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
-            if model.colorMode != .original {
+            ParamToggle(label: "Activo", isOn: $model.eyeVisible,
+                        help: "Apagado, el ojo deja de dibujarse y queda solo lo que venga encima —chat, lluvia de Matrix, glitch— sobre fondo limpio. No es lo mismo que cambiar de fuente: la forma, el color, la estela y el recorrido quedan donde estaban, así que volver a encenderlo devuelve exactamente el mismo ojo.")
+            if model.colorMode != .original && model.eyeVisible {
                 Label("El iris rojo se ve con Color → Original.", systemImage: "info.circle")
                     .font(.system(size: 9))
                     .foregroundStyle(.orange)
