@@ -387,7 +387,11 @@ private struct ControlPanel: View {
                     }
                 }
 
-                if model.sourceKind == .chat || model.sourceKind == .eye {
+                // Visible con CUALQUIER fuente. El chat es una capa encima de lo
+                // que haya, no un accesorio del ojo: mostrandolo solo con Ojo y
+                // Chat, quedaba encendido sobre un video sin ningun control a la
+                // vista para apagarlo.
+                Group {
                     Divider()
                     PanelSection(title: "Chat", systemImage: "bubble.left.and.bubble.right",
                                  help: "Globos de diálogo escritos DIRECTO en la grilla, una letra por celda. La alternativa era dibujarlos en una imagen y dejar que el pipeline los convirtiera a ASCII como a cualquier fuente, pero a los tamaños de celda que se usan un texto pasado por la rampa queda ilegible — se lee como una mancha de densidad con forma de renglón. Escribiéndolos en la grilla el texto queda nítido y además la app dibuja lo que es: caracteres en una grilla.",
