@@ -13,6 +13,8 @@ enum SourceKind: String, CaseIterable, Identifiable {
     case eye = "Ojo"
     /// Sin entrada tampoco: globos de dialogo escritos en la grilla.
     case chat = "Chat"
+    /// Sin entrada tampoco: un campo de caracteres al azar, para usar de fondo.
+    case code = "Código"
 
     var id: String { rawValue }
 }
@@ -240,6 +242,25 @@ final class AppModel: ObservableObject {
         sientense genios! scaneen el QR para que empiece el experimento!
         Sacá la camara para el QR y segui las instrucciones se viene el juego
         """ { didSet { syncChat() } }
+
+    // MARK: Codigo
+
+    /// Que proporcion del ancho ocupa un renglon lleno.
+    @Published var codeDensity: Double = 0.85 { didSet { sync() } }
+    /// Cambios de letra por segundo en cada celda.
+    @Published var codeChurn: Double = 6 { didSet { sync() } }
+    /// Renglones por segundo que sube el campo. En 0 queda quieto.
+    @Published var codeScroll: Double = 4 { didSet { sync() } }
+    /// Proporcion de renglones vacios.
+    @Published var codeLineGap: Double = 0.25 { didSet { sync() } }
+    /// Cuanto varian la sangria y el largo entre renglones.
+    @Published var codeRagged: Double = 0.6 { didSet { sync() } }
+    /// Largo medio de las palabras, en celdas.
+    @Published var codeWordLength: Double = 5 { didSet { sync() } }
+    /// Brillo base del campo.
+    @Published var codeLevel: Double = 0.8 { didSet { sync() } }
+    /// Cuanto varia el brillo entre palabras.
+    @Published var codeVariation: Double = 0.5 { didSet { sync() } }
 
     @Published var chatEnabled = false { didSet { sync() } }
     /// La escala es el unico parametro del chat que viaja por los DOS caminos:
@@ -603,8 +624,17 @@ final class AppModel: ObservableObject {
         guard !isApplyingPreset else { return }
 
         var next = PipelineConfig()
-        next.generative = sourceKind == .eye || sourceKind == .chat
+        next.generative = sourceKind == .eye || sourceKind == .chat || sourceKind == .code
         next.chatOnly = sourceKind == .chat
+        next.codeSource = sourceKind == .code
+        next.codeDensity = Float(codeDensity)
+        next.codeChurn = Float(codeChurn)
+        next.codeScroll = Float(codeScroll)
+        next.codeLineGap = Float(codeLineGap)
+        next.codeRagged = Float(codeRagged)
+        next.codeWordLength = Float(codeWordLength)
+        next.codeLevel = Float(codeLevel)
+        next.codeVariation = Float(codeVariation)
         next.eyeCenter = SIMD2(Float(eyeCenter.x), Float(eyeCenter.y))
         next.eyeRadius = Float(eyeRadius)
         next.eyeCoreRadius = Float(eyeCoreRadius)
@@ -821,6 +851,14 @@ final class AppModel: ObservableObject {
         preset.sourceFill = sourceFill
         preset.chatScript = chatScript
         preset.chatEnabled = chatEnabled
+        preset.codeDensity = codeDensity
+        preset.codeChurn = codeChurn
+        preset.codeScroll = codeScroll
+        preset.codeLineGap = codeLineGap
+        preset.codeRagged = codeRagged
+        preset.codeWordLength = codeWordLength
+        preset.codeLevel = codeLevel
+        preset.codeVariation = codeVariation
         preset.chatScale = chatScale
         preset.chatEntrance = chatEntrance.rawValue
         preset.chatMode = chatMode.rawValue
@@ -1020,6 +1058,14 @@ final class AppModel: ObservableObject {
         // que trae la app y la pantalla quedaria negra sin explicacion.
         if !preset.chatScript.isEmpty { chatScript = preset.chatScript }
         chatEnabled = preset.chatEnabled
+        codeDensity = preset.codeDensity
+        codeChurn = preset.codeChurn
+        codeScroll = preset.codeScroll
+        codeLineGap = preset.codeLineGap
+        codeRagged = preset.codeRagged
+        codeWordLength = preset.codeWordLength
+        codeLevel = preset.codeLevel
+        codeVariation = preset.codeVariation
         chatScale = preset.chatScale
         chatEntrance = ChatEntrance(rawValue: preset.chatEntrance) ?? .riseFade
         chatMode = ChatMode(rawValue: preset.chatMode) ?? .stack
@@ -1250,7 +1296,7 @@ final class AppModel: ObservableObject {
         switch previous {
         case .camera: camera.stop()
         case .file: file.stop()
-        case .eye, .chat: break
+        case .eye, .chat, .code: break
         }
         isRunning = false
         format = nil
@@ -1299,6 +1345,14 @@ final class AppModel: ObservableObject {
             // El chat se enciende al elegirlo: es la unica razon para estar aca.
             chatEnabled = true
             syncChat()
+
+        case .code:
+            fileURL = nil
+            duration = 0
+            currentTime = 0
+            isPlaying = false
+            sourceSize = SIMD2(1920, 1080)
+            isRunning = true
         }
         syncRenderFlags()
         sync()
@@ -1311,11 +1365,12 @@ final class AppModel: ObservableObject {
     /// quedaba apagado y la pantalla en negro. Un solo metodo, llamado desde
     /// todos los didSet que puedan afectarlos.
     private func syncRenderFlags() {
-        renderer.generative = sourceKind == .eye || sourceKind == .chat
+        renderer.generative = sourceKind == .eye || sourceKind == .chat || sourceKind == .code
         renderer.asciiEnabled = asciiEnabled
         // El generador anima por reloj, no por frame de entrada: sin repintado
         // continuo quedaria congelado en el primer cuadro.
-        renderer.continuousRedraw = matrixEnabled || sourceKind == .eye || sourceKind == .chat
+        renderer.continuousRedraw = matrixEnabled || sourceKind == .eye
+            || sourceKind == .chat || sourceKind == .code
         matte.isEnabled = subjectMatteEnabled
     }
 
@@ -1533,7 +1588,7 @@ extension AppModel: FrameSourceDelegate {
         switch sourceKind {
         case .camera: return source === camera
         case .file: return source === file
-        case .eye, .chat: return false   // los generadores no entregan frames por delegate
+        case .eye, .chat, .code: return false   // los generadores no entregan frames por delegate
         }
     }
 

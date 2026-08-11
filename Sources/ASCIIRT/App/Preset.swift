@@ -61,6 +61,16 @@ struct Preset: Codable, Equatable {
     var outputPreset: String = "Fuente"
     var sourceFill: Bool = false
 
+    // Codigo
+    var codeDensity: Double = 0.85
+    var codeChurn: Double = 6.0
+    var codeScroll: Double = 4.0
+    var codeLineGap: Double = 0.25
+    var codeRagged: Double = 0.6
+    var codeWordLength: Double = 5.0
+    var codeLevel: Double = 0.8
+    var codeVariation: Double = 0.5
+
     // Chat
     var chatScript: String = ""
     var chatEnabled: Bool = false
@@ -229,6 +239,14 @@ struct Preset: Codable, Equatable {
         exportCodec = c.value(.exportCodec, d.exportCodec)
         outputPreset = c.value(.outputPreset, d.outputPreset)
         sourceFill = c.value(.sourceFill, d.sourceFill)
+        codeDensity = c.value(.codeDensity, d.codeDensity)
+        codeChurn = c.value(.codeChurn, d.codeChurn)
+        codeScroll = c.value(.codeScroll, d.codeScroll)
+        codeLineGap = c.value(.codeLineGap, d.codeLineGap)
+        codeRagged = c.value(.codeRagged, d.codeRagged)
+        codeWordLength = c.value(.codeWordLength, d.codeWordLength)
+        codeLevel = c.value(.codeLevel, d.codeLevel)
+        codeVariation = c.value(.codeVariation, d.codeVariation)
         chatScript = c.value(.chatScript, d.chatScript)
         chatEnabled = c.value(.chatEnabled, d.chatEnabled)
         chatScale = c.value(.chatScale, d.chatScale)

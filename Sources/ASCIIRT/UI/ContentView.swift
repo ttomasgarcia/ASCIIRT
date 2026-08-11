@@ -353,6 +353,7 @@ private struct ControlPanel: View {
     @State private var showEyeLife = true
     @State private var showEyeMotion = true
     @State private var showChat = true
+    @State private var showCode = true
     @State private var showGlitch = true
     @State private var showProject = true
     @State private var showCoverage = false
@@ -377,6 +378,15 @@ private struct ControlPanel: View {
                              isExpanded: $showSource) {
                     sourceContent
                 }
+                if model.sourceKind == .code {
+                    Divider()
+                    PanelSection(title: "Código", systemImage: "chevron.left.forwardslash.chevron.right",
+                                 help: "Un campo de caracteres al azar organizado en renglones, para usar de fondo. No es una capa aparte: escribe una imagen igual que la cámara y pasa por el mismo pipeline, así que hereda el color, los bordes, el glitch, la lluvia de Matrix y el export sin nada especial. Lo único que se reserva es qué letra va en cada celda — la rampa elige por densidad, y la densidad de un renglón de código es pareja, así que sin pisarla saldrían todas las celdas con la misma letra. Qué caracteres aparecen lo define el charset, en la sección Charset.",
+                                 isExpanded: $showCode) {
+                        codeContent
+                    }
+                }
+
                 if model.sourceKind == .chat || model.sourceKind == .eye {
                     Divider()
                     PanelSection(title: "Chat", systemImage: "bubble.left.and.bubble.right",
@@ -633,7 +643,7 @@ private struct ControlPanel: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .controlSize(.small)
-                HelpMark("Cámara: cualquier dispositivo del sistema, incluida la Continuity Camera del iPhone. Archivo: un video, con player propio y scrub cuadro a cuadro. Ojo: sin entrada, la imagen la genera el pipeline. Los tres terminan en el mismo lugar, así que todos los parámetros de abajo aplican igual.",
+                HelpMark("Cámara: cualquier dispositivo del sistema, incluida la Continuity Camera del iPhone. Archivo: un video, con player propio y scrub cuadro a cuadro. Ojo, Chat y Código: sin entrada, la imagen la genera el pipeline. Todas terminan en el mismo lugar, así que todos los parámetros de abajo aplican igual.",
                          title: "Fuente")
             }
 
@@ -676,6 +686,12 @@ private struct ControlPanel: View {
 
             case .eye:
                 Text("Fuente generativa. Arrastrá sobre el preview para mover el ojo.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+            case .code:
+                Text("Sin entrada: un campo de caracteres al azar. La forma y el movimiento están en la sección Código; qué caracteres aparecen, en Charset.")
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1194,6 +1210,34 @@ private struct ControlPanel: View {
                         help: "A qué luminancia se lleva el promedio de la imagen. 0,5 lo centra en la rampa y usa todo el rango de glifos; más alto aclara y empuja la imagen hacia los caracteres densos; más bajo la oscurece.")
                 .disabled(model.autoLevelStrength <= 0)
             }
+        }
+    }
+
+    // MARK: Codigo
+
+    private var codeContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            PanelGroupLabel(text: "Renglones", help: "La forma del texto en la pantalla.")
+            ParamSlider(label: "Densidad", value: $model.codeDensity, range: 0...1,
+                        help: "Qué proporción del ancho ocupa un renglón lleno. En 1 llegan al borde derecho; bajándolo el bloque se angosta y queda aire alrededor.")
+            ParamSlider(label: "Renglones vacíos", value: $model.codeLineGap, range: 0...0.8,
+                        help: "Cuántos renglones quedan en blanco. Existe porque un bloque parejo de caracteres deja de leerse como código y pasa a leerse como ruido: los huecos son lo que le da respiración de texto.")
+            ParamSlider(label: "Desparejo", value: $model.codeRagged, range: 0...1,
+                        help: "Cuánto varían la sangría y el largo de cada renglón. En 0 son todos bloques iguales alineados a la izquierda; subiéndolo aparecen indentación y largos distintos, que es lo que hace que se lea como código y no como una tabla.")
+            ParamSlider(label: "Palabra", value: $model.codeWordLength, range: 1...16, decimals: 0,
+                        help: "Largo medio de los grupos de caracteres, en celdas. Corto da palabras sueltas tipo tokens; largo da tiradas macizas. Los espacios entre grupos salen de acá.")
+
+            PanelGroupLabel(text: "Movimiento", help: "Cómo cambia el campo con el tiempo.")
+            ParamSlider(label: "Avance", value: $model.codeScroll, range: -20...20, decimals: 1,
+                        help: "Renglones por segundo que sube el campo. En 0 queda quieto, en negativo baja. El avance es de a renglones enteros y no de a píxeles: la letra vive en su celda, así que un desplazamiento suave deslizaría el bloque encendido dejando las letras clavadas en el lugar.")
+            ParamSlider(label: "Mutación", value: $model.codeChurn, range: 0...30, decimals: 1,
+                        help: "Cambios de letra por segundo en cada celda. En 0 el texto queda fijo y sólo se mueve por el avance. Cada celda tiene su reloj desfasado, si no todas mutarían en el mismo cuadro y se vería un parpadeo global.")
+
+            PanelGroupLabel(text: "Brillo", help: "Cuánto pesa el campo contra el fondo.")
+            ParamSlider(label: "Nivel", value: $model.codeLevel, range: 0...1,
+                        help: "Brillo base. Bajo lo deja como fondo detrás de otra cosa; alto lo pone al frente.")
+            ParamSlider(label: "Variación", value: $model.codeVariation, range: 0...1,
+                        help: "Cuánto varía el brillo entre palabras. Sin variación el bloque queda plano; con variación algunos grupos se hunden y otros saltan, y el campo toma profundidad.")
         }
     }
 

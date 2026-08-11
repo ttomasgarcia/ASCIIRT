@@ -513,6 +513,41 @@ typedef struct {
 
     /// Cuantos globos hay en el buffer de rectangulos.
     uint32_t chatRectCount;
+
+    // --- Fuente Codigo -----------------------------------------------------
+    //
+    // Un campo de caracteres al azar organizado en renglones, para usar de
+    // fondo. No es una capa aparte: escribe en lumaRaw como cualquier fuente y
+    // solo se reserva la eleccion del glifo, porque la rampa elige por densidad
+    // y la densidad de un renglon de codigo es plana — sin pisar el indice,
+    // todas las celdas encendidas saldrian con la MISMA letra.
+
+    /// La fuente es el campo de codigo.
+    uint32_t codeEnabled;
+
+    /// Que proporcion del ancho ocupa un renglon lleno.
+    float codeDensity;
+
+    /// Cambios de letra por segundo en cada celda.
+    float codeChurn;
+
+    /// Renglones por segundo que sube el campo. En 0 queda quieto.
+    float codeScroll;
+
+    /// Proporcion de renglones vacios. Un bloque parejo se lee como ruido.
+    float codeLineGap;
+
+    /// Cuanto varian la sangria y el largo entre renglones.
+    float codeRagged;
+
+    /// Largo medio de las palabras, en celdas.
+    float codeWordLength;
+
+    /// Brillo base del campo.
+    float codeLevel;
+
+    /// Cuanto varia el brillo entre palabras.
+    float codeVariation;
 } RenderParams;
 
 #endif /* RenderParams_h */

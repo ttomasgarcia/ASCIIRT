@@ -115,6 +115,19 @@ struct PipelineConfig: Equatable {
     /// `true` = la fuente llena la salida y se recorta lo que sobra.
     var sourceFill = false
 
+    // MARK: Codigo
+    /// La fuente es el campo de codigo. Va junto con `generative`: el pipeline
+    /// no recibe frame y la imagen la escribe `codeKernel`.
+    var codeSource = false
+    var codeDensity: Float = 0.85
+    var codeChurn: Float = 6
+    var codeScroll: Float = 4
+    var codeLineGap: Float = 0.25
+    var codeRagged: Float = 0.6
+    var codeWordLength: Float = 5
+    var codeLevel: Float = 0.8
+    var codeVariation: Float = 0.5
+
     // MARK: Chat
     var chatEnabled = false
     var chatOnly = false
@@ -183,6 +196,7 @@ final class ASCIIPipeline {
     private let glyphIndexPSO: MTLComputePipelineState
     private let statsPSO: MTLComputePipelineState
     private let eyePSO: MTLComputePipelineState
+    private let codePSO: MTLComputePipelineState
     private let trailPSO: MTLComputePipelineState
     private let eyeTrailPSO: MTLComputePipelineState
     private let asciiPSO: MTLComputePipelineState
@@ -272,6 +286,7 @@ final class ASCIIPipeline {
         self.glyphIndexPSO = try ASCIIPipeline.makePSO(context, "glyphIndexKernel")
         self.statsPSO = try ASCIIPipeline.makePSO(context, "lumaStatsKernel")
         self.eyePSO = try ASCIIPipeline.makePSO(context, "eyeKernel")
+        self.codePSO = try ASCIIPipeline.makePSO(context, "codeKernel")
         self.trailPSO = try ASCIIPipeline.makePSO(context, "trailKernel")
         self.eyeTrailPSO = try ASCIIPipeline.makePSO(context, "eyeTrailKernel")
         self.asciiPSO = try ASCIIPipeline.makePSO(context, "asciiKernel")
@@ -419,7 +434,7 @@ final class ASCIIPipeline {
         encoder.setTexture(lumaRawTexture, index: Int(ASCIIRTTextureIndexLumaRaw.rawValue))
         encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
         if config.generative {
-            encoder.setComputePipelineState(eyePSO)
+            encoder.setComputePipelineState(config.codeSource ? codePSO : eyePSO)
             encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
             encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: eyePSO))
 
@@ -736,7 +751,16 @@ final class ASCIIPipeline {
                             chatBubbleB: config.chatBubbleColor.z,
                             chatBubbleAlpha: config.chatBubbleAlpha,
                             chatOffsetY: chat.pixelOffset,
-                            chatRectCount: UInt32(chat.rects.count))
+                            chatRectCount: UInt32(chat.rects.count),
+                            codeEnabled: config.codeSource ? 1 : 0,
+                            codeDensity: config.codeDensity,
+                            codeChurn: config.codeChurn,
+                            codeScroll: config.codeScroll,
+                            codeLineGap: config.codeLineGap,
+                            codeRagged: config.codeRagged,
+                            codeWordLength: config.codeWordLength,
+                            codeLevel: config.codeLevel,
+                            codeVariation: config.codeVariation)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

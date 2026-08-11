@@ -200,6 +200,35 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     uint index = decision.x;
     bool isEdge = decision.y != 0u;
 
+    // Fuente Codigo: la rampa ya decidio la densidad, pero todas las celdas
+    // encendidas tienen la MISMA —el generador escribe un nivel plano por
+    // celda— asi que saldrian todas con la misma letra. Aca se pisa el indice
+    // con uno al azar del charset, que es lo que hace que se lea como codigo y
+    // no como una barra maciza.
+    float codeLevel = 1.0;
+    if (params.codeEnabled != 0u && params.rampLength > 1u) {
+        const CodeCell field = codeField(tile, params);
+        codeLevel = field.level;
+        if (field.level > 0.0) {
+            // El reloj de cada celda arranca desfasado por su hash: si todas
+            // mutaran en el mismo frame se veria un parpadeo global en vez de
+            // caracteres cambiando por su cuenta.
+            const float step = floor(params.time * params.codeChurn
+                                     + hash21(tile) * 17.0);
+            const uint pick = uint(hash11(uint(step) * 2246822519u
+                                          ^ mixHash(uint(field.line) * 2654435761u
+                                                    ^ (tile.x * 3266489917u)))
+                                   * float(params.rampLength - 1u));
+            // Desde 1: el indice 0 es la celda vacia y apagaria la letra.
+            index = 1u + min(pick, params.rampLength - 2u);
+        } else {
+            index = 0u;
+        }
+        // Un glifo direccional congelado adentro del campo cortaria la lectura
+        // de texto mutando.
+        isEdge = false;
+    }
+
     // Solo se revuelven celdas que YA tenian algo. Revolver una celda vacia le
     // pone un caracter donde no habia nada, y eso llena el negro de basura hasta
     // tapar la imagen: deja de leerse como texto corrompido y pasa a ser ruido.
@@ -226,6 +255,7 @@ kernel void asciiKernel(texture2d<float, access::read>  grid   [[texture(ASCIIRT
     // `color` es el multiplicador de la tinta; lo pisa el modo Matrix, que trae
     // su propia paleta.
     float3 color = tint;
+    if (params.codeEnabled != 0u) { color *= codeLevel; }
     bool matrixOverride = false;
 
     if (params.matrixEnabled != 0u) {

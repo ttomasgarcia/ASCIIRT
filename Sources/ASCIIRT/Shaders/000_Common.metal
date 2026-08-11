@@ -73,3 +73,53 @@ static inline float glitchGate(float time, float rate, float duty, float chance,
     if (hash11(mixHash(burst)) > saturate(chance)) { return 0.0; }
     return (t - step) < saturate(duty) ? 1.0 : 0.0;
 }
+
+/// Campo de codigo: renglones de caracteres al azar, con sangria, largos
+/// desparejos y huecos entre palabras.
+///
+/// Lo comparten el generador —que escribe la imagen— y el pase ASCII —que elige
+/// que letra va en cada celda—. Tiene que ser UNA sola funcion: si cada uno
+/// derivara su propio renglon, el bloque encendido y la letra que lo llena se
+/// despegarian apenas el campo se desplaza.
+struct CodeCell {
+    int line;
+    float level;   // 0 = celda apagada
+};
+
+static inline CodeCell codeField(uint2 cell, constant RenderParams &params) {
+    CodeCell out;
+
+    // El desplazamiento es de a renglones ENTEROS. Uno suave, por pixel,
+    // deslizaria el bloque encendido dejando las letras quietas dentro de su
+    // celda: el campo se movería y el texto no.
+    const int line = int(cell.y) + int(floor(params.time * params.codeScroll));
+    out.line = line;
+    out.level = 0.0;
+
+    const uint lineSeed = mixHash(uint(line + 4096) * 2654435761u);
+
+    // Renglones vacios: el codigo respira. Un bloque parejo se lee como ruido.
+    if (hash11(lineSeed) < saturate(params.codeLineGap)) { return out; }
+
+    const float cols = float(max(params.gridSize.x, 1u));
+    const float ragged = saturate(params.codeRagged);
+
+    // El largo se mide DESDE la sangria, asi que subir el desparejo no corre el
+    // renglon entero hacia la derecha: lo acorta.
+    const float indent = floor(hash11(lineSeed ^ 0x27d4eb2fu) * ragged * cols * 0.30);
+    const float span = cols * saturate(params.codeDensity)
+        * mix(1.0, 0.25 + hash11(lineSeed ^ 0x165667b1u), ragged);
+
+    const float x = float(cell.x);
+    if (x < indent || x >= indent + span) { return out; }
+
+    // Palabras: grupos contiguos separados por espacios. Sin esto el renglon es
+    // una barra maciza de caracteres y deja de leerse como codigo.
+    const uint word = uint((x - indent) / max(params.codeWordLength, 1.0));
+    const float wordHash = hash11(lineSeed ^ mixHash(word * 374761393u));
+    if (wordHash < 0.22) { return out; }
+
+    out.level = mix(1.0, 0.35 + wordHash * 0.65, saturate(params.codeVariation))
+              * max(params.codeLevel, 0.0);
+    return out;
+}
