@@ -252,9 +252,18 @@ final class VideoWriter {
     /// exigencia es que entren TODOS los frames (spec §6).
     @discardableResult
     func appendSynchronously(_ buffer: CVPixelBuffer, at time: CMTime) -> Bool {
-        guard isRecording, let input, let adaptor else { return false }
+        guard isRecording, let input, let adaptor, let writer else { return false }
+        // La espera esta ACOTADA y mira el estado del escritor.
+        //
+        // Sin eso, cualquier situacion en la que el input no vuelva a estar
+        // listo cuelga la app para siempre en este while, sin error y sin forma
+        // de cancelar. Es lo que pasaba cuando el audio terminaba antes que el
+        // video: AVAssetWriter entrelaza las pistas y deja de dar por listo el
+        // input de video hasta que el de audio alcance el mismo tiempo, cosa que
+        // no iba a pasar nunca. Ahora eso se corta y se reporta.
         while !input.isReadyForMoreMediaData {
-            Thread.sleep(forTimeInterval: 0.002)
+            if writer.status == .failed || writer.status == .cancelled { return false }
+            if !waitForReady(input, writer: writer) { return false }
         }
         let ok = adaptor.append(buffer, withPresentationTime: time)
         queue.sync {
@@ -272,12 +281,36 @@ final class VideoWriter {
     /// Audio tal cual viene del archivo, sin decodificar ni recodificar.
     @discardableResult
     func appendAudio(_ sample: CMSampleBuffer) -> Bool {
-        guard let audioInput else { return false }
+        guard let audioInput, let writer else { return false }
         while !audioInput.isReadyForMoreMediaData {
-            Thread.sleep(forTimeInterval: 0.002)
+            if writer.status == .failed || writer.status == .cancelled { return false }
+            if !waitForReady(audioInput, writer: writer) { return false }
         }
         return audioInput.append(sample)
     }
+
+    /// Espera a que el input acepte mas datos, con techo. Devuelve `false` si se
+    /// agoto la espera: treinta segundos sin que el codificador acepte un frame
+    /// no es lentitud, es un bloqueo, y colgarse callado es peor que fallar.
+    private func waitForReady(_ input: AVAssetWriterInput, writer: AVAssetWriter) -> Bool {
+        var waited: TimeInterval = 0
+        while !input.isReadyForMoreMediaData {
+            if writer.status == .failed || writer.status == .cancelled { return false }
+            if waited > 30 {
+                stallDetected = true
+                return false
+            }
+            Thread.sleep(forTimeInterval: 0.002)
+            waited += 0.002
+        }
+        return true
+    }
+
+    /// El escritor dejo de aceptar datos y se corto la espera.
+    private(set) var stallDetected = false
+
+    /// Ultimo error del escritor, para poder decir por que fallo el render.
+    var writerError: Error? { writer?.error }
 
     var hasAudioInput: Bool { audioInput != nil }
 

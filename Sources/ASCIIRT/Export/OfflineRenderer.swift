@@ -207,7 +207,14 @@ final class OfflineRenderer {
                 let presentation = CMTime(value: CMTimeValue(frameIndex),
                                           timescale: CMTimeScale(fps.rounded()))
                 guard writer.appendSynchronously(target, at: presentation) else {
-                    throw AppError(.capture, "El escritor rechazó el frame \(frameIndex).")
+                    if writer.stallDetected {
+                        throw AppError(.capture,
+                                       "El escritor dejó de aceptar frames en el \(frameIndex).",
+                                       detail: "Se esperó treinta segundos sin que el codificador tomara un frame más. "
+                                             + "Probá con otro formato de salida.")
+                    }
+                    throw AppError(.capture, "El escritor rechazó el frame \(frameIndex).",
+                                   detail: writer.writerError?.localizedDescription)
                 }
             }
 
@@ -420,6 +427,16 @@ final class OfflineRenderer {
                 writer.appendAudio(sample)
             }
             reader.cancelReading()
+
+            // Avisar que la pista termino, SIEMPRE y apenas termina.
+            //
+            // AVAssetWriter entrelaza las pistas: mientras crea que todavia
+            // puede llegar audio, no da por listo el input de video pasado el
+            // ultimo audio que recibio. El audio casi siempre termina antes que
+            // el video, asi que sin esta linea el render se colgaba a pocos
+            // frames del final, esperando para siempre un audio que ya no
+            // existia.
+            writer.markAudioFinished()
         }
         DispatchQueue.global(qos: .userInitiated).async(execute: work)
         return work
