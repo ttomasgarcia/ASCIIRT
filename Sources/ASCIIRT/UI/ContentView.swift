@@ -49,6 +49,23 @@ struct ContentView: View {
                 .disabled(!(model.sourceKind == .eye || model.sourceKind == .chat
                             || model.sourceKind == .code))
             }
+            // Loop y Video nunca estan habilitados a la vez —uno es para las
+            // fuentes generativas y el otro para un archivo— asi que pueden
+            // compartir el estado del render sin que se confunda cual corre.
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    if model.isRendering { model.cancelOfflineRender() } else { model.startOfflineRender() }
+                } label: {
+                    Label(model.isRendering
+                          ? "\(Int(model.renderProgress.fraction * 100))%"
+                          : "Video",
+                          systemImage: model.isRendering ? "stop.fill" : "film")
+                }
+                .help(model.isRendering
+                      ? "Cancelar el render"
+                      : "Exportar el archivo entero con el efecto encima, de principio a fin y con su propia duración. Cuadro a cuadro sin reloj: no se pierde ninguno. El audio pasa sin recodificar.")
+                .disabled(model.sourceKind != .file || model.fileURL == nil)
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) { showControls.toggle() }
