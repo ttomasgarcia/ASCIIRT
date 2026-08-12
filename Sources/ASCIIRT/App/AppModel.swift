@@ -264,6 +264,10 @@ final class AppModel: ObservableObject {
 
     /// El ojo se dibuja. Apagado quedan solo las capas de encima sobre fondo
     /// limpio, sin perder los seteos del ojo ni su recorrido.
+    /// En el export de archivo, ajustar las frecuencias del efecto para que
+    /// entren enteras en la duracion del video. No toca el preview ni el REC.
+    @Published var loopEffectsOnFile = true
+
     @Published var eyeVisible = true { didSet { sync() } }
 
     @Published var chatEnabled = false { didSet { sync() } }
@@ -866,6 +870,7 @@ final class AppModel: ObservableObject {
         preset.codeWordLength = codeWordLength
         preset.codeLevel = codeLevel
         preset.codeVariation = codeVariation
+        preset.loopEffectsOnFile = loopEffectsOnFile
         preset.eyeVisible = eyeVisible
         preset.chatScale = chatScale
         preset.chatEntrance = chatEntrance.rawValue
@@ -1076,6 +1081,7 @@ final class AppModel: ObservableObject {
         codeWordLength = preset.codeWordLength
         codeLevel = preset.codeLevel
         codeVariation = preset.codeVariation
+        loopEffectsOnFile = preset.loopEffectsOnFile
         eyeVisible = preset.eyeVisible
         chatScale = preset.chatScale
         chatEntrance = ChatEntrance(rawValue: preset.chatEntrance) ?? .riseFade
@@ -1541,6 +1547,7 @@ final class AppModel: ObservableObject {
 
         offline.render(source: source, destination: destination,
                        config: config, codec: exportCodec,
+                       loopEffects: loopEffectsOnFile,
                        onProgress: { [weak self] progress in
                            self?.renderProgress = progress
                        },

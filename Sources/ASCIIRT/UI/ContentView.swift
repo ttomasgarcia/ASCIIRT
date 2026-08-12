@@ -1182,6 +1182,9 @@ private struct ControlPanel: View {
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            ParamToggle(label: "Efecto en loop", isOn: $model.loopEffectsOnFile,
+                        help: "Ajusta cada frecuencia del efecto —la lluvia de Matrix, la mutación de glifos, el glitch— al valor más cercano que complete un número entero de ciclos dentro de la duración del video. Así el último cuadro deja el efecto donde lo encuentra el primero y el archivo exportado empalma consigo mismo. En videos de decenas de segundos el redondeo mueve las velocidades menos de un 2%. Lo que no cierra por esto es lo que arrastra estado del material: la estela y la histéresis vienen de los cuadros anteriores del video, y el video en sí no tiene por qué empalmar. No toca el preview ni el REC.")
+
             HStack(spacing: 6) {
                 Button("Renderizar archivo…") { model.startOfflineRender() }
                     .controlSize(.small)

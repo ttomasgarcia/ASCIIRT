@@ -50,6 +50,7 @@ final class OfflineRenderer {
                 destination: URL,
                 config: PipelineConfig,
                 codec: ExportCodec,
+                loopEffects: Bool = false,
                 onProgress: @escaping (Progress) -> Void,
                 onFinish: @escaping (Result<Int, AppError>) -> Void) {
         cancelLock.lock(); cancelled = false; cancelLock.unlock()
@@ -58,7 +59,8 @@ final class OfflineRenderer {
             guard let self else { return }
             do {
                 let written = try self.run(source: source, destination: destination,
-                                           config: config, codec: codec, onProgress: onProgress)
+                                           config: config, codec: codec,
+                                           loopEffects: loopEffects, onProgress: onProgress)
                 DispatchQueue.main.async { onFinish(.success(written)) }
             } catch let error as AppError {
                 DispatchQueue.main.async { onFinish(.failure(error)) }
@@ -76,6 +78,7 @@ final class OfflineRenderer {
                      destination: URL,
                      config: PipelineConfig,
                      codec: ExportCodec,
+                     loopEffects: Bool,
                      onProgress: @escaping (Progress) -> Void) throws -> Int {
         let asset = AVURLAsset(url: source, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
 
@@ -94,6 +97,19 @@ final class OfflineRenderer {
         var jobConfig = config
         jobConfig.outputSize = SIMD2(UInt32(abs(displaySize.width).rounded()),
                                      UInt32(abs(displaySize.height).rounded()))
+
+        // Periodo de loop = lo que dura el archivo. Con esto cada frecuencia del
+        // efecto —la lluvia, la mutacion de glifos, el glitch— se redondea al
+        // valor mas cercano que complete un numero ENTERO de ciclos dentro del
+        // video, asi que el ultimo cuadro deja el efecto donde lo encuentra el
+        // primero y el clip empalma consigo mismo.
+        //
+        // Lo que NO cierra por esto es lo que arrastra estado del material:
+        // estela e histeresis vienen de los cuadros anteriores del video, y el
+        // video en si no tiene por que empalmar.
+        if loopEffects, duration.seconds > 0 {
+            jobConfig.loopPeriod = Float(duration.seconds)
+        }
 
         // El total es estimado: la unica cuenta exacta de frames de un archivo es
         // decodificarlo entero. Sirve para la barra, no para el criterio de
