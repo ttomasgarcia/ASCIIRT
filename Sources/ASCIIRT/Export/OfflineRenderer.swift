@@ -95,8 +95,19 @@ final class OfflineRenderer {
 
         let displaySize = naturalSize.applying(transform)
         var jobConfig = config
-        jobConfig.outputSize = SIMD2(UInt32(abs(displaySize.width).rounded()),
-                                     UInt32(abs(displaySize.height).rounded()))
+
+        // La resolucion de salida es la del PROYECTO, no la del archivo.
+        //
+        // Antes se pisaba siempre con el tamano natural del video, y como la
+        // celda no cambia, cambiaba la grilla: un archivo de 640x360 con el
+        // proyecto en 1080p exportaba 80x24 celdas donde el preview mostraba
+        // 240x72. Los caracteres salian tres veces mas grandes que lo que se
+        // habia estado mirando. Solo se toma el tamano del archivo cuando la
+        // salida esta puesta en «Fuente», que es justamente pedir eso.
+        if config.outputFollowsSource {
+            jobConfig.outputSize = SIMD2(UInt32(abs(displaySize.width).rounded()),
+                                         UInt32(abs(displaySize.height).rounded()))
+        }
 
         // Periodo de loop = lo que dura el archivo. Con esto cada frecuencia del
         // efecto —la lluvia, la mutacion de glifos, el glitch— se redondea al
