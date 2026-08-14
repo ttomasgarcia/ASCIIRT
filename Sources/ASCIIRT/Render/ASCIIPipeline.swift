@@ -133,6 +133,20 @@ struct PipelineConfig: Equatable {
     var codeLevel: Float = 0.8
     var codeVariation: Float = 0.5
 
+    // MARK: Audio
+    var audioSource = false
+    var audioStyle: UInt32 = 0
+    var audioAmplitude: Float = 0.7
+    var audioThickness: Float = 0.012
+    var audioSpan: Float = 0.8
+    var audioMirror = true
+    var audioGlow: Float = 0.02
+    var audioFill: Float = 0
+    var audioCenterY: Float = 0.5
+    var audioRadius: Float = 0.5
+    var audioBars: Float = 48
+    var audioReact: Float = 0.5
+
     // MARK: Chat
     var chatEnabled = false
     var eyeVisible = true
@@ -203,6 +217,7 @@ final class ASCIIPipeline {
     private let statsPSO: MTLComputePipelineState
     private let eyePSO: MTLComputePipelineState
     private let codePSO: MTLComputePipelineState
+    private let audioPSO: MTLComputePipelineState
     private let trailPSO: MTLComputePipelineState
     private let eyeTrailPSO: MTLComputePipelineState
     private let asciiPSO: MTLComputePipelineState
@@ -273,6 +288,11 @@ final class ASCIIPipeline {
 
     /// Globos de chat. El maquetado corre en CPU y deja una textura de grid.
     let chat = ChatLayer()
+
+    /// Onda del microfono y su nivel. Los pone el modelo cada frame; el pipeline
+    /// no captura audio, solo lo dibuja.
+    var audioTexture: MTLTexture?
+    var audioLevel: Float = 0
     private var textAtlas: TextAtlas?
 
     init(context: MetalContext, config: PipelineConfig) throws {
@@ -293,6 +313,7 @@ final class ASCIIPipeline {
         self.statsPSO = try ASCIIPipeline.makePSO(context, "lumaStatsKernel")
         self.eyePSO = try ASCIIPipeline.makePSO(context, "eyeKernel")
         self.codePSO = try ASCIIPipeline.makePSO(context, "codeKernel")
+        self.audioPSO = try ASCIIPipeline.makePSO(context, "audioKernel")
         self.trailPSO = try ASCIIPipeline.makePSO(context, "trailKernel")
         self.eyeTrailPSO = try ASCIIPipeline.makePSO(context, "eyeTrailKernel")
         self.asciiPSO = try ASCIIPipeline.makePSO(context, "asciiKernel")
@@ -441,7 +462,12 @@ final class ASCIIPipeline {
         encoder.setTexture(lumaRawTexture, index: Int(ASCIIRTTextureIndexLumaRaw.rawValue))
         encoder.setTexture(colorTexture, index: Int(ASCIIRTTextureIndexColor.rawValue))
         if config.generative {
-            encoder.setComputePipelineState(config.codeSource ? codePSO : eyePSO)
+            if config.audioSource {
+                encoder.setComputePipelineState(audioPSO)
+                encoder.setTexture(audioTexture, index: Int(ASCIIRTTextureIndexAudio.rawValue))
+            } else {
+                encoder.setComputePipelineState(config.codeSource ? codePSO : eyePSO)
+            }
             encoder.setTexture(eyeMaskTexture, index: Int(ASCIIRTTextureIndexEyeMask.rawValue))
             encoder.dispatchThreads(outputThreads, threadsPerThreadgroup: threadgroup(for: eyePSO))
 
@@ -769,7 +795,20 @@ final class ASCIIPipeline {
                             codeWordLength: config.codeWordLength,
                             codeLevel: config.codeLevel,
                             codeVariation: config.codeVariation,
-                            loopPeriod: config.loopPeriod)
+                            loopPeriod: config.loopPeriod,
+                            audioEnabled: config.audioSource ? 1 : 0,
+                            audioStyle: config.audioStyle,
+                            audioMirror: config.audioMirror ? 1 : 0,
+                            audioAmplitude: config.audioAmplitude,
+                            audioThickness: config.audioThickness,
+                            audioSpan: config.audioSpan,
+                            audioGlow: config.audioGlow,
+                            audioFill: config.audioFill,
+                            audioCenterY: config.audioCenterY,
+                            audioRadius: config.audioRadius,
+                            audioBars: config.audioBars,
+                            audioReact: config.audioReact,
+                            audioLevel: audioLevel)
     }
 
     /// Un threadgroup por tile (spec §1). Con celdas grandes (32x64 = 2048) se

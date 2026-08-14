@@ -1,3 +1,4 @@
+import CoreAudio
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -386,6 +387,7 @@ private struct ControlPanel: View {
     @State private var showEyeMotion = true
     @State private var showChat = true
     @State private var showCode = true
+    @State private var showAudio = true
     @State private var showGlitch = true
     @State private var showProject = true
     @State private var showCoverage = false
@@ -410,6 +412,15 @@ private struct ControlPanel: View {
                              isExpanded: $showSource) {
                     sourceContent
                 }
+                if model.sourceKind == .audio {
+                    Divider()
+                    PanelSection(title: "Audio", systemImage: "waveform",
+                                 help: "La onda del micrófono dibujada en el centro. No es una capa aparte: escribe una imagen en escala de grises igual que la cámara y pasa por el mismo pipeline, así que el glitch, la lluvia de Matrix, los glifos de borde, la estela y el export la afectan sin nada especial. Lo que se dibuja acá es tinta, no glifos — la rampa decide después qué carácter le toca a cada celda según cuánta hay.",
+                                 isExpanded: $showAudio) {
+                        audioContent
+                    }
+                }
+
                 if model.sourceKind == .code {
                     Divider()
                     PanelSection(title: "Código", systemImage: "chevron.left.forwardslash.chevron.right",
@@ -722,6 +733,12 @@ private struct ControlPanel: View {
 
             case .eye:
                 Text("Fuente generativa. Arrastrá sobre el preview para mover el ojo.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+            case .audio:
+                Text("Sin entrada de video: la onda del micrófono. Los seteos están en la sección Audio.")
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1257,6 +1274,76 @@ private struct ControlPanel: View {
                         help: "A qué luminancia se lleva el promedio de la imagen. 0,5 lo centra en la rampa y usa todo el rango de glifos; más alto aclara y empuja la imagen hacia los caracteres densos; más bajo la oscurece.")
                 .disabled(model.autoLevelStrength <= 0)
             }
+        }
+    }
+
+    // MARK: Audio
+
+    private var audioContent: some View {
+        VStack(alignment: .leading, spacing: PanelMetrics.rowSpacing) {
+            Picker("", selection: $model.audioStyle) {
+                Text("Onda").tag(0)
+                Text("Barras").tag(1)
+                Text("Anillo").tag(2)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+
+            HStack(spacing: 6) {
+                Picker("", selection: Binding(
+                    get: { model.selectedAudioDeviceID ?? 0 },
+                    set: { model.selectedAudioDeviceID = $0 == 0 ? nil : $0 }
+                )) {
+                    Text("— del sistema —").tag(AudioDeviceID(0))
+                    ForEach(model.audioDevices) { device in Text(device.name).tag(device.id) }
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                Button { model.refreshAudioDevices() } label: { Image(systemName: "arrow.clockwise") }
+                    .help("Actualizar la lista de entradas")
+                    .controlSize(.small)
+                HelpMark("Qué entrada se escucha. Vale la pena elegirla a mano: la entrada por defecto del sistema suele ser un dispositivo que existe pero no está entregando nada —unos AirPods guardados, un Zoom o Teams virtual— y eso se ve igual que un bug, con la onda plana y el nivel en cero. Mirá el Nivel de abajo y quedate con la que se mueve. Si tenés un dispositivo de loopback instalado aparece acá como una entrada más, y con eso tomás el audio del sistema en vez del ambiente.",
+                         title: "Entrada")
+            }
+
+            ParamReadout(label: "Permiso", value: model.audioPermission)
+            ParamReadout(label: "Nivel", value: String(format: "%.2f", model.audioMeter))
+
+            PanelGroupLabel(text: "Captura", help: "Cómo se lee el micrófono, antes de dibujar nada.")
+            ParamSlider(label: "Ganancia", value: $model.audioGain, range: 0.1...8, decimals: 2,
+                        help: "Multiplica lo que entra. Subilo si la onda queda plana, bajalo si satura y se ve una banda maciza.")
+            ParamSlider(label: "Suavizado", value: $model.audioSmoothing, range: 0...0.95,
+                        help: "Cuánto pesa el cuadro anterior. Existe porque la onda cruda tiembla cuadro a cuadro y la rampa —que cuantiza a celdas— convierte ese temblor en un hervidero ilegible. En 0 responde al instante y vibra; cerca de 1 se vuelve pesada y arrastra.")
+
+            PanelGroupLabel(text: "Forma", help: "Cómo se dibuja la onda.")
+            ParamSlider(label: "Amplitud", value: $model.audioAmplitude, range: 0...2, decimals: 2,
+                        help: "Alto de la onda, en fracción de la media pantalla.")
+            ParamSlider(label: "Grosor", value: $model.audioThickness, range: 0.002...0.15, decimals: 3,
+                        help: "Grosor del trazo, en fracción de la altura. Muy fino cae adentro de una sola celda y sale como puntos sueltos: para eso está el halo.")
+            ParamSlider(label: "Halo", value: $model.audioGlow, range: 0...0.2, decimals: 3,
+                        help: "Difuminado alrededor del trazo. Es lo que le da cuerpo al pasar por la rampa — el degradé del halo es lo que hace que aparezcan caracteres de distinta densidad en vez de un borde duro.")
+            ParamSlider(label: "Relleno", value: $model.audioFill, range: 0...1,
+                        help: "Cuánta tinta hay entre el trazo y el eje. En 0 es sólo la línea; subiéndolo la onda se vuelve un bloque sólido.")
+            if model.audioStyle == 2 {
+                ParamSlider(label: "Radio", value: $model.audioRadius, range: 0.05...1.5, decimals: 2,
+                            help: "Radio del anillo, en fracción de la media altura.")
+            } else {
+                ParamSlider(label: "Ancho", value: $model.audioSpan, range: 0.1...1,
+                            help: "Qué fracción del ancho ocupa. Menos de 1 deja aire a los dos lados.")
+                if model.audioStyle == 1 {
+                    ParamSlider(label: "Barras", value: $model.audioBars, range: 4...160, decimals: 0,
+                                help: "Cuántas barras tiene el espectro. Más que celdas de ancho tiene la grilla no agrega nada: la rampa no puede resolverlas.")
+                }
+                ParamToggle(label: "Espejo", isOn: $model.audioMirror,
+                            help: "Refleja la onda del otro lado del eje. Es lo que le da la simetría de visualizador clásico.")
+            }
+            ParamSlider(label: "Posición", value: $model.audioCenterY, range: 0...1,
+                        help: "Centro vertical, de arriba a abajo.")
+
+            PanelGroupLabel(text: "Reacción", help: "Cuánto responde el tamaño al volumen.")
+            ParamSlider(label: "Reactividad", value: $model.audioReact, range: 0...1,
+                        help: "Cuánto agranda el volumen a la onda además de moverla. En 0 el tamaño no depende del nivel y sólo cambia la forma, que es lo que hace falta cuando la onda tiene que quedar estable en cuadro.")
         }
     }
 

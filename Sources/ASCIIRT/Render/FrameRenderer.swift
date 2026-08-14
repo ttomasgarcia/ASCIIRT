@@ -45,6 +45,11 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
     /// la imagen. Va siempre con `continuousRedraw`.
     var generative = false
 
+    /// Se llama al principio de cada draw, en el hilo del display link. Lo usa
+    /// la fuente Audio para dejar la onda del frame antes de encodear: subirla
+    /// desde el hilo de audio seria escribir una textura mientras la GPU la lee.
+    var beforeDraw: (() -> Void)?
+
     /// Se consulta en cada draw en vez de empujarse desde Vision: asi el matte
     /// que entra al frame es siempre el ultimo disponible, sin sincronizacion
     /// entre la cola de Vision y el render.
@@ -207,6 +212,8 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
+        beforeDraw?()
+
         bufferLock.lock()
         let buffer = pendingBuffer ?? lastBuffer
         if pendingBuffer != nil { lastTime = pendingTime }

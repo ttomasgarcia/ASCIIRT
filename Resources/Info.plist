@@ -20,6 +20,8 @@
 	<string>14.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ASCIIRT dibuja la onda del micrófono como ASCII en tiempo real.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>ASCIIRT convierte la imagen de la cámara a ASCII en tiempo real.</string>
 	<key>NSPrincipalClass</key>

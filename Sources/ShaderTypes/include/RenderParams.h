@@ -68,6 +68,7 @@ typedef ASCIIRT_ENUM(EnumBackingType, ASCIIRTTextureIndex) {
     ASCIIRTTextureIndexTrailOut = 24, ///< R16F lo que ven las etapas de abajo: fuente + rastro
     ASCIIRTTextureIndexChat = 25,     ///< RG8Uint por celda: (indice de caracter + 1, opacidad del globo)
     ASCIIRTTextureIndexTextAtlas = 26,///< R8Unorm, atlas de texto para los globos
+    ASCIIRTTextureIndexAudio = 27,    ///< RG32F 1 x N: R onda en -1..1, G espectro en 0..1
 };
 
 /// Un globo de chat, en PIXELES de salida.
@@ -566,6 +567,53 @@ typedef struct {
     /// El redondeo mueve las velocidades menos de un 2% con periodos de decenas
     /// de segundos, asi que el preview y el loop se ven iguales.
     float loopPeriod;
+
+    // --- Fuente Audio ------------------------------------------------------
+    //
+    // La onda del microfono dibujada en el centro. Como cualquier fuente,
+    // escribe en lumaRaw y color: el glitch, la lluvia, el codigo, la estela y
+    // el export la afectan sin que haya que tocarlos.
+
+    /// La fuente es la onda de audio.
+    uint32_t audioEnabled;
+
+    /// 0 onda, 1 barras de espectro, 2 anillo.
+    uint32_t audioStyle;
+
+    /// Reflejar la onda hacia el otro lado del eje.
+    uint32_t audioMirror;
+
+    /// Alto de la onda, en fraccion de la media pantalla.
+    float audioAmplitude;
+
+    /// Grosor del trazo, en fraccion de la altura.
+    float audioThickness;
+
+    /// Que fraccion del ancho ocupa.
+    float audioSpan;
+
+    /// Halo alrededor del trazo. Es lo que le da cuerpo al pasar por la rampa:
+    /// una linea de un pixel cae adentro de una sola celda y sale como puntos
+    /// sueltos en vez de como una onda.
+    float audioGlow;
+
+    /// Relleno entre el trazo y el eje.
+    float audioFill;
+
+    /// Centro vertical, en 0..1 desde arriba.
+    float audioCenterY;
+
+    /// Radio del anillo, en fraccion de la media altura.
+    float audioRadius;
+
+    /// Cuantas barras tiene el espectro.
+    float audioBars;
+
+    /// Cuanto agranda el volumen a la onda. En 0 el tamano no depende del nivel.
+    float audioReact;
+
+    /// Nivel general en 0..1, medido en CPU y ya suavizado.
+    float audioLevel;
 } RenderParams;
 
 #endif /* RenderParams_h */

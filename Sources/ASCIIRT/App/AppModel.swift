@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import AppKit
 import Combine
 import CoreVideo
@@ -15,6 +16,8 @@ enum SourceKind: String, CaseIterable, Identifiable {
     case chat = "Chat"
     /// Sin entrada tampoco: un campo de caracteres al azar, para usar de fondo.
     case code = "Código"
+    /// Sin entrada de video: la onda del microfono dibujada en el centro.
+    case audio = "Audio"
 
     var id: String { rawValue }
 }
@@ -266,6 +269,55 @@ final class AppModel: ObservableObject {
     /// limpio, sin perder los seteos del ojo ni su recorrido.
     /// En el export de archivo, ajustar las frecuencias del efecto para que
     /// entren enteras en la duracion del video. No toca el preview ni el REC.
+    // MARK: Audio
+
+    /// 0 onda, 1 barras, 2 anillo.
+    @Published var audioStyle: Int = 0 { didSet { sync() } }
+    @Published var audioAmplitude: Double = 0.7 { didSet { sync() } }
+    @Published var audioThickness: Double = 0.012 { didSet { sync() } }
+    @Published var audioSpan: Double = 0.8 { didSet { sync() } }
+    @Published var audioMirror = true { didSet { sync() } }
+    @Published var audioGlow: Double = 0.02 { didSet { sync() } }
+    @Published var audioFill: Double = 0 { didSet { sync() } }
+    @Published var audioCenterY: Double = 0.5 { didSet { sync() } }
+    @Published var audioRadius: Double = 0.5 { didSet { sync() } }
+    @Published var audioBars: Double = 48 { didSet { sync() } }
+    @Published var audioReact: Double = 0.5 { didSet { sync() } }
+    /// Suavizado temporal de la captura. No es un parametro de dibujo: sin el,
+    /// la onda tiembla cuadro a cuadro y la rampa lo vuelve un hervidero.
+    @Published var audioSmoothing: Double = 0.5 { didSet { audio.smoothing = Float(audioSmoothing) } }
+    @Published var audioGain: Double = 1 { didSet { audio.gain = Float(audioGain) } }
+    /// Nivel medido, solo para mostrar en el panel.
+    @Published var audioMeter: Double = 0
+
+    let audio = AudioEngine()
+    @Published var audioDevices: [AudioEngine.Device] = []
+    /// `nil` = la entrada que tenga puesta el sistema.
+    @Published var selectedAudioDeviceID: AudioDeviceID? {
+        didSet {
+            // Se guarda el NOMBRE, no el id: CoreAudio reasigna los ids al
+            // reiniciar o al conectar otra cosa, asi que un id guardado apunta
+            // despues a un dispositivo cualquiera —o a ninguno— y la fuente
+            // vuelve sola al default silencioso.
+            audioDeviceName = audioDevices.first { $0.id == selectedAudioDeviceID }?.name ?? ""
+            guard sourceKind == .audio else { return }
+            audio.stop()
+            audio.deviceID = selectedAudioDeviceID
+            startAudio()
+        }
+    }
+
+    /// Nombre de la entrada elegida. Es lo que sobrevive entre sesiones.
+    @Published var audioDeviceName: String = ""
+
+    /// Estado del permiso de microfono, para mostrarlo.
+    ///
+    /// Sin esto, un permiso no concedido se ve identico a un dispositivo mudo o
+    /// a una sala en silencio: onda plana y nivel cero. Ponerlo a la vista
+    /// convierte una falla invisible en una que se lee.
+    @Published var audioPermission = "—"
+    private var meterTicks = 0
+
     @Published var loopEffectsOnFile = true
 
     @Published var eyeVisible = true { didSet { sync() } }
@@ -613,6 +665,29 @@ final class AppModel: ObservableObject {
         // sin mensajes y la pantalla queda negra con el chat encendido.
         syncChat()
 
+        // Al abrir con la fuente ya en Audio, `switchSource` no corre —no hubo
+        // cambio— asi que el microfono no arrancaba solo y el nivel se quedaba
+        // en cero para siempre. Mismo caso que cualquier fuente que necesite
+        // encender algo al aparecer.
+        if sourceKind == .audio { startAudio() }
+
+        // La onda se sube en el hilo del display link, justo antes de encodear.
+        // Hacerlo desde el hilo de audio seria escribir la textura mientras la
+        // GPU la esta leyendo.
+        renderer.beforeDraw = { [weak self] in
+            guard let self, self.sourceKind == .audio else { return }
+            self.renderer.ascii.audioTexture = self.audio.makeTexture(device: self.metal.device)
+            let levels = self.audio.currentLevels
+            self.renderer.ascii.audioLevel = levels.x
+            // El medidor es solo para mirar, asi que se publica a 10 Hz: un
+            // @Published por frame le roba tiempo al render, que corre en main.
+            self.meterTicks += 1
+            if self.meterTicks >= 6 {
+                self.meterTicks = 0
+                self.audioMeter = Double(levels.x)
+            }
+        }
+
         openFileObserver = NotificationCenter.default.addObserver(
             forName: .asciirtOpenFile, object: nil, queue: .main
         ) { [weak self] note in
@@ -632,10 +707,23 @@ final class AppModel: ObservableObject {
         guard !isApplyingPreset else { return }
 
         var next = PipelineConfig()
-        next.generative = sourceKind == .eye || sourceKind == .chat || sourceKind == .code
+        next.generative = sourceKind == .eye || sourceKind == .chat
+            || sourceKind == .code || sourceKind == .audio
         next.eyeVisible = eyeVisible
         next.chatOnly = sourceKind == .chat
         next.codeSource = sourceKind == .code
+        next.audioSource = sourceKind == .audio
+        next.audioStyle = UInt32(max(audioStyle, 0))
+        next.audioAmplitude = Float(audioAmplitude)
+        next.audioThickness = Float(audioThickness)
+        next.audioSpan = Float(audioSpan)
+        next.audioMirror = audioMirror
+        next.audioGlow = Float(audioGlow)
+        next.audioFill = Float(audioFill)
+        next.audioCenterY = Float(audioCenterY)
+        next.audioRadius = Float(audioRadius)
+        next.audioBars = Float(audioBars)
+        next.audioReact = Float(audioReact)
         next.codeDensity = Float(codeDensity)
         next.codeChurn = Float(codeChurn)
         next.codeScroll = Float(codeScroll)
@@ -870,6 +958,20 @@ final class AppModel: ObservableObject {
         preset.codeWordLength = codeWordLength
         preset.codeLevel = codeLevel
         preset.codeVariation = codeVariation
+        preset.audioDeviceName = audioDeviceName
+        preset.audioStyle = audioStyle
+        preset.audioAmplitude = audioAmplitude
+        preset.audioThickness = audioThickness
+        preset.audioSpan = audioSpan
+        preset.audioMirror = audioMirror
+        preset.audioGlow = audioGlow
+        preset.audioFill = audioFill
+        preset.audioCenterY = audioCenterY
+        preset.audioRadius = audioRadius
+        preset.audioBars = audioBars
+        preset.audioReact = audioReact
+        preset.audioSmoothing = audioSmoothing
+        preset.audioGain = audioGain
         preset.loopEffectsOnFile = loopEffectsOnFile
         preset.eyeVisible = eyeVisible
         preset.chatScale = chatScale
@@ -1081,6 +1183,20 @@ final class AppModel: ObservableObject {
         codeWordLength = preset.codeWordLength
         codeLevel = preset.codeLevel
         codeVariation = preset.codeVariation
+        audioDeviceName = preset.audioDeviceName
+        audioStyle = preset.audioStyle
+        audioAmplitude = preset.audioAmplitude
+        audioThickness = preset.audioThickness
+        audioSpan = preset.audioSpan
+        audioMirror = preset.audioMirror
+        audioGlow = preset.audioGlow
+        audioFill = preset.audioFill
+        audioCenterY = preset.audioCenterY
+        audioRadius = preset.audioRadius
+        audioBars = preset.audioBars
+        audioReact = preset.audioReact
+        audioSmoothing = preset.audioSmoothing
+        audioGain = preset.audioGain
         loopEffectsOnFile = preset.loopEffectsOnFile
         eyeVisible = preset.eyeVisible
         chatScale = preset.chatScale
@@ -1314,6 +1430,7 @@ final class AppModel: ObservableObject {
         case .camera: camera.stop()
         case .file: file.stop()
         case .eye, .chat, .code: break
+        case .audio: audio.stop()
         }
         isRunning = false
         format = nil
@@ -1370,6 +1487,15 @@ final class AppModel: ObservableObject {
             isPlaying = false
             sourceSize = SIMD2(1920, 1080)
             isRunning = true
+        
+        case .audio:
+            fileURL = nil
+            duration = 0
+            currentTime = 0
+            isPlaying = false
+            sourceSize = SIMD2(1920, 1080)
+            isRunning = true
+            startAudio()
         }
         syncRenderFlags()
         sync()
@@ -1382,12 +1508,13 @@ final class AppModel: ObservableObject {
     /// quedaba apagado y la pantalla en negro. Un solo metodo, llamado desde
     /// todos los didSet que puedan afectarlos.
     private func syncRenderFlags() {
-        renderer.generative = sourceKind == .eye || sourceKind == .chat || sourceKind == .code
+        renderer.generative = sourceKind == .eye || sourceKind == .chat
+            || sourceKind == .code || sourceKind == .audio
         renderer.asciiEnabled = asciiEnabled
         // El generador anima por reloj, no por frame de entrada: sin repintado
         // continuo quedaria congelado en el primer cuadro.
         renderer.continuousRedraw = matrixEnabled || sourceKind == .eye
-            || sourceKind == .chat || sourceKind == .code
+            || sourceKind == .chat || sourceKind == .code || sourceKind == .audio
         matte.isEnabled = subjectMatteEnabled
     }
 
@@ -1433,6 +1560,37 @@ final class AppModel: ObservableObject {
         refreshCameras()
         isRunning = true
         camera.start(deviceID: selectedCameraID)
+    }
+
+    /// Arranca el microfono. El permiso lo pide el sistema la primera vez.
+    func refreshAudioDevices() {
+        audioDevices = AudioEngine.devices()
+    }
+
+    private func startAudio() {
+        refreshAudioDevices()
+        audioPermission = ["sin decidir", "restringido", "denegado", "concedido"][
+            Int(AVCaptureDevice.authorizationStatus(for: .audio).rawValue)]
+        // Resolver el nombre guardado contra los dispositivos de ahora.
+        if selectedAudioDeviceID == nil, !audioDeviceName.isEmpty {
+            selectedAudioDeviceID = audioDevices.first { $0.name == audioDeviceName }?.id
+        }
+        audio.deviceID = selectedAudioDeviceID
+        audio.smoothing = Float(audioSmoothing)
+        audio.gain = Float(audioGain)
+        AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.audioPermission = granted ? "concedido" : "denegado"
+                guard granted else {
+                    self.report(AppError(.permissions, "Acceso al micrófono denegado.",
+                                         detail: "Ajustes del Sistema › Privacidad y seguridad › Micrófono → habilitar ASCIIRT."))
+                    return
+                }
+                do { try self.audio.start() } catch let error as AppError { self.report(error) }
+                catch { self.report(AppError(.capture, "No se pudo arrancar el audio.", underlying: error)) }
+            }
+        }
     }
 
     func stopCapture() {
@@ -1659,7 +1817,7 @@ extension AppModel: FrameSourceDelegate {
         switch sourceKind {
         case .camera: return source === camera
         case .file: return source === file
-        case .eye, .chat, .code: return false   // los generadores no entregan frames por delegate
+        case .eye, .chat, .code, .audio: return false   // los generadores no entregan frames por delegate
         }
     }
 
