@@ -10,11 +10,10 @@ import Metal
 /// textura de 1 x N con la forma de onda ya suavizada. El shader la lee como un
 /// arreglo: no hay geometría que subir ni buffers que sincronizar.
 ///
-/// **Por qué el micrófono y no el audio del sistema:** macOS no deja capturar la
-/// salida sin un dispositivo virtual de por medio (BlackHole, Loopback) o sin
-/// ScreenCaptureKit y su permiso de grabación de pantalla. El micrófono funciona
-/// con parlantes en la sala, que es el caso de un vivo, y si alguien instala un
-/// dispositivo virtual aparece en la lista de entradas como cualquier otro.
+/// Toma una entrada —micrófono o cualquier dispositivo del sistema— o, con
+/// `useSystemAudio`, la salida de la Mac a través de `SystemAudioCapture`. Las
+/// dos vías terminan en el mismo análisis: el resto de la clase no sabe de dónde
+/// vinieron las muestras.
 final class AudioEngine {
 
     /// Muestras que ve el shader. Potencia de dos por el FFT, y 512 alcanza:
@@ -132,24 +131,29 @@ final class AudioEngine {
 
     /// Capturar la salida de la Mac en vez de una entrada.
     ///
-    /// Va por ScreenCaptureKit, que desde macOS 13 entrega el audio del sistema
-    /// sin driver de por medio. La alternativa clasica —BlackHole, Loopback— hay
-    /// que instalarla con contrasena de administrador y aparece como un
-    /// dispositivo mas; esto no necesita nada, solo el permiso de grabacion de
-    /// pantalla.
+    /// Va por los taps de proceso de Core Audio: sin driver, sin permiso de
+    /// grabacion de pantalla y sin tocar la configuracion de sonido.
     var useSystemAudio = false
 
-    private var systemCapture: SystemAudioCapture?
+    /// `Any` porque el tipo concreto sólo existe en 14.2 y una propiedad
+    /// almacenada no puede llevar `@available`.
+    private var systemCapture: AnyObject?
 
-    /// Por que no hay audio del sistema, si es que no lo hay. ScreenCaptureKit
-    /// falla de forma asincrona —el permiso se resuelve despues de arrancar— asi
-    /// que el error no puede viajar por el `throw` de `start`.
-    var systemFailure: String? { systemCapture?.failure }
+    /// Por que no hay audio del sistema, si es que no lo hay.
+    var systemFailure: String? {
+        guard #available(macOS 14.2, *) else { return nil }
+        return (systemCapture as? SystemAudioCapture)?.failure
+    }
 
     func start() throws {
         guard !isRunning else { return }
 
         if useSystemAudio {
+            guard #available(macOS 14.2, *) else {
+                throw AppError(.capture, "El audio del sistema necesita macOS 14.2 o posterior.",
+                               detail: "Es la versión en la que aparecieron los taps de Core Audio. "
+                                     + "Mientras tanto podés elegir una entrada de la lista.")
+            }
             let capture = SystemAudioCapture { [weak self] samples, count in
                 self?.consume(samples, count: count)
             }
@@ -196,9 +200,11 @@ final class AudioEngine {
 
     func stop() {
         guard isRunning else { return }
-        if let systemCapture {
-            systemCapture.stop()
-            self.systemCapture = nil
+        if #available(macOS 14.2, *), let capture = systemCapture as? SystemAudioCapture {
+            capture.stop()
+            systemCapture = nil
+        } else if systemCapture != nil {
+            systemCapture = nil
         } else {
             engine.inputNode.removeTap(onBus: 0)
             engine.stop()

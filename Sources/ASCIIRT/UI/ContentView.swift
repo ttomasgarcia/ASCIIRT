@@ -1291,7 +1291,7 @@ private struct ControlPanel: View {
             .controlSize(.small)
 
             ParamToggle(label: "Audio de la Mac", isOn: $model.audioFromSystem,
-                        help: "Toma lo que está sonando en la computadora en vez de una entrada: Spotify, un video, lo que sea. Va por ScreenCaptureKit, que entrega el audio del sistema sin driver de por medio — la alternativa clásica es instalar un dispositivo virtual tipo BlackHole o Loopback, que pide contraseña de administrador. La primera vez macOS pide permiso de grabación de pantalla; es el permiso que gobierna esta API, aunque acá no se guarde ni un cuadro de imagen. El audio de la propia app queda excluido para que no se escuche a sí misma.")
+                        help: "Toma lo que está sonando en la computadora en vez de una entrada: Spotify, un video, lo que sea. Va por los taps de proceso de Core Audio: se engancha un tap a la salida del sistema y se lee de un dispositivo agregado privado, que no aparece en Ajustes de Sonido ni en otras apps. El audio sigue sonando por los parlantes — el tap escucha, no intercepta. No pide permiso de grabación de pantalla, no instala ningún driver y no cambia la configuración de sonido de la máquina.")
 
             if !model.audioFromSystem {
             HStack(spacing: 6) {
@@ -1313,11 +1313,9 @@ private struct ControlPanel: View {
             }
 
             ParamReadout(label: "Permiso", value: model.audioPermission)
-            if model.audioPermission.contains("denegado") {
+            if model.audioPermission.contains("denegado") && !model.audioFromSystem {
                 Button("Abrir Ajustes de privacidad…") {
-                    let pane = model.audioFromSystem
-                        ? "Privacy_ScreenCapture" : "Privacy_Microphone"
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
                         NSWorkspace.shared.open(url)
                     }
                 }

@@ -696,15 +696,13 @@ final class AppModel: ObservableObject {
             if self.meterTicks >= 6 {
                 self.meterTicks = 0
                 self.audioMeter = Double(levels.x)
-                // El fallo de ScreenCaptureKit llega despues de arrancar, asi que
-                // se mira aca en vez de en el throw de start().
+                // El fallo del tap se mira aca y no en el throw de start(): el
+                // sistema decide si esta app puede escuchar recien al arrancar el
+                // dispositivo, y eso pasa despues.
                 if self.audioFromSystem, let failure = self.audio.systemFailure {
-                    self.audioPermission = "pantalla: " + failure
-                    self.report(AppError(.permissions,
-                                         "Falta el permiso de grabación de pantalla.",
-                                         detail: "Es el que gobierna la captura del audio del sistema, aunque no se guarde "
-                                               + "ni un cuadro de imagen. Ajustes del Sistema › Privacidad y seguridad › "
-                                               + "Grabación de pantalla → habilitar ASCIIRT, y volver a abrir la app."))
+                    self.audioPermission = "falló"
+                    self.report(AppError(.capture, "No se pudo tomar el audio del sistema.",
+                                         detail: failure))
                 }
             }
         }
@@ -1603,10 +1601,10 @@ final class AppModel: ObservableObject {
         audio.deviceID = selectedAudioDeviceID
         audio.smoothing = Float(audioSmoothing)
         audio.gain = Float(audioGain)
-        // El audio del sistema no pasa por el permiso de microfono sino por el
-        // de grabacion de pantalla, que lo pide macOS solo la primera vez.
+        // El audio del sistema no pasa por el permiso de microfono: el tap de
+        // Core Audio lo autoriza el sistema al arrancar el dispositivo.
         if audioFromSystem {
-            audioPermission = "pantalla"
+            audioPermission = "tap del sistema"
             do { try audio.start() } catch let error as AppError { report(error) }
             catch { report(AppError(.capture, "No se pudo tomar el audio del sistema.", underlying: error)) }
             return

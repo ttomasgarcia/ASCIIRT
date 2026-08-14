@@ -20,6 +20,8 @@
 	<string>14.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>ASCIIRT dibuja como ASCII el audio que está sonando en la Mac. No graba ni guarda el sonido.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ASCIIRT dibuja la onda del micrófono como ASCII en tiempo real.</string>
 	<key>NSCameraUsageDescription</key>

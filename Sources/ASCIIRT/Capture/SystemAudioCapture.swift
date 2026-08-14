@@ -1,121 +1,224 @@
+import AudioToolbox
 import AVFoundation
+import CoreAudio
 import Foundation
-import ScreenCaptureKit
 
-/// Captura el audio que está sonando en la Mac, sin driver de por medio.
+/// Captura el audio que está sonando en la Mac.
 ///
-/// ScreenCaptureKit entrega el audio del sistema desde macOS 13. La alternativa
-/// clásica es un dispositivo virtual de loopback —BlackHole, Loopback—, que hay
-/// que instalar con contraseña de administrador; esto no necesita nada instalado,
-/// solo el permiso de grabación de pantalla.
+/// Usa los **taps de proceso de Core Audio** (macOS 14.2+): se engancha un tap a
+/// la salida del sistema, se arma un dispositivo agregado privado que lo tiene
+/// como entrada, y se lee de ahí con un IOProc. El audio sigue sonando por los
+/// parlantes — el tap escucha, no intercepta.
 ///
-/// **Se pide un stream de video igual.** SCStream no tiene modo solo-audio: hay
-/// que darle un filtro de pantalla. Se pide el mínimo que acepta y un cuadro cada
-/// tanto, así el costo es despreciable y el frame se descarta sin mirarlo.
+/// **Por qué no ScreenCaptureKit.** También entrega el audio del sistema, pero
+/// pasa por el permiso de Grabación de pantalla: para escuchar música habría que
+/// autorizar a la app a ver la pantalla, que es muchísimo más de lo que hace
+/// falta. Esta vía no pide nada de eso.
 ///
-/// **Se excluye el audio propio.** Sin eso, si alguna vez la app llega a emitir
-/// sonido, se escucharía a sí misma y realimentaría la onda.
-final class SystemAudioCapture: NSObject, SCStreamOutput {
+/// **Por qué no un dispositivo de loopback.** BlackHole y Loopback funcionan, y
+/// si están instalados aparecen igual en el selector de entrada. Pero hay que
+/// instalarlos con contraseña de administrador y reconfigurar la salida del
+/// sistema para que pase por ellos. Esto no toca nada de la máquina.
+///
+/// Los taps llegaron en macOS 14.2. Por debajo de eso la app sigue andando y lo
+/// único que no está es este toggle, así que no justifica subir el mínimo.
+@available(macOS 14.2, *)
+final class SystemAudioCapture {
 
-    /// Recibe muestras mono intercaladas ya listas para analizar.
+    /// Recibe muestras mono ya listas para analizar.
     private let onSamples: (UnsafePointer<Float>, Int) -> Void
 
-    private var stream: SCStream?
-    private let queue = DispatchQueue(label: "asciirt.systemaudio", qos: .userInitiated)
+    private var tapID = AudioObjectID(kAudioObjectUnknown)
+    private var aggregateID = AudioObjectID(kAudioObjectUnknown)
+    private var procID: AudioDeviceIOProcID?
 
     /// Último error, para que el modelo pueda contar por qué no hay sonido.
     private(set) var failure: String?
+
+    /// Buffer de mezcla reutilizado. Reservarlo por callback allocaría en el
+    /// hilo de audio, que es donde no se puede.
+    private var mono = [Float](repeating: 0, count: 8192)
 
     init(onSamples: @escaping (UnsafePointer<Float>, Int) -> Void) {
         self.onSamples = onSamples
     }
 
+    // MARK: - Arranque
+
     func start() {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let content = try await SCShareableContent.excludingDesktopWindows(
-                    false, onScreenWindowsOnly: false)
-                guard let display = content.displays.first else {
-                    self.failure = "No hay pantalla desde donde tomar el audio."
-                    return
-                }
+        do {
+            try build()
+            failure = nil
+        } catch let error as AppError {
+            failure = error.detail ?? error.message
+            teardown()
+        } catch {
+            failure = error.localizedDescription
+            teardown()
+        }
+    }
 
-                let filter = SCContentFilter(display: display, excludingWindows: [])
-                let configuration = SCStreamConfiguration()
-                configuration.capturesAudio = true
-                configuration.excludesCurrentProcessAudio = true
-                configuration.sampleRate = 48_000
-                configuration.channelCount = 2
-                // El video es peaje, no contenido: el mínimo tamaño y un cuadro
-                // cada dos segundos.
-                configuration.width = 2
-                configuration.height = 2
-                configuration.minimumFrameInterval = CMTime(value: 1, timescale: 2)
-                configuration.queueDepth = 3
+    private func build() throws {
+        // Tap global: toda la salida, sin excluir ningún proceso. `.unmuted` es
+        // lo que hace que el audio se siga escuchando mientras se lo mira.
+        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
+        description.name = "ASCIIRT"
+        description.isPrivate = true
+        description.muteBehavior = .unmuted
 
-                let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
-                try stream.addStreamOutput(self, type: .audio,
-                                           sampleHandlerQueue: self.queue)
-                try await stream.startCapture()
-                self.stream = stream
-                self.failure = nil
-            } catch {
-                // El rechazo de TCC llega como un error largo y en tono de
-                // sistema. Se traduce a lo unico accionable: falta el permiso.
-                let ns = error as NSError
-                // -3801 = userDeclined. La constante no esta expuesta en Swift.
-                let declined = ns.domain == SCStreamErrorDomain && ns.code == -3801
-                self.failure = declined ? "permiso denegado" : error.localizedDescription
-            }
+        var tap = AudioObjectID(kAudioObjectUnknown)
+        let created = AudioHardwareCreateProcessTap(description, &tap)
+        guard created == noErr else {
+            throw AppError(.capture, "No se pudo enganchar la salida de audio.",
+                           detail: status(created, "crear el tap"))
+        }
+        tapID = tap
+
+        // El agregado necesita un dispositivo de reloj: se usa la salida por
+        // defecto, que es de donde viene el audio que se quiere escuchar.
+        guard let outputUID = defaultOutputUID() else {
+            throw AppError(.capture, "No se encontró la salida de audio del sistema.")
+        }
+
+        var tapUID: CFString = "" as CFString
+        var uidSize = UInt32(MemoryLayout<CFString>.size)
+        var uidAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioTapPropertyUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(tapID, &uidAddress, 0, nil,
+                                         &uidSize, &tapUID) == noErr else {
+            throw AppError(.capture, "No se pudo identificar el tap de audio.")
+        }
+
+        // Privado: el agregado no aparece en Ajustes de Sonido ni en la lista de
+        // dispositivos de otras apps. Es un detalle interno, no un dispositivo
+        // que el usuario tenga que ver ni elegir.
+        let aggregate: [String: Any] = [
+            kAudioAggregateDeviceNameKey: "ASCIIRT audio del sistema",
+            kAudioAggregateDeviceUIDKey: "tv.tomasgarcia.asciirt.tap",
+            kAudioAggregateDeviceMainSubDeviceKey: outputUID,
+            kAudioAggregateDeviceIsPrivateKey: true,
+            kAudioAggregateDeviceIsStackedKey: false,
+            kAudioAggregateDeviceTapAutoStartKey: true,
+            kAudioAggregateDeviceSubDeviceListKey: [],
+            kAudioAggregateDeviceTapListKey: [
+                [kAudioSubTapUIDKey: tapUID,
+                 kAudioSubTapDriftCompensationKey: true]
+            ]
+        ]
+
+        var device = AudioObjectID(kAudioObjectUnknown)
+        let made = AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &device)
+        guard made == noErr else {
+            throw AppError(.capture, "No se pudo armar el dispositivo de captura.",
+                           detail: status(made, "crear el agregado"))
+        }
+        aggregateID = device
+
+        var proc: AudioDeviceIOProcID?
+        let installed = AudioDeviceCreateIOProcIDWithBlock(&proc, aggregateID, nil) {
+            [weak self] _, inputData, _, _, _ in
+            self?.receive(inputData)
+        }
+        guard installed == noErr, let proc else {
+            throw AppError(.capture, "No se pudo instalar la lectura de audio.",
+                           detail: status(installed, "crear el IOProc"))
+        }
+        procID = proc
+
+        let started = AudioDeviceStart(aggregateID, proc)
+        guard started == noErr else {
+            // Es acá donde cae la falta de permiso: el tap se crea, el agregado
+            // se arma, y recién al arrancar el sistema decide si esta app puede
+            // escuchar. Se traduce a algo accionable en vez del código crudo.
+            let detail = started == 1_768_910_707   // 'priv' — sin autorización
+                ? "macOS no autorizó a ASCIIRT a escuchar el audio del sistema."
+                : status(started, "arrancar el dispositivo")
+            throw AppError(.capture, "No se pudo arrancar el audio del sistema.", detail: detail)
         }
     }
 
     func stop() {
-        guard let stream else { return }
-        self.stream = nil
-        Task { try? await stream.stopCapture() }
+        teardown()
     }
 
-    // MARK: - SCStreamOutput
+    private func teardown() {
+        if aggregateID != kAudioObjectUnknown, let procID {
+            AudioDeviceStop(aggregateID, procID)
+            AudioDeviceDestroyIOProcID(aggregateID, procID)
+        }
+        procID = nil
+        if aggregateID != kAudioObjectUnknown {
+            AudioHardwareDestroyAggregateDevice(aggregateID)
+            aggregateID = AudioObjectID(kAudioObjectUnknown)
+        }
+        if tapID != kAudioObjectUnknown {
+            AudioHardwareDestroyProcessTap(tapID)
+            tapID = AudioObjectID(kAudioObjectUnknown)
+        }
+    }
 
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
-                of type: SCStreamOutputType) {
-        guard type == .audio, CMSampleBufferDataIsReady(sampleBuffer) else { return }
+    deinit { teardown() }
 
-        var listSize = 0
-        var block: CMBlockBuffer?
-        guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sampleBuffer, bufferListSizeNeededOut: &listSize, bufferListOut: nil,
-            bufferListSize: 0, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil,
-            flags: 0, blockBufferOut: nil) == noErr else { return }
+    // MARK: - Lectura
 
-        let raw = UnsafeMutableRawPointer.allocate(byteCount: listSize, alignment: 16)
-        defer { raw.deallocate() }
-        let list = raw.assumingMemoryBound(to: AudioBufferList.self)
-
-        guard CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sampleBuffer, bufferListSizeNeededOut: nil, bufferListOut: list,
-            bufferListSize: listSize, blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
-            blockBufferOut: &block) == noErr else { return }
-
-        let buffers = UnsafeMutableAudioBufferListPointer(list)
+    /// Corre en el hilo de audio de Core Audio: sin locks, sin allocaciones.
+    private func receive(_ inputData: UnsafePointer<AudioBufferList>) {
+        let buffers = UnsafeMutableAudioBufferListPointer(
+            UnsafeMutablePointer(mutating: inputData))
         guard let first = buffers.first,
               let data = first.mData?.assumingMemoryBound(to: Float.self) else { return }
-        let frames = Int(first.mDataByteSize) / MemoryLayout<Float>.size
-        guard frames > 0 else { return }
 
-        // ScreenCaptureKit entrega los canales por separado. Se suman a mono: la
-        // onda es una sola línea, y quedarse con el canal izquierdo perdería lo
-        // que esté paneado a la derecha.
-        if buffers.count > 1, let second = buffers[1].mData?.assumingMemoryBound(to: Float.self) {
-            var mono = [Float](repeating: 0, count: frames)
-            for i in 0..<frames { mono[i] = (data[i] + second[i]) * 0.5 }
-            mono.withUnsafeBufferPointer { onSamples($0.baseAddress!, frames) }
-        } else {
+        let channels = Int(first.mNumberChannels)
+        let frames = Int(first.mDataByteSize) / MemoryLayout<Float>.size / max(channels, 1)
+        guard frames > 0, frames <= mono.count else { return }
+
+        if channels <= 1 {
             onSamples(data, frames)
+            return
         }
+
+        // A mono. Quedarse con el canal izquierdo perdería lo que esté paneado a
+        // la derecha, y la onda es una sola línea de todos modos.
+        for i in 0..<frames {
+            var sum: Float = 0
+            for c in 0..<channels { sum += data[i * channels + c] }
+            mono[i] = sum / Float(channels)
+        }
+        mono.withUnsafeBufferPointer { onSamples($0.baseAddress!, frames) }
+    }
+
+    // MARK: - Auxiliares
+
+    private func defaultOutputUID() -> String? {
+        var id = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                         &address, 0, nil, &size, &id) == noErr else { return nil }
+
+        var uid: CFString = "" as CFString
+        var uidSize = UInt32(MemoryLayout<CFString>.size)
+        var uidAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(id, &uidAddress, 0, nil,
+                                         &uidSize, &uid) == noErr else { return nil }
+        return uid as String
+    }
+
+    /// Los OSStatus de Core Audio son cuatro caracteres empaquetados en un
+    /// entero; impresos como número no dicen nada.
+    private func status(_ code: OSStatus, _ what: String) -> String {
+        let value = UInt32(bitPattern: code)
+        let chars = [24, 16, 8, 0].map { Character(UnicodeScalar(UInt8((value >> $0) & 0xff))) }
+        let readable = chars.allSatisfy { $0.isLetter || $0.isNumber || $0 == " " }
+            ? String(chars) : String(code)
+        return "Falló al \(what): \(readable)."
     }
 }
