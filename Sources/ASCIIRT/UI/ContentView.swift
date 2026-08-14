@@ -1290,6 +1290,10 @@ private struct ControlPanel: View {
             .labelsHidden()
             .controlSize(.small)
 
+            ParamToggle(label: "Audio de la Mac", isOn: $model.audioFromSystem,
+                        help: "Toma lo que está sonando en la computadora en vez de una entrada: Spotify, un video, lo que sea. Va por ScreenCaptureKit, que entrega el audio del sistema sin driver de por medio — la alternativa clásica es instalar un dispositivo virtual tipo BlackHole o Loopback, que pide contraseña de administrador. La primera vez macOS pide permiso de grabación de pantalla; es el permiso que gobierna esta API, aunque acá no se guarde ni un cuadro de imagen. El audio de la propia app queda excluido para que no se escuche a sí misma.")
+
+            if !model.audioFromSystem {
             HStack(spacing: 6) {
                 Picker("", selection: Binding(
                     get: { model.selectedAudioDeviceID ?? 0 },
@@ -1306,8 +1310,19 @@ private struct ControlPanel: View {
                 HelpMark("Qué entrada se escucha. Vale la pena elegirla a mano: la entrada por defecto del sistema suele ser un dispositivo que existe pero no está entregando nada —unos AirPods guardados, un Zoom o Teams virtual— y eso se ve igual que un bug, con la onda plana y el nivel en cero. Mirá el Nivel de abajo y quedate con la que se mueve. Si tenés un dispositivo de loopback instalado aparece acá como una entrada más, y con eso tomás el audio del sistema en vez del ambiente.",
                          title: "Entrada")
             }
+            }
 
             ParamReadout(label: "Permiso", value: model.audioPermission)
+            if model.audioPermission.contains("denegado") {
+                Button("Abrir Ajustes de privacidad…") {
+                    let pane = model.audioFromSystem
+                        ? "Privacy_ScreenCapture" : "Privacy_Microphone"
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .controlSize(.small)
+            }
             ParamReadout(label: "Nivel", value: String(format: "%.2f", model.audioMeter))
 
             PanelGroupLabel(text: "Captura", help: "Cómo se lee el micrófono, antes de dibujar nada.")

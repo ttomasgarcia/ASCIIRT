@@ -77,6 +77,7 @@ struct Preset: Codable, Equatable {
     // Chat
     var chatScript: String = ""
     var chatEnabled: Bool = false
+    var audioFromSystem: Bool = false
     var audioDeviceName: String = ""
     var audioStyle: Int = 0
     var audioAmplitude: Double = 0.7
@@ -270,6 +271,7 @@ struct Preset: Codable, Equatable {
         codeVariation = c.value(.codeVariation, d.codeVariation)
         chatScript = c.value(.chatScript, d.chatScript)
         chatEnabled = c.value(.chatEnabled, d.chatEnabled)
+        audioFromSystem = c.value(.audioFromSystem, d.audioFromSystem)
         audioDeviceName = c.value(.audioDeviceName, d.audioDeviceName)
         audioStyle = c.value(.audioStyle, d.audioStyle)
         audioAmplitude = c.value(.audioAmplitude, d.audioAmplitude)

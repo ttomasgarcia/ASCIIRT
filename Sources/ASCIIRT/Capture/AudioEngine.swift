@@ -130,8 +130,34 @@ final class AudioEngine {
 
     // MARK: - Ciclo
 
+    /// Capturar la salida de la Mac en vez de una entrada.
+    ///
+    /// Va por ScreenCaptureKit, que desde macOS 13 entrega el audio del sistema
+    /// sin driver de por medio. La alternativa clasica —BlackHole, Loopback— hay
+    /// que instalarla con contrasena de administrador y aparece como un
+    /// dispositivo mas; esto no necesita nada, solo el permiso de grabacion de
+    /// pantalla.
+    var useSystemAudio = false
+
+    private var systemCapture: SystemAudioCapture?
+
+    /// Por que no hay audio del sistema, si es que no lo hay. ScreenCaptureKit
+    /// falla de forma asincrona —el permiso se resuelve despues de arrancar— asi
+    /// que el error no puede viajar por el `throw` de `start`.
+    var systemFailure: String? { systemCapture?.failure }
+
     func start() throws {
         guard !isRunning else { return }
+
+        if useSystemAudio {
+            let capture = SystemAudioCapture { [weak self] samples, count in
+                self?.consume(samples, count: count)
+            }
+            systemCapture = capture
+            capture.start()
+            isRunning = true
+            return
+        }
 
         let input = engine.inputNode
 
@@ -170,8 +196,13 @@ final class AudioEngine {
 
     func stop() {
         guard isRunning else { return }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        if let systemCapture {
+            systemCapture.stop()
+            self.systemCapture = nil
+        } else {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+        }
         isRunning = false
 
         // Dejar el estado en cero, no congelado: una onda quieta a mitad de
@@ -189,7 +220,12 @@ final class AudioEngine {
     /// sin tocar nada de UI.
     private func consume(_ buffer: AVAudioPCMBuffer) {
         guard let channel = buffer.floatChannelData?[0] else { return }
-        let count = Int(buffer.frameLength)
+        consume(channel, count: Int(buffer.frameLength))
+    }
+
+    /// El analisis no sabe de donde vienen las muestras: lo comparten el tap del
+    /// microfono y la captura del audio del sistema.
+    private func consume(_ channel: UnsafePointer<Float>, count: Int) {
         guard count > 0 else { return }
 
         let n = AudioEngine.bins

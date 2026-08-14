@@ -293,12 +293,23 @@ final class AppModel: ObservableObject {
     let audio = AudioEngine()
     @Published var audioDevices: [AudioEngine.Device] = []
     /// `nil` = la entrada que tenga puesta el sistema.
+    /// Tomar el audio que suena en la Mac en vez de una entrada.
+    @Published var audioFromSystem = false {
+        didSet {
+            audioDeviceName = audioFromSystem ? "«sistema»" : ""
+            guard sourceKind == .audio else { return }
+            audio.stop()
+            startAudio()
+        }
+    }
+
     @Published var selectedAudioDeviceID: AudioDeviceID? {
         didSet {
             // Se guarda el NOMBRE, no el id: CoreAudio reasigna los ids al
             // reiniciar o al conectar otra cosa, asi que un id guardado apunta
             // despues a un dispositivo cualquiera —o a ninguno— y la fuente
             // vuelve sola al default silencioso.
+            guard !audioFromSystem else { return }
             audioDeviceName = audioDevices.first { $0.id == selectedAudioDeviceID }?.name ?? ""
             guard sourceKind == .audio else { return }
             audio.stop()
@@ -685,6 +696,16 @@ final class AppModel: ObservableObject {
             if self.meterTicks >= 6 {
                 self.meterTicks = 0
                 self.audioMeter = Double(levels.x)
+                // El fallo de ScreenCaptureKit llega despues de arrancar, asi que
+                // se mira aca en vez de en el throw de start().
+                if self.audioFromSystem, let failure = self.audio.systemFailure {
+                    self.audioPermission = "pantalla: " + failure
+                    self.report(AppError(.permissions,
+                                         "Falta el permiso de grabación de pantalla.",
+                                         detail: "Es el que gobierna la captura del audio del sistema, aunque no se guarde "
+                                               + "ni un cuadro de imagen. Ajustes del Sistema › Privacidad y seguridad › "
+                                               + "Grabación de pantalla → habilitar ASCIIRT, y volver a abrir la app."))
+                }
             }
         }
 
@@ -958,6 +979,7 @@ final class AppModel: ObservableObject {
         preset.codeWordLength = codeWordLength
         preset.codeLevel = codeLevel
         preset.codeVariation = codeVariation
+        preset.audioFromSystem = audioFromSystem
         preset.audioDeviceName = audioDeviceName
         preset.audioStyle = audioStyle
         preset.audioAmplitude = audioAmplitude
@@ -1183,6 +1205,7 @@ final class AppModel: ObservableObject {
         codeWordLength = preset.codeWordLength
         codeLevel = preset.codeLevel
         codeVariation = preset.codeVariation
+        audioFromSystem = preset.audioFromSystem
         audioDeviceName = preset.audioDeviceName
         audioStyle = preset.audioStyle
         audioAmplitude = preset.audioAmplitude
@@ -1572,12 +1595,23 @@ final class AppModel: ObservableObject {
         audioPermission = ["sin decidir", "restringido", "denegado", "concedido"][
             Int(AVCaptureDevice.authorizationStatus(for: .audio).rawValue)]
         // Resolver el nombre guardado contra los dispositivos de ahora.
-        if selectedAudioDeviceID == nil, !audioDeviceName.isEmpty {
+        if audioDeviceName == "«sistema»" { audioFromSystem = true }
+        if !audioFromSystem, selectedAudioDeviceID == nil, !audioDeviceName.isEmpty {
             selectedAudioDeviceID = audioDevices.first { $0.name == audioDeviceName }?.id
         }
+        audio.useSystemAudio = audioFromSystem
         audio.deviceID = selectedAudioDeviceID
         audio.smoothing = Float(audioSmoothing)
         audio.gain = Float(audioGain)
+        // El audio del sistema no pasa por el permiso de microfono sino por el
+        // de grabacion de pantalla, que lo pide macOS solo la primera vez.
+        if audioFromSystem {
+            audioPermission = "pantalla"
+            do { try audio.start() } catch let error as AppError { report(error) }
+            catch { report(AppError(.capture, "No se pudo tomar el audio del sistema.", underlying: error)) }
+            return
+        }
+
         AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
             DispatchQueue.main.async {
                 guard let self else { return }
